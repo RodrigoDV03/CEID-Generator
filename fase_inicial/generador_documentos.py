@@ -6,7 +6,7 @@ from tkinter import messagebox
 from datetime import datetime
 from utils import *
 
-def generar_documentos(ruta_excel, hoja_seleccionada):
+def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino):
 
     meses = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -18,7 +18,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada):
 
     datos = pd.read_excel(ruta_excel, sheet_name=hoja_seleccionada)
 
-    carpeta_principal = 'FASE INICIAL'
+    carpeta_principal = os.path.join(carpeta_destino, 'FASE INICIAL')
     os.makedirs(carpeta_principal, exist_ok=True)
 
     for i, fila in enumerate(datos.itertuples(index=False), start=1):

@@ -1,32 +1,21 @@
+import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import os
 import pandas as pd
-from generador_documentos import *
+from constants import *
+from generador import *
 
 
 # --- VENTANA PRINCIPAL ---
 root = tk.Tk()
-root.title("Generador de Archivos Fase Inicial CEID")
+root.title("Generador de Conformidades - FASE FINAL")
 root.geometry("560x380")
-root.configure(bg="#f4f6fa")
+root.configure(bg=BG_COLOR)
 root.resizable(False, False)
-
-# --- ESTILOS ---
-PRIMARY_COLOR = "#2d415a"
-ACCENT_COLOR = "#4a90e2"
-BG_COLOR = "#f4f6fa"
-TEXT_COLOR = "#333"
-DISABLED_COLOR = "#bbb"
-
-FONT_TITLE = ("Segoe UI", 17, "bold")
-FONT_LABEL = ("Segoe UI", 11)
-FONT_BUTTON = ("Segoe UI", 10)
-FONT_FOOTER = ("Segoe UI", 9)
 
 # --- ENCABEZADO ---
 tk.Label(
-    root, text="Generador de Archivos Fase Inicial CEID",
+    root, text="Generador de Conformidades - FASE FINAL",
     font=FONT_TITLE, bg=BG_COLOR, fg=PRIMARY_COLOR
 ).pack(pady=(20, 10))
 
@@ -88,52 +77,47 @@ hoja_menu = tk.OptionMenu(frame_hoja, hoja_var, "")
 hoja_menu.config(font=FONT_BUTTON, width=25)
 hoja_menu.pack(side="left", padx=(10, 0))
 
+# --- SELECCIÓN DE CARPETA DE SALIDA ---
+frame_salida = tk.Frame(root, bg=BG_COLOR)
+frame_salida.pack(fill="x", padx=30, pady=(15, 0))
 
-# --- SELECCIÓN DE CARPETA DESTINO ---
-frame_carpeta = tk.Frame(root, bg=BG_COLOR)
-frame_carpeta.pack(fill="x", padx=30, pady=(10, 0))
-
-label_carpeta = tk.Label(
-    frame_carpeta,
+label_salida = tk.Label(
+    frame_salida,
     text="Ninguna carpeta seleccionada",
     fg="red", bg=BG_COLOR,
     font=("Segoe UI", 10, "italic")
 )
-label_carpeta.pack(side="left", padx=(0, 10))
+label_salida.pack(side="left", padx=(0, 10))
 
-carpeta_destino = {"ruta": None}
-
-def seleccionar_carpeta():
-    ruta = filedialog.askdirectory(
-        title="Seleccionar carpeta de destino"
-    )
+def seleccionar_salida():
+    ruta = filedialog.askdirectory(title="Seleccionar carpeta de salida base")
     if ruta:
-        carpeta_destino["ruta"] = ruta
-        label_carpeta.config(text=f"📂 {ruta}", fg="green")
+        label_salida.config(text=f"📂 {os.path.basename(ruta)}", fg="green")
+        boton_generar.carpeta_salida = ruta
 
 tk.Button(
-    frame_carpeta,
-    text="Seleccionar carpeta de destino",
-    command=seleccionar_carpeta,
+    frame_salida,
+    text="Seleccionar carpeta",
+    command=seleccionar_salida,
     font=FONT_BUTTON,
     bg=ACCENT_COLOR, fg="white",
     activebackground="#357ABD", activeforeground="white",
     relief="flat", padx=10, pady=4
 ).pack(side="right")
 
-
 # --- BOTÓN GENERAR ---
 def iniciar_generacion():
     hoja = hoja_var.get()
     ruta = getattr(boton_generar, "ruta_excel", None)
-    carpeta = carpeta_destino.get("ruta")
-    if not hoja or not ruta:
-        messagebox.showerror("Error", "Debe seleccionar un archivo y una hoja.")
+    carpeta = getattr(boton_generar, "carpeta_salida", None)
+    if not hoja or not ruta or not carpeta:
+        messagebox.showerror("Error", "Debe seleccionar un archivo, una hoja y una carpeta de salida.")
         return
-    if not carpeta:
-        messagebox.showerror("Error", "Debe seleccionar una carpeta de destino.")
-        return
-    generar_documentos(ruta, hoja, carpeta)
+    try:
+        procesar_planilla(ruta, hoja, carpeta)
+        messagebox.showinfo("Proceso finalizado", "Los documentos han sido generados exitosamente.")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
 
 boton_generar = tk.Button(
     root,
@@ -147,12 +131,32 @@ boton_generar = tk.Button(
     relief="flat",
     padx=12, pady=8
 )
-boton_generar.pack(pady=35)
+boton_generar.pack(pady=30)
+
+# --- AYUDA ---
+def mostrar_ayuda():
+    messagebox.showinfo(
+        "Ayuda",
+        "1. Seleccione el archivo Excel con los datos.\n"
+        "2. Elija la hoja correspondiente.\n"
+        "3. Seleccione la carpeta donde se guardarán los documentos.\n"
+        "4. Presione 'Generar documentos'."
+    )
+
+tk.Button(
+    root,
+    text="Ayuda",
+    command=mostrar_ayuda,
+    font=FONT_BUTTON,
+    bg=ACCENT_COLOR, fg="white",
+    activebackground="#357ABD", activeforeground="white",
+    relief="flat", padx=8, pady=3
+).pack()
 
 # --- PIE DE PÁGINA ---
 tk.Label(
     root,
-    text="CEID Generator - v1.0",
+    text="CEID Generator - FASE FINAL",
     font=FONT_FOOTER,
     bg=BG_COLOR,
     fg="#a0a8b8"

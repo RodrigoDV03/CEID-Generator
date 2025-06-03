@@ -103,9 +103,12 @@ def generar_planilla(ruta_cursos, ruta_clasificacion, mes_seleccionado):
         )
 
         año_actual = datetime.datetime.now().year
+        carpeta_salida = f"{mes_seleccionado} {año_actual}"
+        if not os.path.exists(carpeta_salida):
+            os.makedirs(carpeta_salida)
         nombre_salida = f"Planilla_{mes_seleccionado}_{año_actual}.xlsx"
 
-        with pd.ExcelWriter(nombre_salida, engine='openpyxl') as writer:
+        with pd.ExcelWriter(os.path.join(carpeta_salida, nombre_salida), engine='openpyxl') as writer:
             # Hoja principal
             TABLA.to_excel(writer, sheet_name=f"Planilla {mes_seleccionado}", index=False)
 
