@@ -1,4 +1,4 @@
-from interfaz_gui import iniciar_generacion
+from interfaz_gui import *
 
 if __name__ == "__main__":
-    iniciar_generacion()
+    pass

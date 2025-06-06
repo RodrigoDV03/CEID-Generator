@@ -1,5 +1,6 @@
 import os
 import tkinter as tk
+from datetime import datetime
 from tkinter import ttk, filedialog, messagebox
 import pandas as pd
 from constants import *
@@ -77,6 +78,28 @@ hoja_menu = tk.OptionMenu(frame_hoja, hoja_var, "")
 hoja_menu.config(font=FONT_BUTTON, width=25)
 hoja_menu.pack(side="left", padx=(10, 0))
 
+# --- SELECCIÓN DE MES Y AÑO ---
+frame_fecha = tk.Frame(root, bg=BG_COLOR)
+frame_fecha.pack(fill="x", padx=30, pady=(15, 0))
+
+tk.Label(frame_fecha, text="Mes:", font=FONT_LABEL, bg=BG_COLOR, fg=TEXT_COLOR).pack(side="left")
+
+meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+mes_var = tk.StringVar(value=meses[datetime.now().month - 1])
+mes_menu = tk.OptionMenu(frame_fecha, mes_var, *meses)
+mes_menu.config(font=FONT_BUTTON)
+mes_menu.pack(side="left", padx=(5, 20))
+
+tk.Label(frame_fecha, text="Año:", font=FONT_LABEL, bg=BG_COLOR, fg=TEXT_COLOR).pack(side="left")
+
+año_actual = datetime.now().year
+años = list(range(año_actual - 5, año_actual + 6))
+año_var = tk.StringVar(value=str(año_actual))
+año_menu = tk.OptionMenu(frame_fecha, año_var, *años)
+año_menu.config(font=FONT_BUTTON)
+año_menu.pack(side="left", padx=(5, 0))
+
 # --- SELECCIÓN DE CARPETA DE SALIDA ---
 frame_salida = tk.Frame(root, bg=BG_COLOR)
 frame_salida.pack(fill="x", padx=30, pady=(15, 0))
@@ -110,12 +133,17 @@ def iniciar_generacion():
     hoja = hoja_var.get()
     ruta = getattr(boton_generar, "ruta_excel", None)
     carpeta = getattr(boton_generar, "carpeta_salida", None)
-    if not hoja or not ruta or not carpeta:
-        messagebox.showerror("Error", "Debe seleccionar un archivo, una hoja y una carpeta de salida.")
+    mes = mes_var.get()
+    año = año_var.get()
+    if not hoja or not ruta or not carpeta or not mes or not año:
+        messagebox.showerror("Error", "Debe seleccionar todos los campos: archivo, hoja, carpeta, mes y año.")
         return
     try:
-        procesar_planilla(ruta, hoja, carpeta)
-        messagebox.showinfo("Proceso finalizado", "Los documentos han sido generados exitosamente.")
+        generados, errores = procesar_planilla(ruta, hoja, carpeta, mes, año)
+        msg = f"Documentos generados: {len(generados)}"
+        if errores:
+            msg += "\n\nErrores:\n" + "\n".join([f"{d}: {e}" for d, e in errores])
+        messagebox.showinfo("Proceso finalizado", msg)
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
 

@@ -1,14 +1,16 @@
 import os
-import datetime
+from datetime import datetime
 import pandas as pd
 from docx import Document
 from utils import *
 
-def generar_conformidad_desde_excel(fila, plantilla_path, carpeta_base):
+def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
+
     docente = str(getattr(fila, "Docente", "N/A"))
     nombre_docente = limpiar_nombre_archivo(docente)
-    carpeta_final = os.path.join(carpeta_base, "FASE FINAL", nombre_docente)
-    os.makedirs(carpeta_final, exist_ok=True)
+
+    if not os.path.exists(plantilla_path):
+        raise FileNotFoundError(f"No se encontró la plantilla: {plantilla_path}")
 
     ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
     descripcion_raw = str(getattr(fila, "Curso", ""))
@@ -24,7 +26,7 @@ def generar_conformidad_desde_excel(fila, plantilla_path, carpeta_base):
     else:
         categoria_valor = int(categoria_valor)
 
-    clasif_cant_horas = clasif_valor / categoria_valor
+    clasif_cant_horas = clasif_valor / categoria_valor if categoria_valor else 0
     horas_clasif = f"{int(round(clasif_cant_horas))} horas de clasificación"
 
     if clasif_valor == 0:
@@ -54,34 +56,61 @@ def generar_conformidad_desde_excel(fila, plantilla_path, carpeta_base):
 
     doc = Document(plantilla_path)
     for p in doc.paragraphs:
-        if "nombre" in p.text:
-            p.text = p.text.replace("nombre", nombre_docente)
-        if "numero_ruc" in p.text:
-            p.text = p.text.replace("numero_ruc", ruc)
-        if "descripcion" in p.text:
-            p.text = p.text.replace("descripcion", descripcion_final)
-        if "numero_orden" in p.text:
-            p.text = p.text.replace("numero_orden", "______________")
-        if "monto_subtotal" in p.text:
-            p.text = p.text.replace("monto_subtotal", f"S/. {monto_total_str} ({monto_total_letras})")
-        if "categoria_monto" in p.text:
-            p.text = p.text.replace("categoria_monto", f"S/. {monto_categoria:.2f} ({monto_categoria_letras})")
-        if "fecha" in p.text:
-            p.text = p.text.replace("fecha", fecha_formateada)
+        for run in p.runs:
+            if "nombre" in run.text:
+                run.text = run.text.replace("nombre", nombre_docente)
+            if "ruc" in run.text:
+                run.text = run.text.replace("ruc", ruc)
+            if "descripcion_cursos" in run.text:
+                run.text = run.text.replace("descripcion_cursos", descripcion_final)
+            if "numero_orden" in run.text:
+                run.text = run.text.replace("numero_orden", "______________")
+            if "monto_subtotal" in run.text:
+                run.text = run.text.replace("monto_subtotal", f"S/. {monto_total_str} ({monto_total_letras})")
+            if "monto_hora" in run.text:
+                run.text = run.text.replace("monto_hora", f"S/. {monto_categoria:.2f} ({monto_categoria_letras})")
+            if "fecha" in run.text:
+                run.text = run.text.replace("fecha", fecha_formateada)
 
-    nombre_archivo = f"CONFORMIDAD - {nombre_docente} - {hoy.month} {hoy.year}.docx"
-    output_path = os.path.join(carpeta_final, nombre_archivo)
-    doc.save(output_path)
-    return output_path
+    carpeta_final = os.path.dirname(ruta_salida)
+    os.makedirs(carpeta_final, exist_ok=True)
 
-def procesar_planilla(excel_path, hoja, carpeta_base):
-    plantilla_path = os.path.join("Modelos_documentos", "CONFORMIDAD - MODELO.docx")
-    df = pd.read_excel(excel_path, sheet_name=hoja)
-    generados, errores = [], []
+    try:
+        doc.save(ruta_salida)
+    except Exception as e:
+        print(f"Error al guardar {ruta_salida}: {e}")
+        raise
+    return ruta_salida
+
+
+def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
+    df = pd.read_excel(ruta_excel, sheet_name=hoja)
+    generados = []
+    errores = []
+
     for _, fila in df.iterrows():
         try:
-            output = generar_conformidad_desde_excel(fila, plantilla_path, carpeta_base)
-            generados.append(os.path.basename(output))
+            estado = fila["ESTADO"].strip().lower()
+            nombre = fila["Docente"].strip()
+            nombre_docente = limpiar_nombre_archivo(nombre)  # Usa tu función para limpiar el nombre
+
+            if estado == "contrato":
+                plantilla = "Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx"
+            elif estado == "tercero":
+                plantilla = "Modelos_documentos/CONFORMIDAD TERCERO - MODELO.docx"
+            else:
+                raise ValueError(f"Estado inválido: {estado}")
+
+            # Carpeta FASE FINAL > Carpeta del docente
+            carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", nombre_docente)
+            os.makedirs(carpeta_final, exist_ok=True)
+
+            nombre_archivo = f"CONFORMIDAD - {nombre} - {mes} {año}.docx"
+            ruta_salida = os.path.join(carpeta_final, nombre_archivo)
+
+            generar_conformidad_desde_excel(fila, plantilla, ruta_salida)
+            generados.append(os.path.join("FASE FINAL", nombre_docente, nombre_archivo))
         except Exception as e:
-            errores.append((fila.get("Docente", "Sin nombre"), str(e)))
+            errores.append((fila.get("Docente", "Desconocido"), str(e)))
+
     return generados, errores
