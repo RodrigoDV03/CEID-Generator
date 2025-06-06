@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 import pandas as pd
 from docx import Document
 from utils import *
@@ -37,6 +36,7 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
     monto_categoria = getattr(fila, "Categoria_monto", 0)
     monto_categoria_letras = monto_a_letras(monto_categoria)
     monto_total = getattr(fila, "Subtotal_pago", 0)
+    nro_contrato = getattr(fila, "Nro_Contrato", "")
     try:
         monto_total = float(monto_total)
         monto_total_str = f"{monto_total:,.2f}"
@@ -44,33 +44,23 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
         monto_total_str = str(monto_total)
     monto_total_letras = monto_a_letras(monto_total)
 
-    meses_es = {
-        "January": "enero", "February": "febrero", "March": "marzo",
-        "April": "abril", "May": "mayo", "June": "junio",
-        "July": "julio", "August": "agosto", "September": "septiembre",
-        "October": "octubre", "November": "noviembre", "December": "diciembre"
-    }
-    hoy = datetime.now()
-    nombre_mes = meses_es[hoy.strftime("%B")]
-    fecha_formateada = f"{hoy.day} de {nombre_mes} de {hoy.year}"
-
     doc = Document(plantilla_path)
     for p in doc.paragraphs:
         for run in p.runs:
             if "nombre" in run.text:
-                run.text = run.text.replace("nombre", nombre_docente)
+                run.text = run.text.replace("nombre", str(nombre_docente))
             if "ruc" in run.text:
-                run.text = run.text.replace("ruc", ruc)
+                run.text = run.text.replace("ruc", str(ruc))
             if "descripcion_cursos" in run.text:
-                run.text = run.text.replace("descripcion_cursos", descripcion_final)
+                run.text = run.text.replace("descripcion_cursos", str(descripcion_final))
             if "numero_orden" in run.text:
                 run.text = run.text.replace("numero_orden", "______________")
             if "monto_subtotal" in run.text:
-                run.text = run.text.replace("monto_subtotal", f"S/. {monto_total_str} ({monto_total_letras})")
+                run.text = run.text.replace("monto_subtotal", f"S/. {monto_total_str} ({str(monto_total_letras)})")
             if "monto_hora" in run.text:
-                run.text = run.text.replace("monto_hora", f"S/. {monto_categoria:.2f} ({monto_categoria_letras})")
-            if "fecha" in run.text:
-                run.text = run.text.replace("fecha", fecha_formateada)
+                run.text = run.text.replace("monto_hora", f"S/. {monto_categoria:.2f} ({str(monto_categoria_letras)})")
+            if "Nro_Contrato" in run.text:
+                run.text = run.text.replace("Nro_Contrato", str(nro_contrato))
 
     carpeta_final = os.path.dirname(ruta_salida)
     os.makedirs(carpeta_final, exist_ok=True)
@@ -92,7 +82,7 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
         try:
             estado = fila["ESTADO"].strip().lower()
             nombre = fila["Docente"].strip()
-            nombre_docente = limpiar_nombre_archivo(nombre)  # Usa tu función para limpiar el nombre
+            nombre_docente = limpiar_nombre_archivo(nombre)
 
             if estado == "contrato":
                 plantilla = "Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx"
@@ -101,7 +91,6 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
             else:
                 raise ValueError(f"Estado inválido: {estado}")
 
-            # Carpeta FASE FINAL > Carpeta del docente
             carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", nombre_docente)
             os.makedirs(carpeta_final, exist_ok=True)
 

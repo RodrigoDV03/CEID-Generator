@@ -88,6 +88,28 @@ hoja_menu = tk.OptionMenu(frame_hoja, hoja_var, "")
 hoja_menu.config(font=FONT_BUTTON, width=25)
 hoja_menu.pack(side="left", padx=(10, 0))
 
+# --- SELECCIÓN DE MES Y AÑO ---
+frame_fecha = tk.Frame(root, bg=BG_COLOR)
+frame_fecha.pack(fill="x", padx=30, pady=(15, 0))
+
+tk.Label(frame_fecha, text="Mes:", font=FONT_LABEL, bg=BG_COLOR, fg=TEXT_COLOR).pack(side="left")
+
+meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+mes_var = tk.StringVar(value=meses[datetime.now().month - 1])
+mes_menu = tk.OptionMenu(frame_fecha, mes_var, *meses)
+mes_menu.config(font=FONT_BUTTON)
+mes_menu.pack(side="left", padx=(5, 20))
+
+tk.Label(frame_fecha, text="Año:", font=FONT_LABEL, bg=BG_COLOR, fg=TEXT_COLOR).pack(side="left")
+
+año_actual = datetime.now().year
+años = list(range(año_actual - 5, año_actual + 6))
+año_var = tk.StringVar(value=str(año_actual))
+año_menu = tk.OptionMenu(frame_fecha, año_var, *años)
+año_menu.config(font=FONT_BUTTON)
+año_menu.pack(side="left", padx=(5, 0))
+
 
 # --- SELECCIÓN DE CARPETA DESTINO ---
 frame_carpeta = tk.Frame(root, bg=BG_COLOR)
@@ -127,13 +149,13 @@ def iniciar_generacion():
     hoja = hoja_var.get()
     ruta = getattr(boton_generar, "ruta_excel", None)
     carpeta = carpeta_destino.get("ruta")
-    if not hoja or not ruta:
-        messagebox.showerror("Error", "Debe seleccionar un archivo y una hoja.")
+    mes = mes_var.get()
+    año = año_var.get()
+    if not hoja or not ruta or not carpeta or not mes or not año:
+        messagebox.showerror("Error", "Debe seleccionar todos los campos: archivo, hoja, carpeta, mes y año.")
         return
-    if not carpeta:
-        messagebox.showerror("Error", "Debe seleccionar una carpeta de destino.")
-        return
-    generar_documentos(ruta, hoja, carpeta)
+    
+    generar_documentos(ruta, hoja, carpeta, mes, año)
 
 boton_generar = tk.Button(
     root,

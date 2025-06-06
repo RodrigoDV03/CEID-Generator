@@ -1,20 +1,10 @@
 import os
 import pandas as pd
 from docx import Document
-import datetime
 from tkinter import messagebox
-from datetime import datetime
 from utils import *
 
-def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino):
-
-    meses = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-    ]
-
-    hoy = datetime.now()
-    fecha_actual = f"{hoy.day} de {meses[hoy.month - 1]} de {hoy.year}"
+def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año):
 
     datos = pd.read_excel(ruta_excel, sheet_name=hoja_seleccionada)
 
@@ -39,7 +29,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino):
         celular = limpiar_numero(getattr(fila, "Numero_celular", ""))
         dni_docente = limpiar_numero(getattr(fila, "Numero_dni", ""))
         if len(dni_docente) < 8:
-            dni_docente = dni_docente.zfill(8)  # Añade ceros a la izquierda
+            dni_docente = dni_docente.zfill(8)
 
         categoria_valor = getattr(fila, "Categoria_monto", 1)
         if pd.isna(categoria_valor):
@@ -73,7 +63,6 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino):
             documento = Document(plantilla_oficio)
             for parrafo in documento.paragraphs:
                 for run in parrafo.runs:
-                    run.text = run.text.replace("fecha", fecha_actual)
                     run.text = run.text.replace("docente", docente)
                     run.text = run.text.replace("descripcion", descripcion_final)
                     run.text = run.text.replace("categoria", f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})")
@@ -105,7 +94,6 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino):
                 "ruc_docente_cot": f"RUC N.º {ruc}",
                 "correo_docente_cot": f"Correo: {correo}",
                 "celular_cot": f"Teléfono: {celular}",
-                "fecha": fecha_actual,
                 "descripcion_servicio": descripcion_final,
                 "categoria_monto": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
                 "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
@@ -115,7 +103,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino):
             reemplazar_en_parrafos(documento_cot, reemplazos)
             reemplazar_en_tablas(documento_cot, reemplazos)
 
-            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente}.docx")
+            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
             documento_cot.save(ruta_salida_cot)
 
     messagebox.showinfo("Éxito", f"Todos los documentos se guardaron en la carpeta '{carpeta_principal}'.")
