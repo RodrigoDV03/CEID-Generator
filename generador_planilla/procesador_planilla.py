@@ -109,7 +109,7 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
 
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
             TABLA.to_excel(writer, sheet_name=f"Planilla {mes_seleccionado}", index=False)
-            columnas_extra = ['DNI', 'Celular', 'Direccion', 'Correo personal']
+            columnas_extra = ['Nro. Documento', 'Celular', 'Dirección', 'Correo personal']
             hoja_generador = (
                 TABLA
                 .merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left')
@@ -121,9 +121,9 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
                     'Sub Total Pago S/.': 'Subtotal_pago',
                     'Contrato o Tercero': 'Contrato_o_tercero',
                     'N°. Ruc': 'N_Ruc',
-                    'DNI': 'Numero_dni',
+                    'Nro. Documento': 'Numero_dni',
                     'Celular': 'Numero_celular',
-                    'Direccion': 'Domicilio_docente',
+                    'Dirección': 'Domicilio_docente',
                     'Correo personal': 'Correo_personal'
                 })
             )
