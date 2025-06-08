@@ -19,13 +19,13 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
     horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
     clasif_valor = int(getattr(fila, "Examen_clasif", 0))
 
-    categoria_valor = getattr(fila, "Categoria_monto", 1)
-    if pd.isna(categoria_valor):
-        categoria_valor = 1
+    monto_categoria = float(getattr(fila, "Categoria_monto", 1))
+    if pd.isna(monto_categoria):
+        monto_categoria = 1
     else:
-        categoria_valor = int(categoria_valor)
+        monto_categoria = int(monto_categoria)
 
-    clasif_cant_horas = clasif_valor / categoria_valor if categoria_valor else 0
+    clasif_cant_horas = clasif_valor / monto_categoria if monto_categoria else 0
     horas_clasif = f"{int(round(clasif_cant_horas))} horas de clasificación"
 
     if clasif_valor == 0:
@@ -33,7 +33,6 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
     else:
         descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
 
-    monto_categoria = getattr(fila, "Categoria_monto", 0)
     monto_categoria_letras = monto_a_letras(monto_categoria)
     monto_total = getattr(fila, "Subtotal_pago", 0)
     nro_contrato = getattr(fila, "Nro_Contrato", "")
@@ -80,13 +79,13 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
 
     for _, fila in df.iterrows():
         try:
-            estado = fila["ESTADO"].strip().lower()
-            nombre = fila["Docente"].strip()
-            nombre_docente = limpiar_nombre_archivo(nombre)
+            estado = str(getattr(fila, "Contrato_o_tercero", ""))
+            docente = str(getattr(fila, "Docente", "N/A"))
+            nombre_docente = limpiar_nombre_archivo(docente)
 
-            if estado == "contrato":
+            if estado == "CONTRATO":
                 plantilla = "Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx"
-            elif estado == "tercero":
+            elif estado == "TERCERO":
                 plantilla = "Modelos_documentos/CONFORMIDAD TERCERO - MODELO.docx"
             else:
                 raise ValueError(f"Estado inválido: {estado}")
@@ -94,7 +93,7 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
             carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", nombre_docente)
             os.makedirs(carpeta_final, exist_ok=True)
 
-            nombre_archivo = f"CONFORMIDAD - {nombre} - {mes} {año}.docx"
+            nombre_archivo = f"CONFORMIDAD - {nombre_docente} - {mes} {año}.docx"
             ruta_salida = os.path.join(carpeta_final, nombre_archivo)
 
             generar_conformidad_desde_excel(fila, plantilla, ruta_salida)

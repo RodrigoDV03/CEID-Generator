@@ -9,7 +9,7 @@ def lanzar_gui():
 
     ventana = tk.Tk()
     ventana.title("Generador de Planilla - CEID")
-    ventana.geometry("580x480")
+    ventana.geometry("580x520")
     ventana.configure(bg="#f4f6fa")
     ventana.resizable(False, False)
 
@@ -24,7 +24,7 @@ def lanzar_gui():
     FONT_FOOTER = ("Segoe UI", 9)
 
     # Título
-    tk.Label(ventana, text="Generador de Planillas y Documentos", font=FONT_TITLE, bg=BG, fg=PRIMARY).pack(pady=(20, 10))
+    tk.Label(ventana, text="Generador de Planilla - CEID", font=FONT_TITLE, bg=BG, fg=PRIMARY).pack(pady=(20, 10))
     ttk.Separator(ventana, orient="horizontal").pack(fill="x", padx=30)
 
     # Mes
@@ -36,9 +36,18 @@ def lanzar_gui():
              "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
     tk.OptionMenu(frame_mes, mes_var, *meses).pack(side="left", padx=(10, 0))
 
+    # Número de Carga
+    frame_carga = tk.Frame(ventana, bg=BG)
+    frame_carga.pack(pady=(5, 10), fill="x", padx=30)
+    tk.Label(frame_carga, text="Número de planilla:", font=FONT_LABEL, bg=BG, fg=PRIMARY).pack(side="left")
+    carga_var = tk.IntVar(value=1)
+    opciones_carga = [("1 (Primera carga)", 1), ("2 (Segunda carga)", 2)]
+    for texto, valor in opciones_carga:
+        tk.Radiobutton(frame_carga, text=texto, variable=carga_var, value=valor, bg=BG, font=FONT_TEXT, fg=PRIMARY, selectcolor=BG).pack(side="left", padx=5)
+
     # Cursos
     frame_cursos = tk.LabelFrame(ventana, text="Archivo de Cursos", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
-    frame_cursos.pack(fill="x", padx=30, pady=(18, 5))
+    frame_cursos.pack(fill="x", padx=30, pady=(10, 5))
     label_cursos = tk.Label(frame_cursos, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
     label_cursos.pack(side="left", padx=(0, 10))
 
@@ -71,7 +80,12 @@ def lanzar_gui():
         if not archivo_cursos_path or not archivo_clasif_path:
             messagebox.showerror("Error", "⚠️ Debes seleccionar ambos archivos.")
             return
-        resultado = generar_planilla(archivo_cursos_path, archivo_clasif_path, mes_var.get())
+        resultado = generar_planilla(
+            archivo_cursos_path,
+            archivo_clasif_path,
+            mes_var.get(),
+            carga_var.get()
+        )
         if resultado.startswith("Error"):
             messagebox.showerror("Error", resultado)
         else:
