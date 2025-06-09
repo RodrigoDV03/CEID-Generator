@@ -2,6 +2,8 @@ import os
 import pandas as pd
 from docx import Document
 from utils import *
+from fuzzywuzzy import process
+from fuzzywuzzy import fuzz
 
 def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
 
@@ -35,13 +37,19 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
 
     monto_categoria_letras = monto_a_letras(monto_categoria)
     monto_total = getattr(fila, "Subtotal_pago", 0)
-    nro_contrato = getattr(fila, "Nro_Contrato", "")
     try:
         monto_total = float(monto_total)
         monto_total_str = f"{monto_total:,.2f}"
     except Exception:
         monto_total_str = str(monto_total)
     monto_total_letras = monto_a_letras(monto_total)
+
+    nro_contrato = getattr(fila, "Nro_Contrato", "")
+    try:
+        nro_contrato = int(float(nro_contrato))
+    except (ValueError, TypeError):
+        pass
+
 
     doc = Document(plantilla_path)
     for p in doc.paragraphs:
@@ -74,12 +82,14 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
 
 def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
+    df_control = pd.read_excel("fase_final/CONTRATO DE LOCACIÓN DE MAYO - JULIO DEL 2025.xlsx", sheet_name="CONTRATOS")
+
     generados = []
     errores = []
 
     for _, fila in df.iterrows():
         try:
-            estado = str(getattr(fila, "Contrato_o_tercero", ""))
+            estado = str(getattr(fila, "Contrato_o_tercero", "")).strip().upper()
             docente = str(getattr(fila, "Docente", "N/A"))
             nombre_docente = limpiar_nombre_archivo(docente)
 
@@ -93,12 +103,85 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
             carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", nombre_docente)
             os.makedirs(carpeta_final, exist_ok=True)
 
-            nombre_archivo = f"CONFORMIDAD - {nombre_docente} - {mes} {año}.docx"
-            ruta_salida = os.path.join(carpeta_final, nombre_archivo)
+            # === GENERAR DOCUMENTO DE CONFORMIDAD ===
+            nombre_archivo_conformidad = f"CONFORMIDAD - {nombre_docente} - {mes} {año}.docx"
+            ruta_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
 
-            generar_conformidad_desde_excel(fila, plantilla, ruta_salida)
-            generados.append(os.path.join("FASE FINAL", nombre_docente, nombre_archivo))
+            generar_conformidad_desde_excel(fila, plantilla, ruta_conformidad)
+            generados.append(os.path.join("FASE FINAL", nombre_docente, nombre_archivo_conformidad))
+
+            # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
+            if estado == "CONTRATO":
+                plantilla_control = "Modelos_documentos/Control de avance de pagos - MODELO.docx"
+                nombre_archivo_control = f"CONTROL DE AVANCE - {nombre_docente} - {mes} {año}.docx"
+                ruta_control = os.path.join(carpeta_final, nombre_archivo_control)
+
+                try:
+                    # Usa el monto_total calculado en generar_conformidad
+                    monto_total = getattr(fila, "Subtotal_pago", 0)
+                    monto_total = float(monto_total) if not pd.isna(monto_total) else 0
+
+                    generar_control_avance(fila=fila, monto_subtotal=monto_total, ruta_salida=ruta_control, plantilla_control_path=plantilla_control, df_control=df_control)
+
+                    generados.append(os.path.join("FASE FINAL", nombre_docente, nombre_archivo_control))
+
+                except Exception as e:
+                    errores.append((str(getattr(fila, "Docente", "Desconocido")) + " [CONTROL]", str(e)))
+
         except Exception as e:
             errores.append((fila.get("Docente", "Desconocido"), str(e)))
 
     return generados, errores
+
+
+def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_path, df_control):
+
+    nombre_docente = str(getattr(fila, "Docente", ""))
+    nombre_archivo_docente = limpiar_nombre_archivo(nombre_docente)
+
+    # Buscar coincidencia en Excel fijo
+    resultado = process.extractOne(nombre_docente, df_control["Docente"], scorer=fuzz.token_sort_ratio)
+    mejor_match, score = resultado[0], resultado[1]
+
+    if score < 85:
+        raise ValueError(f"No se encontró coincidencia adecuada para '{nombre_docente}' (score: {score})")
+
+    fila_control = df_control[df_control["Docente"] == mejor_match].iloc[0]
+
+    idioma_docente = str(fila_control["Especialidad"])
+    monto_total = float(fila_control["Monto total"])
+    nro_contrato = str(fila_control["Nro Contrato"])
+    try:
+        nro_contrato = int(float(nro_contrato))
+    except (ValueError, TypeError):
+        pass
+
+    saldo_restante = monto_total - monto_subtotal
+
+    # Cargar plantilla
+    doc = Document(plantilla_control_path)
+
+    reemplazos = {
+        "Nombre_Docente": nombre_docente,
+        "Idioma_Docente": idioma_docente,
+        "Monto_Subtotal": f"S/ {monto_subtotal:,.2f}",
+        "Monto_Total": f"S/ {monto_total:,.2f}",
+        "Saldo_Restante": f"S/ {saldo_restante:,.2f}",
+        "Nro_Contrato": str(nro_contrato)
+    }
+
+    for p in doc.paragraphs:
+        for key, val in reemplazos.items():
+            if key in p.text:
+                p.text = p.text.replace(key, val)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for key, val in reemplazos.items():
+                    if key in cell.text:
+                        cell.text = cell.text.replace(key, val)
+
+    os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
+    doc.save(ruta_salida)
+    return ruta_salida
