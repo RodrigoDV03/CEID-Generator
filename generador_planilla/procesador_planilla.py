@@ -24,7 +24,7 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
             try:
                 datos = pd.read_csv(ruta_cursos, sep=',')
             except Exception:
-                datos = pd.read_csv(ruta_cursos)  # fallback sin separador explícito
+                datos = pd.read_csv(ruta_cursos)
         elif extension in [".xls", ".xlsx"]:
             datos = pd.read_excel(ruta_cursos)
         else:
@@ -32,16 +32,11 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
         
         archivo_docentes = os.path.join(os.path.dirname(__file__), "docentes.xlsx")
         datos_docentes = pd.read_excel(archivo_docentes, sheet_name="list")
-        clasif_df = pd.read_excel(ruta_clasificacion, header=1)
 
         datos['docente'] = datos['docente'].astype(str).str.strip()
         datos_docentes['Docente'] = datos_docentes['Docente'].astype(str).str.strip()
-        clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
 
-        # Quitar registros vacíos
         datos = datos[~datos['docente'].isin(['', ',', None])]
-
-        # Columna "detalles_curso" para agrupar
         datos['detalles_curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
         agrupar = (
@@ -51,7 +46,6 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
                  .reset_index()
         )
 
-        # Fuzzy-matching de nombres con la base oficial de docentes
         nombres_base = datos_docentes['Docente'].tolist()
         agrupar['Docente'] = [
             process.extractOne(n, nombres_base, scorer=fuzz.token_sort_ratio)[0]
@@ -59,23 +53,31 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
             for n in agrupar['docente']
         ]
 
-        # Anexar datos extra de docentes
         agrupar = agrupar.merge(
             datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Contrato o tercero']],
             on='Docente', how='left'
         )
 
-        # Cálculo de remuneraciones (curso dictado y diseño de exámenes)
         agrupar['Curso Dictado'] = agrupar['Categoria (Monto)'] * agrupar['cantidad_cursos'] * 28
         agrupar['Diseño de Examenes'] = agrupar['Categoria (Monto)'] * agrupar['cantidad_cursos'] * 4
 
-        # Examen de clasificación
-        agrupar['docente_norm'] = agrupar['Docente'].apply(normalizar_texto)
-        clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
-        agrupar = agrupar.merge(clasif_df[['docente_norm', 'Monto']], on='docente_norm', how='left')
-        agrupar['Examen Clasif.'] = agrupar['Monto'].fillna(0)
-        agrupar.drop(columns=['docente_norm', 'Monto'], inplace=True)
+        # Examen de clasificación (manejo opcional)
+        if os.path.exists(ruta_clasificacion):
+            try:
+                clasif_df = pd.read_excel(ruta_clasificacion, header=1)
+                clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
+                clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
 
+                agrupar['docente_norm'] = agrupar['Docente'].apply(normalizar_texto)
+                agrupar = agrupar.merge(clasif_df[['docente_norm', 'Monto']], on='docente_norm', how='left')
+                agrupar['Examen Clasif.'] = agrupar['Monto'].fillna(0)
+                agrupar.drop(columns=['docente_norm', 'Monto'], inplace=True)
+            except Exception as e:
+                print(f"⚠️ Error al leer archivo de clasificación: {e}")
+                agrupar['Examen Clasif.'] = 0
+        else:
+            print("⚠️ No se encontró el archivo de clasificación. Se asumirá monto 0 para todos.")
+            agrupar['Examen Clasif.'] = 0
 
         TABLA = pd.DataFrame({
             'N°': range(1, len(agrupar) + 1),
