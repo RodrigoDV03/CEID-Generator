@@ -148,6 +148,7 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
                 'Modalidad': datos['modalidad'],
                 'Estado Planilla': estado_planilla
             })
+            df_carga = df_carga.sort_values(by='Docente', ascending=True).reset_index(drop=True)
             df_carga.to_excel(writer, sheet_name=nombre_hoja_carga, index=False)
 
         wb = load_workbook(ruta_salida)

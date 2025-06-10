@@ -46,7 +46,7 @@ def lanzar_gui():
         tk.Radiobutton(frame_carga, text=texto, variable=carga_var, value=valor, bg=BG, font=FONT_TEXT, fg=PRIMARY, selectcolor=BG).pack(side="left", padx=5)
 
     # Cursos
-    frame_cursos = tk.LabelFrame(ventana, text="Archivo de Cursos", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
+    frame_cursos = tk.LabelFrame(ventana, text="Archivo crudo (.csv)", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
     frame_cursos.pack(fill="x", padx=30, pady=(10, 5))
     label_cursos = tk.Label(frame_cursos, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
     label_cursos.pack(side="left", padx=(0, 10))
@@ -61,14 +61,14 @@ def lanzar_gui():
     tk.Button(frame_cursos, text="Seleccionar...", font=FONT_BUTTON, bg=ACCENT, fg="white", command=seleccionar_cursos).pack(side="right")
 
     # Clasificación
-    frame_clasif = tk.LabelFrame(ventana, text="Archivo de Clasificación", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
+    frame_clasif = tk.LabelFrame(ventana, text="Archivo de Examen de Clasificación", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
     frame_clasif.pack(fill="x", padx=30, pady=(10, 5))
     label_clasif = tk.Label(frame_clasif, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
     label_clasif.pack(side="left", padx=(0, 10))
 
     def seleccionar_clasif():
         nonlocal archivo_clasif_path
-        archivo = filedialog.askopenfilename(title="Selecciona archivo de clasificación", filetypes=[("Excel", "*.xlsx *.xls")])
+        archivo = filedialog.askopenfilename(title="Selecciona excel de examen de clasificación", filetypes=[("Excel", "*.xlsx *.xls")])
         if archivo:
             archivo_clasif_path = archivo
             label_clasif.config(text=f"📁 {os.path.basename(archivo)}", fg=PRIMARY)

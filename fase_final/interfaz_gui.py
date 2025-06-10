@@ -54,7 +54,7 @@ def seleccionar_archivo():
 
 tk.Button(
     frame_archivo,
-    text="Seleccionar archivo",
+    text="Seleccionar planilla del mes",
     command=seleccionar_archivo,
     font=FONT_BUTTON,
     bg=ACCENT_COLOR, fg="white",
