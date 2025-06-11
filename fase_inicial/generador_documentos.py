@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from docx import Document
 from tkinter import messagebox
-from utils import *
+from .utils import *
 
 def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año):
 

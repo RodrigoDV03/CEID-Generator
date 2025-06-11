@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from docx import Document
-from utils import *
+from .utils import *
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 

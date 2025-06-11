@@ -1,9 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
-from .procesador_planilla import generar_planilla
+from .procesador_planilla import *
 
-def lanzar_gui():
+def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""
     archivo_clasif_path = ""
 
@@ -92,6 +92,22 @@ def lanzar_gui():
             messagebox.showinfo("Éxito", resultado)
 
     tk.Button(ventana, text="🚀 Procesar y generar archivo", font=("Segoe UI", 12, "bold"), bg=PRIMARY, fg="white", command=procesar).pack(pady=30)
+
+    def volver():
+        ventana.destroy()
+        if callback_volver:
+            callback_volver()
+
+    tk.Button(
+        ventana, text="⬅ Volver al Menú Principal",
+        command=volver,
+        font=("Segoe UI", 10),
+        bg="#cccccc", fg="#222",
+        relief="flat", padx=8, pady=4
+    ).pack(pady=(10, 15), side="bottom")
+
+
+
     tk.Label(ventana, text="CEID Generator - v1.0", font=FONT_FOOTER, bg=BG, fg=GRAY).pack(side="bottom", pady=(0, 12))
 
     ventana.mainloop()

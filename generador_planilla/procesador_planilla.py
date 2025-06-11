@@ -1,12 +1,11 @@
 import pandas as pd
 import os
 import datetime
-import tempfile
 from fuzzywuzzy import process, fuzz
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font
-from .utils import normalizar_texto
+from .utils import *
 
 def traducir_dias(dias_raw: str) -> str:
     dias_dict = {

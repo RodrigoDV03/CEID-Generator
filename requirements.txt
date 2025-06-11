@@ -1,0 +1,10 @@
+tkinter
+os
+pandas
+fuzzywuzzy
+datetime
+re
+num2words
+docx
+openpyxl
+unicodedata
