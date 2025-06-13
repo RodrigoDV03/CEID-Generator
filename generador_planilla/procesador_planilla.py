@@ -15,7 +15,7 @@ def traducir_dias(dias_raw: str) -> str:
     dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
     return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
 
-def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado: str, numero_carga: int):
+def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: str, mes_seleccionado: str, numero_carga: int):
 
     try:
         extension = os.path.splitext(ruta_cursos)[-1].lower()
@@ -29,8 +29,8 @@ def generar_planilla(ruta_cursos: str, ruta_clasificacion: str, mes_seleccionado
         else:
             raise ValueError("Formato de cursos no soportado. Usa CSV o Excel.")
         
-        archivo_docentes = os.path.join(os.path.dirname(__file__), "docentes.xlsx")
-        datos_docentes = pd.read_excel(archivo_docentes, sheet_name="list")
+    
+        datos_docentes = pd.read_excel(ruta_docentes, sheet_name="list")
 
         datos['docente'] = datos['docente'].astype(str).str.strip()
         datos_docentes['Docente'] = datos_docentes['Docente'].astype(str).str.strip()

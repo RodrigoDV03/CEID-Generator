@@ -1,9 +1,17 @@
 import os
+import sys
 import pandas as pd
 from docx import Document
 from .utils import *
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
+
+def ruta_absoluta_relativa(path_relativo):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, path_relativo)
 
 def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
 
@@ -80,9 +88,9 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
     return ruta_salida
 
 
-def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
+def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
-    df_control = pd.read_excel("fase_final/CONTRATO DE LOCACIÓN DE MAYO - JULIO DEL 2025.xlsx", sheet_name="CONTRATOS")
+    df_control = pd.read_excel(ruta_docente)
 
     generados = []
     errores = []
@@ -94,9 +102,9 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
             nombre_docente = limpiar_nombre_archivo(docente)
 
             if estado == "CONTRATO":
-                plantilla = "Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx"
+                plantilla = ruta_absoluta_relativa("Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx")
             elif estado == "TERCERO":
-                plantilla = "Modelos_documentos/CONFORMIDAD TERCERO - MODELO.docx"
+                plantilla = ruta_absoluta_relativa("Modelos_documentos/CONFORMIDAD TERCERO - MODELO.docx")
             else:
                 raise ValueError(f"Estado inválido: {estado}")
 
@@ -112,7 +120,7 @@ def procesar_planilla(ruta_excel, hoja, carpeta_salida, mes, año):
 
             # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
             if estado == "CONTRATO":
-                plantilla_control = "Modelos_documentos/Control de avance de pagos - MODELO.docx"
+                plantilla_control = ruta_absoluta_relativa("Modelos_documentos/Control de avance de pagos - MODELO.docx")
                 nombre_archivo_control = f"CONTROL DE AVANCE - {nombre_docente} - {mes} {año}.docx"
                 ruta_control = os.path.join(carpeta_final, nombre_archivo_control)
 

@@ -22,7 +22,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     ttk.Separator(root, orient="horizontal").pack(fill="x", padx=30)
 
-    # --- SELECCIÓN DE ARCHIVO ---
+    # --- SELECCIÓN DE PLANILLA ---
     frame_archivo = tk.Frame(root, bg=BG_COLOR)
     frame_archivo.pack(fill="x", padx=30, pady=(20, 5))
 
@@ -60,7 +60,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
         bg=ACCENT_COLOR, fg="white",
         activebackground="#357ABD", activeforeground="white",
         relief="flat", padx=10, pady=4
-    ).pack(side="right")
+    ).pack(side="right")  
 
     # --- SELECCIÓN DE HOJA ---
     frame_hoja = tk.Frame(root, bg=BG_COLOR)
@@ -77,6 +77,48 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     hoja_menu = tk.OptionMenu(frame_hoja, hoja_var, "")
     hoja_menu.config(font=FONT_BUTTON, width=25)
     hoja_menu.pack(side="left", padx=(10, 0))
+
+    # --- SELECCIÓN EXCEL DE DOCENTE DE CONTRATO PARA GENERACIÓN DE CONTROL DE PAGOS ---
+
+    frame_docente = tk.Frame(root, bg=BG_COLOR)
+    frame_docente.pack(fill="x", padx=30, pady=(20, 5))
+
+    label_docente = tk.Label(
+        frame_docente,
+        text="Ningún archivo seleccionado",
+        fg="red", bg=BG_COLOR,
+        font=("Segoe UI", 10, "italic")
+    )
+    label_docente.pack(side="left", padx=(0, 10))
+
+    def seleccionar_docente():
+        archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo de docentes",
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+        )
+        if archivo:
+            try:
+                hojas = pd.ExcelFile(archivo).sheet_names
+                hoja_var.set(hojas[0])
+                hoja_menu['menu'].delete(0, 'end')
+                for h in hojas:
+                    hoja_menu['menu'].add_command(label=h, command=lambda val=h: hoja_var.set(val))
+                label_docente.config(text=f"📁 {os.path.basename(archivo)}", fg="green")
+                boton_generar.config(state="normal")
+                boton_generar.archivo_docente = archivo
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
+
+    tk.Button(
+        frame_docente,
+        text="Seleccionar planilla del mes",
+        command=seleccionar_docente,
+        font=FONT_BUTTON,
+        bg=ACCENT_COLOR, fg="white",
+        activebackground="#357ABD", activeforeground="white",
+        relief="flat", padx=10, pady=4
+    ).pack(side="right") 
+
 
     # --- SELECCIÓN DE MES Y AÑO ---
     frame_fecha = tk.Frame(root, bg=BG_COLOR)
@@ -132,6 +174,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     def iniciar_generacion():
         hoja = hoja_var.get()
         ruta = getattr(boton_generar, "ruta_excel", None)
+        archivo = getattr(boton_generar, "archivo_docente", None)
         carpeta = getattr(boton_generar, "carpeta_salida", None)
         mes = mes_var.get()
         año = año_var.get()
@@ -139,11 +182,11 @@ def iniciar_interfaz_fase_final(callback_volver=None):
             messagebox.showerror("Error", "Debe seleccionar todos los campos: archivo, hoja, carpeta, mes y año.")
             return
         try:
-            generados, errores = procesar_planilla(ruta, hoja, carpeta, mes, año)
+            generados, errores = procesar_planilla(ruta, archivo, hoja, carpeta, mes, año)
             msg = f"Documentos generados: {len(generados)}"
             if errores:
                 msg += "\n\nErrores:\n" + "\n".join([f"{d}: {e}" for d, e in errores])
-            messagebox.showinfo("Proceso finalizado", msg)
+            messagebox.showinfo("Éxito", f"Documentos de fase final generados correctamente.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
 

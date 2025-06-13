@@ -5,11 +5,12 @@ from .procesador_planilla import *
 
 def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""
+    archivo_docentes_path = ""
     archivo_clasif_path = ""
 
     ventana = tk.Tk()
     ventana.title("Generador de Planilla - CEID")
-    ventana.geometry("580x520")
+    ventana.geometry("580x650")
     ventana.configure(bg="#f4f6fa")
     ventana.resizable(False, False)
 
@@ -60,8 +61,23 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     tk.Button(frame_cursos, text="Seleccionar...", font=FONT_BUTTON, bg=ACCENT, fg="white", command=seleccionar_cursos).pack(side="right")
 
+    # Docentes
+    frame_docentes = tk.LabelFrame(ventana, text="Lista de docentes (.xlsx)", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
+    frame_docentes.pack(fill="x", padx=30, pady=(10, 5))
+    label_docentes = tk.Label(frame_docentes, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
+    label_docentes.pack(side="left", padx=(0, 10))
+
+    def seleccionar_docentes():
+        nonlocal archivo_docentes_path
+        archivo = filedialog.askopenfilename(title="Selecciona archivo de docentes", filetypes=[("Excel", "*.xlsx *.xls")])
+        if archivo:
+            archivo_docentes_path = archivo
+            label_docentes.config(text=f"📁 {os.path.basename(archivo)}", fg=PRIMARY)
+
+    tk.Button(frame_docentes, text="Seleccionar...", font=FONT_BUTTON, bg=ACCENT, fg="white", command=seleccionar_docentes).pack(side="right")
+
     # Clasificación
-    frame_clasif = tk.LabelFrame(ventana, text="Archivo de Examen de Clasificación", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
+    frame_clasif = tk.LabelFrame(ventana, text="Archivo de Examen de Clasificación (.xlsx)", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
     frame_clasif.pack(fill="x", padx=30, pady=(10, 5))
     label_clasif = tk.Label(frame_clasif, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
     label_clasif.pack(side="left", padx=(0, 10))
@@ -77,11 +93,12 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     # Procesar
     def procesar():
-        if not archivo_cursos_path or not archivo_clasif_path:
+        if not archivo_cursos_path or not archivo_docentes_path or not archivo_clasif_path:
             messagebox.showerror("Error", "⚠️ Debes seleccionar ambos archivos.")
             return
         resultado = generar_planilla(
             archivo_cursos_path,
+            archivo_docentes_path,
             archivo_clasif_path,
             mes_var.get(),
             carga_var.get()

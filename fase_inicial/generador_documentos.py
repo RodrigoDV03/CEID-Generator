@@ -1,8 +1,16 @@
 import os
+import sys
 import pandas as pd
 from docx import Document
 from tkinter import messagebox
 from .utils import *
+
+def ruta_absoluta_relativa(path_relativo):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, path_relativo)
 
 def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año):
 
@@ -53,9 +61,9 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         # -------- GENERAR OFICIO --------
         tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
         if tipo_contrato == "CONTRATO":
-            plantilla_oficio = './Modelos_documentos/modelo_oficio_contrato_FLCH.docx'
+            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/modelo_oficio_contrato_FLCH.docx')
         elif tipo_contrato == "TERCERO":
-            plantilla_oficio = './Modelos_documentos/modelo_FLCH.docx'
+            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/modelo_FLCH.docx')
         else:
             plantilla_oficio = None
 
@@ -72,7 +80,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
 
         # -------- GENERAR TDR --------
         tipo_tdr = str(getattr(fila, "Categoria_letra", "")).strip().upper()
-        plantilla_tdr = f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx'
+        plantilla_tdr = ruta_absoluta_relativa(f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx')
         if os.path.exists(plantilla_tdr):
             documento_tdr = Document(plantilla_tdr)
             for parrafo in documento_tdr.paragraphs:
@@ -85,7 +93,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
 
         # -------- GENERAR COTIZACIÓN --------
 
-        plantilla_cotizacion = './Modelos_documentos/modelo_cotizacion.docx'
+        plantilla_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
         if os.path.exists(plantilla_cotizacion):
             documento_cot = Document(plantilla_cotizacion)
             reemplazos = {
@@ -106,4 +114,4 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
             ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
             documento_cot.save(ruta_salida_cot)
 
-    messagebox.showinfo("Éxito", f"Todos los documentos se guardaron en la carpeta '{carpeta_principal}'.")
+    messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente")
