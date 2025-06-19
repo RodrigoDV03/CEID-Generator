@@ -59,6 +59,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         monto_categoria_letras = monto_a_letras(monto_categoria)
         monto_total = getattr(fila, "Subtotal_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
+        nro_contrato = str(getattr(fila, "Nro_Contrato", "N/A"))
 
         # -------- GENERAR OFICIO --------
         tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
@@ -73,6 +74,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
             documento = Document(plantilla_oficio)
             for parrafo in documento.paragraphs:
                 for run in parrafo.runs:
+                    run.text = run.text.replace("Nro_Contrato", nro_contrato)
                     run.text = run.text.replace("docente", docente)
                     run.text = run.text.replace("descripcion", descripcion_final)
                     run.text = run.text.replace("categoria", f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})")
