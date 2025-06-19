@@ -1,10 +1,11 @@
+import openpyxl
 import pandas as pd
 import os
 import datetime
 from fuzzywuzzy import process, fuzz
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, Border, Side
 from .utils import *
 
 def traducir_dias(dias_raw: str) -> str:
@@ -135,7 +136,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             hoja_generador.to_excel(writer, sheet_name="Planilla_Generador", index=False)
 
             df_carga = pd.DataFrame({
-                'N°': range(1, len(datos) + 1),
                 'Dias': datos['dias'].apply(traducir_dias),
                 'H. Inicio': datos['horainicio'].astype(str).str[:5],
                 'H. Fin': datos['horafin'].astype(str).str[:5],
@@ -149,8 +149,15 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 'Docente': datos['docente'],
                 'Modalidad': datos['modalidad'],
                 'Estado Planilla': estado_planilla
-            })
+            })           
+            if os.path.exists(ruta_clasificacion):
+                try:
+                    hoja_clasificacion = pd.read_excel(ruta_clasificacion, header=1)
+                    hoja_clasificacion.to_excel(writer, sheet_name="Examen de clasificación", index=False)
+                except Exception as e:
+                    print(f"⚠️ Error al copiar hoja de clasificación: {e}")
             df_carga = df_carga.sort_values(by='Docente', ascending=True).reset_index(drop=True)
+            df_carga.insert(0, 'N°', range(1, len(df_carga) + 1))
             df_carga.to_excel(writer, sheet_name=nombre_hoja_carga, index=False)
 
         wb = load_workbook(ruta_salida)
@@ -160,17 +167,87 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             "MODALIDAD: VIRTUAL Y PRESENCIAL"
         )
 
-        hojas_con_titulo = [f"Planilla {mes_seleccionado}", nombre_hoja_carga]
-        for hoja in hojas_con_titulo:
-            ws = wb[hoja]
-            ws.insert_rows(1)
-            max_col = ws.max_column
-            rango = f"A1:{get_column_letter(max_col)}1"
-            ws.merge_cells(rango)
-            ws["A1"].value = titulo_fusionado
-            ws["A1"].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            ws["A1"].font = Font(bold=True)
+        hojas_con_titulo = [
+            ("Examen de clasificación", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+            
+            (f"Planilla {mes_seleccionado}", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+            
+            (nombre_hoja_carga, 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL")
+        ]
 
+        for hoja, titulo_fusionado in hojas_con_titulo:
+            if hoja in wb.sheetnames:
+                ws = wb[hoja]
+                ws.insert_rows(1)
+                max_col = ws.max_column
+                rango = f"A1:{get_column_letter(max_col)}1"
+                ws.merge_cells(rango)
+                ws["A1"].value = titulo_fusionado
+                ws["A1"].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                ws["A1"].fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
+                ws["A1"].font = Font(bold=True, color="ffffff", size=22)
+
+                # Aplicar bordes, centrado y ajuste de columnas
+                thin_border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=ws.max_column):
+                    for cell in row:
+                        cell.border = thin_border
+                        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+                # Ajustar ancho de columnas automáticamente
+                for col in ws.columns:
+                    max_length = 0
+                    col_letter = get_column_letter(col[0].column)
+                    for cell in col:
+                        if cell.value:
+                            try:
+                                cell_len = len(str(cell.value))
+                                if cell_len > max_length:
+                                    max_length = cell_len
+                            except:
+                                pass
+                    adjusted_width = max_length + 2  # Un poco de margen extra
+                    ws.column_dimensions[col_letter].width = adjusted_width
+
+            for col in range(1, max_col + 1):
+                celda = ws.cell(row=2, column=col)
+                celda.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                celda.fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
+                celda.font = Font(bold=True, color="ffffff", size=12)
+
+            if hoja == f"Planilla {mes_seleccionado}":
+                fila_total = ws.max_row + 1
+
+                # Escribir la palabra "Totales" en la columna A y combinar de A hasta G
+                ws.merge_cells(f"A{fila_total}:G{fila_total}")
+                celda_total = ws[f"A{fila_total}"]
+                celda_total.alignment = Alignment(horizontal="center", vertical="center")
+                celda_total.fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
+
+                # Insertar fórmulas para H a M
+                columnas_sumar = ['H', 'I', 'J', 'K', 'L', 'M']
+                for col in columnas_sumar:
+                    celda = ws[f"{col}{fila_total}"]
+                    celda.value = f"=SUM({col}3:{col}{fila_total-1})"
+                    celda.font = Font(bold=True)
+                    celda.alignment = Alignment(horizontal="center", vertical="center")
+
+        hojas_ordenadas = ["Examen de clasificación", nombre_hoja_carga, f"Planilla {mes_seleccionado}", "Planilla_Generador"]
+        hojas_existentes = wb.sheetnames
+        nuevas_hojas = [hoja for hoja in hojas_ordenadas if hoja in hojas_existentes]
+        for idx, hoja in enumerate(nuevas_hojas):
+            wb._sheets.insert(idx, wb[hoja])
+        wb._sheets = wb._sheets[:len(nuevas_hojas)] + [s for s in wb._sheets if s.title not in nuevas_hojas]
+        
         wb.save(ruta_salida)
         return f"✅ {nombre_salida} generado correctamente."
 
