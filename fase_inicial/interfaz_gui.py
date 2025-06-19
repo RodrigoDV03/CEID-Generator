@@ -52,13 +52,20 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
         if ruta:
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names
-                hoja_var.set(hojas[0])
                 hoja_menu['menu'].delete(0, 'end')
+
                 for h in hojas:
                     hoja_menu['menu'].add_command(label=h, command=lambda val=h: hoja_var.set(val))
+
+                if "Planilla_Generador" in hojas:
+                    hoja_var.set("Planilla_Generador")
+                else:
+                    hoja_var.set(hojas[0])
+
                 label_archivo.config(text=f"📁 {os.path.basename(ruta)}", fg="green")
                 boton_generar.config(state="normal")
                 boton_generar.ruta_excel = ruta
+
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 

@@ -4,6 +4,7 @@ import pandas as pd
 from docx import Document
 from tkinter import messagebox
 from .utils import *
+from docx2pdf import convert
 
 def ruta_absoluta_relativa(path_relativo):
     if getattr(sys, 'frozen', False):
@@ -36,6 +37,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         correo = str(getattr(fila, "Correo_personal", ''))
         celular = limpiar_numero(getattr(fila, "Numero_celular", ""))
         dni_docente = limpiar_numero(getattr(fila, "Numero_dni", ""))
+        idioma = str(getattr(fila, "Docente_idioma", ""))
         if len(dni_docente) < 8:
             dni_docente = dni_docente.zfill(8)
 
@@ -46,7 +48,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
             categoria_valor = int(categoria_valor)
 
         clasif_cant_horas = clasif_valor / categoria_valor
-        horas_clasif = f"{int(round(clasif_cant_horas))} horas de clasificación"
+        horas_clasif = f"{int(round(clasif_cant_horas))} horas de examen de clasificación"
 
         if clasif_valor == 0:
             descripcion_final = f"{descripcion} y {horas_disenio}"
@@ -79,39 +81,52 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
             documento.save(ruta_salida_oficio)
 
         # -------- GENERAR TDR --------
-        tipo_tdr = str(getattr(fila, "Categoria_letra", "")).strip().upper()
-        plantilla_tdr = ruta_absoluta_relativa(f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx')
-        if os.path.exists(plantilla_tdr):
-            documento_tdr = Document(plantilla_tdr)
-            for parrafo in documento_tdr.paragraphs:
-                for run in parrafo.runs:
-                    run.text = run.text.replace("descripcion", descripcion_final)
-                    run.text = run.text.replace("categoria", f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})")
-                    run.text = run.text.replace("monto_subtotal", f"S/ {monto_total:,.2f} ({monto_total_letras})")
-            ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente}.docx")
-            documento_tdr.save(ruta_salida_tdr)
+        if tipo_contrato == "TERCERO":
+            tipo_tdr = str(getattr(fila, "Categoria_letra", "")).strip().upper()
+            plantilla_tdr = ruta_absoluta_relativa(f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx')
+            if os.path.exists(plantilla_tdr):
+                documento_tdr = Document(plantilla_tdr)
+                reemplazos_tdr = {
+                    "descripcion": descripcion_final,
+                    "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                    "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                    "docente_idioma": idioma
+                }
+                reemplazar_en_parrafos(documento_tdr, reemplazos_tdr)
+                reemplazar_en_tablas(documento_tdr, reemplazos_tdr)
+                ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente}.pdf")
+                # Guardar primero como DOCX temporal
+                ruta_temp_docx = os.path.join(carpeta_docente, f"TDR - {nombre_docente}_temp.docx")
+                documento_tdr.save(ruta_temp_docx)
+                # Convertir a PDF usando docx2pdf
+                try:
+                    convert(ruta_temp_docx, ruta_salida_tdr)
+                    os.remove(ruta_temp_docx)
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo convertir a PDF: {e}")
 
         # -------- GENERAR COTIZACIÓN --------
 
-        plantilla_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
-        if os.path.exists(plantilla_cotizacion):
-            documento_cot = Document(plantilla_cotizacion)
-            reemplazos = {
-                "nombre_docente": docente,
-                "direccion_cot": f"Dirección: {direccion}",
-                "ruc_docente_cot": f"RUC N.º {ruc}",
-                "correo_docente_cot": f"Correo: {correo}",
-                "celular_cot": f"Teléfono: {celular}",
-                "descripcion_servicio": descripcion_final,
-                "categoria_monto": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
-                "dni_cot": f"DNI: {dni_docente}"
-            }
+        if tipo_contrato == "TERCERO":
+            plantilla_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
+            if os.path.exists(plantilla_cotizacion):
+                documento_cot = Document(plantilla_cotizacion)
+                reemplazos = {
+                    "nombre_docente": docente,
+                    "direccion_cot": f"Dirección: {direccion}",
+                    "ruc_docente_cot": f"RUC N.º {ruc}",
+                    "correo_docente_cot": f"Correo: {correo}",
+                    "celular_cot": f"Teléfono: {celular}",
+                    "descripcion_servicio": descripcion_final,
+                    "categoria_monto": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                    "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                    "dni_cot": f"DNI: {dni_docente}"
+                }
 
-            reemplazar_en_parrafos(documento_cot, reemplazos)
-            reemplazar_en_tablas(documento_cot, reemplazos)
+                reemplazar_en_parrafos(documento_cot, reemplazos)
+                reemplazar_en_tablas(documento_cot, reemplazos)
 
-            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
-            documento_cot.save(ruta_salida_cot)
+                ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
+                documento_cot.save(ruta_salida_cot)
 
     messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente")

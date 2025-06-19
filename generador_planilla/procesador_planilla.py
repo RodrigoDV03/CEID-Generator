@@ -100,17 +100,18 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         )
 
         año_actual = datetime.datetime.now().year
-        carpeta_salida = f"{mes_seleccionado} {año_actual}"
-        os.makedirs(carpeta_salida, exist_ok=True)
-        nombre_salida = f"Planilla {mes_seleccionado} {año_actual}.xlsx"
-        ruta_salida = os.path.join(carpeta_salida, nombre_salida)
 
         estado_planilla = "Primera planilla" if numero_carga == 1 else "Segunda planilla"
         nombre_hoja_carga = f"{numero_carga} carga académica"
 
+        carpeta_salida = f"{mes_seleccionado} {año_actual}"
+        os.makedirs(carpeta_salida, exist_ok=True)
+        nombre_salida = f"{estado_planilla} {mes_seleccionado} {año_actual}.xlsx"
+        ruta_salida = os.path.join(carpeta_salida, nombre_salida)
+
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
             TABLA.to_excel(writer, sheet_name=f"Planilla {mes_seleccionado}", index=False)
-            columnas_extra = ['Nro. Documento', 'Celular', 'Dirección', 'Correo personal']
+            columnas_extra = ['Idioma', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
             hoja_generador = (
                 TABLA
                 .merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left')
@@ -121,11 +122,13 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     'Categoria (Monto)': 'Categoria_monto',
                     'Sub Total Pago S/.': 'Subtotal_pago',
                     'Contrato o Tercero': 'Contrato_o_tercero',
+                    'Idioma': 'Docente_idioma',
                     'N°. Ruc': 'N_Ruc',
                     'Nro. Documento': 'Numero_dni',
                     'Celular': 'Numero_celular',
                     'Dirección': 'Domicilio_docente',
-                    'Correo personal': 'Correo_personal'
+                    'Correo personal': 'Correo_personal',
+                    'N° Contrato': 'Nro_contrato'
                 })
             )
             hoja_generador['Numero_dni'] = hoja_generador['Numero_dni'].apply(lambda x: str(int(float(x))).zfill(8) if pd.notna(x) else '')
@@ -169,7 +172,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             ws["A1"].font = Font(bold=True)
 
         wb.save(ruta_salida)
-        return f"✅ Archivo generado correctamente: '{ruta_salida}'"
+        return f"✅ {nombre_salida} generado correctamente."
 
     except Exception as e:
         return f"❌ Error: {e}"
