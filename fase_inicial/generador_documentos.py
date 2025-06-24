@@ -2,7 +2,6 @@ import os
 import sys
 import pandas as pd
 from docx import Document
-from tkinter import messagebox
 from .utils import *
 from docx2pdf import convert
 
@@ -78,7 +77,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
                     run.text = run.text.replace("descripcion", descripcion_final)
                     run.text = run.text.replace("categoria", f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})")
                     run.text = run.text.replace("monto_subtotal", f"S/ {monto_total:,.2f} ({monto_total_letras})")
-            ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente}.docx")
+            ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año}.docx")
             documento.save(ruta_salida_oficio)
 
         # -------- GENERAR TDR --------
@@ -94,16 +93,8 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
                 }
                 reemplazar_en_parrafos(documento_tdr, reemplazos_tdr)
                 reemplazar_en_tablas(documento_tdr, reemplazos_tdr)
-                ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente}.pdf")
-                # Guardar primero como DOCX temporal
-                ruta_temp_docx = os.path.join(carpeta_docente, f"TDR - {nombre_docente}_temp.docx")
-                documento_tdr.save(ruta_temp_docx)
-                # Convertir a PDF usando docx2pdf
-                try:
-                    convert(ruta_temp_docx, ruta_salida_tdr)
-                    os.remove(ruta_temp_docx)
-                except Exception as e:
-                    messagebox.showerror("Error", f"No se pudo convertir a PDF: {e}")
+                ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente} - {mes} {año}.docx")
+                documento_tdr.save(ruta_salida_tdr)
 
         # -------- GENERAR COTIZACIÓN --------
 
