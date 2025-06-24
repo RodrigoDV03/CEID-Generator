@@ -36,7 +36,7 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
         monto_categoria = int(monto_categoria)
 
     clasif_cant_horas = clasif_valor / monto_categoria if monto_categoria else 0
-    horas_clasif = f"{int(round(clasif_cant_horas))} horas de clasificación"
+    horas_clasif = f"{int(round(clasif_cant_horas))} horas de examen de clasificación"
 
     if clasif_valor == 0:
         descripcion_final = f"{descripcion} y {horas_disenio}"

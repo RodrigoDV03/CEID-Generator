@@ -1,207 +1,127 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
 from datetime import datetime
 import os
 import pandas as pd
 from .generador_documentos import *
 
 def iniciar_interfaz_fase_inicial(callback_volver=None):
-    # --- VENTANA PRINCIPAL ---
-    root = tk.Tk()
-    root.title("Generador de Archivos Fase Inicial CEID")
-    root.geometry("600x500")
-    root.configure(bg="#f4f6fa")
-    root.resizable(False, False)
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("blue")
 
-    # --- ESTILOS ---
-    PRIMARY_COLOR = "#2d415a"
-    ACCENT_COLOR = "#4a90e2"
-    BG_COLOR = "#f4f6fa"
-    TEXT_COLOR = "#333"
+    ventana = ctk.CTk()
+    ventana.title("Fase Inicial | Generador de Archivos CEID")
+    ventana.geometry("650x700")
+    ventana.resizable(False, False)
 
-    FONT_TITLE = ("Segoe UI", 17, "bold")
-    FONT_LABEL = ("Segoe UI", 11)
-    FONT_BUTTON = ("Segoe UI", 10)
-    FONT_FOOTER = ("Segoe UI", 9)
+    hoja_var = ctk.StringVar()
+    mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    año_var = ctk.StringVar(value=str(datetime.now().year))
+    ruta_excel = None
+    carpeta_destino = None
 
-    # --- ENCABEZADO ---
-    tk.Label(
-        root, text="Generador de Archivos Fase Inicial CEID",
-        font=FONT_TITLE, bg=BG_COLOR, fg=PRIMARY_COLOR
-    ).pack(pady=(20, 10))
+    def titulo(texto):
+        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=22, weight="bold"))
 
-    ttk.Separator(root, orient="horizontal").pack(fill="x", padx=30)
+    def etiqueta(texto, size=13):
+        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=size))
 
-    # --- SELECCIÓN DE ARCHIVO ---
-    frame_archivo = tk.Frame(root, bg=BG_COLOR)
-    frame_archivo.pack(fill="x", padx=30, pady=(20, 5))
+    # Título principal
+    titulo("📄 Generador de Archivos - Fase Inicial").pack(pady=(25, 10))
 
-    label_archivo = tk.Label(
-        frame_archivo,
-        text="Ningún archivo seleccionado",
-        fg="red", bg=BG_COLOR,
-        font=("Segoe UI", 10, "italic")
-    )
-    label_archivo.pack(side="left", padx=(0, 10))
+    # Sección archivo Excel
+    frame_excel = ctk.CTkFrame(ventana)
+    frame_excel.pack(padx=30, pady=10, fill="x")
+
+    etiqueta("Seleccionar archivo Excel del mes:", 15).pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
+    label_excel = ctk.CTkLabel(frame_excel, text="📂 No seleccionado", text_color="gray")
+    label_excel.pack(side="left", padx=10)
 
     def seleccionar_archivo():
-        ruta = filedialog.askopenfilename(
-            title="Seleccionar archivo Excel",
-            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
-        )
+        nonlocal ruta_excel
+        ruta = filedialog.askopenfilename(title="Seleccionar archivo Excel", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if ruta:
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names
-                hoja_menu['menu'].delete(0, 'end')
-
-                for h in hojas:
-                    hoja_menu['menu'].add_command(label=h, command=lambda val=h: hoja_var.set(val))
-
-                if "Planilla_Generador" in hojas:
-                    hoja_var.set("Planilla_Generador")
-                else:
-                    hoja_var.set(hojas[0])
-
-                label_archivo.config(text=f"📁 {os.path.basename(ruta)}", fg="green")
-                boton_generar.config(state="normal")
-                boton_generar.ruta_excel = ruta
-
+                hoja_menu.configure(values=hojas)
+                hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
+                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color="black")
+                boton_generar.configure(state="normal")
+                ruta_excel = ruta
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 
-    tk.Button(
-        frame_archivo,
-        text="Seleccionar planilla del mes",
-        command=seleccionar_archivo,
-        font=FONT_BUTTON,
-        bg=ACCENT_COLOR, fg="white",
-        activebackground="#357ABD", activeforeground="white",
-        relief="flat", padx=10, pady=4
-    ).pack(side="right")
+    ctk.CTkButton(frame_excel, text="Seleccionar archivo", command=seleccionar_archivo, width=160).pack(side="right", padx=10)
 
-    # --- SELECCIÓN DE HOJA ---
-    frame_hoja = tk.Frame(root, bg=BG_COLOR)
-    frame_hoja.pack(fill="x", padx=30, pady=(15, 0))
+    # Hoja de trabajo
+    frame_hoja = ctk.CTkFrame(ventana)
+    frame_hoja.pack(padx=30, pady=(0, 10), fill="x")
 
-    tk.Label(
-        frame_hoja,
-        text="Selecciona la hoja de trabajo:",
-        font=FONT_LABEL,
-        bg=BG_COLOR, fg=TEXT_COLOR
-    ).pack(side="left")
+    etiqueta("Hoja de trabajo:", 15).pack(in_=frame_hoja, anchor="w", padx=10, pady=(10, 2))
+    hoja_menu = ctk.CTkOptionMenu(frame_hoja, variable=hoja_var, values=[])
+    hoja_menu.pack(padx=10, pady=(0, 10), fill="x")
 
-    hoja_var = tk.StringVar()
-    hoja_menu = tk.OptionMenu(frame_hoja, hoja_var, "")
-    hoja_menu.config(font=FONT_BUTTON, width=25)
-    hoja_menu.pack(side="left", padx=(10, 0))
+    # Mes y año
+    frame_fecha = ctk.CTkFrame(ventana)
+    frame_fecha.pack(padx=30, pady=10, fill="x")
 
-    # --- SELECCIÓN DE MES Y AÑO ---
-    frame_fecha = tk.Frame(root, bg=BG_COLOR)
-    frame_fecha.pack(fill="x", padx=30, pady=(15, 0))
+    etiqueta("Mes:", 15).pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
+    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+             "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    ctk.CTkOptionMenu(frame_fecha, variable=mes_var, values=meses).pack(padx=10, fill="x")
 
-    tk.Label(frame_fecha, text="Mes:", font=FONT_LABEL, bg=BG_COLOR, fg=TEXT_COLOR).pack(side="left")
+    etiqueta("Año:", 15).pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
+    años = [str(a) for a in range(datetime.now().year - 5, datetime.now().year + 6)]
+    ctk.CTkOptionMenu(frame_fecha, variable=año_var, values=años).pack(padx=10, fill="x", pady=(0, 10))
 
-    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    mes_var = tk.StringVar(value=meses[datetime.now().month - 1])
-    mes_menu = tk.OptionMenu(frame_fecha, mes_var, *meses)
-    mes_menu.config(font=FONT_BUTTON)
-    mes_menu.pack(side="left", padx=(5, 20))
+    # Selección de carpeta destino
+    frame_destino = ctk.CTkFrame(ventana)
+    frame_destino.pack(padx=30, pady=10, fill="x")
 
-    tk.Label(frame_fecha, text="Año:", font=FONT_LABEL, bg=BG_COLOR, fg=TEXT_COLOR).pack(side="left")
-
-    año_actual = datetime.now().year
-    años = list(range(año_actual - 5, año_actual + 6))
-    año_var = tk.StringVar(value=str(año_actual))
-    año_menu = tk.OptionMenu(frame_fecha, año_var, *años)
-    año_menu.config(font=FONT_BUTTON)
-    año_menu.pack(side="left", padx=(5, 0))
-
-
-    # --- SELECCIÓN DE CARPETA DESTINO ---
-    frame_carpeta = tk.Frame(root, bg=BG_COLOR)
-    frame_carpeta.pack(fill="x", padx=30, pady=(10, 0))
-
-    label_carpeta = tk.Label(
-        frame_carpeta,
-        text="Ninguna carpeta seleccionada",
-        fg="red", bg=BG_COLOR,
-        font=("Segoe UI", 10, "italic")
-    )
-    label_carpeta.pack(side="left", padx=(0, 10))
-
-    carpeta_destino = {"ruta": None}
+    etiqueta("Seleccionar carpeta de destino:", 15).pack(in_=frame_destino, anchor="w", padx=10, pady=(10, 2))
+    label_destino = ctk.CTkLabel(frame_destino, text="📂 No seleccionado", text_color="gray")
+    label_destino.pack(side="left", padx=10)
 
     def seleccionar_carpeta():
-        ruta = filedialog.askdirectory(
-            title="Seleccionar carpeta de destino"
-        )
-        if ruta:
-            carpeta_destino["ruta"] = ruta
-            label_carpeta.config(text=f"📂 {ruta}", fg="green")
+        nonlocal carpeta_destino
+        carpeta = filedialog.askdirectory(title="Seleccionar carpeta de destino")
+        if carpeta:
+            carpeta_destino = carpeta
+            label_destino.configure(text=f"📁 {os.path.dirname(carpeta)}", text_color="black")
 
-    tk.Button(
-        frame_carpeta,
-        text="Seleccionar carpeta de destino",
-        command=seleccionar_carpeta,
-        font=FONT_BUTTON,
-        bg=ACCENT_COLOR, fg="white",
-        activebackground="#357ABD", activeforeground="white",
-        relief="flat", padx=10, pady=4
-    ).pack(side="right")
+    ctk.CTkButton(frame_destino, text="Seleccionar carpeta", command=seleccionar_carpeta, width=160).pack(side="right", padx=10)
 
+    # Botón generar documentos
+    def generar():
+        if not ruta_excel:
+            return messagebox.showwarning("Falta archivo", "Por favor selecciona un archivo Excel.")
+        if not hoja_var.get():
+            return messagebox.showwarning("Falta hoja", "Selecciona una hoja del archivo.")
+        if not carpeta_destino:
+            return messagebox.showwarning("Falta carpeta", "Selecciona una carpeta de destino.")
+        try:
+            generar_documentos(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get())
+            messagebox.showinfo("Éxito", "¡Los documentos fueron generados correctamente!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
 
-    # --- BOTÓN GENERAR ---
-    def iniciar_generacion():
-        hoja = hoja_var.get()
-        ruta = getattr(boton_generar, "ruta_excel", None)
-        carpeta = carpeta_destino.get("ruta")
-        mes = mes_var.get()
-        año = año_var.get()
-        if not hoja or not ruta or not carpeta or not mes or not año:
-            messagebox.showerror("Error", "Debe seleccionar todos los campos: archivo, hoja, carpeta, mes y año.")
-            return
-        
-        generar_documentos(ruta, hoja, carpeta, mes, año)
-
-    boton_generar = tk.Button(
-        root,
-        text="📄 Generar documentos",
-        state="disabled",
-        command=iniciar_generacion,
-        font=("Segoe UI", 12, "bold"),
-        bg=PRIMARY_COLOR, fg="white",
-        activebackground="#466a8f",
-        activeforeground="white",
-        relief="flat",
-        padx=12, pady=8
+    boton_generar = ctk.CTkButton(
+        ventana, text="🚀 Generar Documentos", command=generar,
+        state="disabled", height=40, font=ctk.CTkFont(size=14, weight="bold")
     )
-    boton_generar.pack(pady=35)
+    boton_generar.pack(pady=25, padx=60, fill="x")
 
     def volver():
-        root.destroy()
+        ventana.destroy()
         if callback_volver:
             callback_volver()
 
-    tk.Button(
-        root, text="⬅ Volver al Menú Principal",
-        command=volver,
-        font=("Segoe UI", 10),
-        bg="#cccccc", fg="#222",
-        relief="flat", padx=8, pady=4
-    ).pack(pady=(10, 15), side="bottom")
-    
-    
-    # --- PIE DE PÁGINA ---
-    tk.Label(
-        root,
-        text="CEID Generator - FASE INICIAL",
-        font=FONT_FOOTER,
-        bg=BG_COLOR,
-        fg="#a0a8b8"
-    ).pack(side="bottom", pady=(0, 10))
+    ctk.CTkButton(
+        ventana, text="⬅ Volver al menú",
+        command=volver, fg_color="#cccccc", text_color="#222"
+    ).pack(pady=(5, 15))
 
-    root.mainloop()
+    # Footer
+    ctk.CTkLabel(ventana, text="CEID Generator - FASE INICIAL", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 10))
 
-if __name__ == "__main__":
-    iniciar_interfaz_fase_inicial()
+    ventana.mainloop()

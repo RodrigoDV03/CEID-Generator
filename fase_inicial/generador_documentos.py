@@ -37,7 +37,6 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         correo = str(getattr(fila, "Correo_personal", ''))
         celular = limpiar_numero(getattr(fila, "Numero_celular", ""))
         dni_docente = limpiar_numero(getattr(fila, "Numero_dni", ""))
-        idioma = str(getattr(fila, "Docente_idioma", ""))
         if len(dni_docente) < 8:
             dni_docente = dni_docente.zfill(8)
 
@@ -59,10 +58,10 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         monto_categoria_letras = monto_a_letras(monto_categoria)
         monto_total = getattr(fila, "Subtotal_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
+        tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
         nro_contrato = str(getattr(fila, "Nro_Contrato", "N/A"))
 
         # -------- GENERAR OFICIO --------
-        tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
         if tipo_contrato == "CONTRATO":
             plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/modelo_oficio_contrato_FLCH.docx')
         elif tipo_contrato == "TERCERO":
@@ -92,7 +91,6 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
                     "descripcion": descripcion_final,
                     "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
                     "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
-                    "docente_idioma": idioma
                 }
                 reemplazar_en_parrafos(documento_tdr, reemplazos_tdr)
                 reemplazar_en_tablas(documento_tdr, reemplazos_tdr)
@@ -130,5 +128,3 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
 
                 ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
                 documento_cot.save(ruta_salida_cot)
-
-    messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente")

@@ -1,5 +1,5 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
 import os
 from .procesador_planilla import *
 
@@ -8,93 +8,77 @@ def iniciar_interfaz_planilla(callback_volver=None):
     archivo_docentes_path = ""
     archivo_clasif_path = ""
 
-    ventana = tk.Tk()
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("blue")
+
+    ventana = ctk.CTk()
     ventana.title("Generador de Planilla - CEID")
-    ventana.geometry("580x650")
-    ventana.configure(bg="#f4f6fa")
+    ventana.geometry("650x720")
     ventana.resizable(False, False)
 
-    PRIMARY = "#2d415a"
-    ACCENT = "#4a90e2"
-    BG = "#f4f6fa"
-    GRAY = "#a0a8b8"
-    FONT_TITLE = ("Segoe UI", 18, "bold")
-    FONT_LABEL = ("Segoe UI", 11)
-    FONT_TEXT = ("Segoe UI", 10)
-    FONT_BUTTON = ("Segoe UI", 10, "bold")
-    FONT_FOOTER = ("Segoe UI", 9)
+    def titulo(texto):
+        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=22, weight="bold"))
+
+    def seccion_titulo(texto):
+        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=16, weight="bold"))
+
+    def etiqueta(texto):
+        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=13))
 
     # Título
-    tk.Label(ventana, text="Generador de Planilla - CEID", font=FONT_TITLE, bg=BG, fg=PRIMARY).pack(pady=(20, 10))
-    ttk.Separator(ventana, orient="horizontal").pack(fill="x", padx=30)
+    titulo("📄 Generador de Planilla - CEID").pack(pady=(25, 10))
+
+    # Sección Mes y Carga
+    marco_opciones = ctk.CTkFrame(ventana)
+    marco_opciones.pack(pady=10, padx=30, fill="x")
 
     # Mes
-    frame_mes = tk.Frame(ventana, bg=BG)
-    frame_mes.pack(pady=(20, 5), fill="x", padx=30)
-    tk.Label(frame_mes, text="Selecciona el mes:", font=FONT_LABEL, bg=BG, fg=PRIMARY).pack(side="left")
-    mes_var = tk.StringVar(value="Enero")
-    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
-             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    tk.OptionMenu(frame_mes, mes_var, *meses).pack(side="left", padx=(10, 0))
+    etiqueta("Selecciona el mes:").pack(in_=marco_opciones, anchor="w", padx=10, pady=(10, 0))
+    mes_var = ctk.StringVar(value="Enero")
+    ctk.CTkOptionMenu(marco_opciones, variable=mes_var, values=[
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ]).pack(padx=10, pady=(0, 10), fill="x")
 
-    # Número de Carga
-    frame_carga = tk.Frame(ventana, bg=BG)
-    frame_carga.pack(pady=(5, 10), fill="x", padx=30)
-    tk.Label(frame_carga, text="Número de planilla:", font=FONT_LABEL, bg=BG, fg=PRIMARY).pack(side="left")
-    carga_var = tk.IntVar(value=1)
-    opciones_carga = [("1 (Primera carga)", 1), ("2 (Segunda carga)", 2)]
-    for texto, valor in opciones_carga:
-        tk.Radiobutton(frame_carga, text=texto, variable=carga_var, value=valor, bg=BG, font=FONT_TEXT, fg=PRIMARY, selectcolor=BG).pack(side="left", padx=5)
+    # Número de planilla
+    etiqueta("Número de carga:").pack(in_=marco_opciones, anchor="w", padx=10)
+    carga_var = ctk.IntVar(value=1)
+    ctk.CTkRadioButton(marco_opciones, text="1 (Primera carga)", variable=carga_var, value=1).pack(anchor="w", padx=20)
+    ctk.CTkRadioButton(marco_opciones, text="2 (Segunda carga)", variable=carga_var, value=2).pack(anchor="w", padx=20, pady=(0, 10))
 
-    # Cursos
-    frame_cursos = tk.LabelFrame(ventana, text="Archivo crudo (.csv)", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
-    frame_cursos.pack(fill="x", padx=30, pady=(10, 5))
-    label_cursos = tk.Label(frame_cursos, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
-    label_cursos.pack(side="left", padx=(0, 10))
+    # Función para crear selector de archivo
+    def crear_selector_archivo(texto_label, extensiones, actualizar_func):
+        frame = ctk.CTkFrame(ventana)
+        frame.pack(padx=30, pady=10, fill="x")
 
-    def seleccionar_cursos():
-        nonlocal archivo_cursos_path
-        archivo = filedialog.askopenfilename(title="Selecciona archivo de cursos", filetypes=[("Excel o CSV", "*.xlsx *.xls *.csv")])
-        if archivo:
-            archivo_cursos_path = archivo
-            label_cursos.config(text=f"📁 {os.path.basename(archivo)}", fg=PRIMARY)
+        seccion_titulo(texto_label).pack(in_=frame, anchor="w", padx=10, pady=(5, 2))
+        label_estado = ctk.CTkLabel(frame, text="📂 No seleccionado", text_color="gray")
+        label_estado.pack(side="left", padx=10)
 
-    tk.Button(frame_cursos, text="Seleccionar...", font=FONT_BUTTON, bg=ACCENT, fg="white", command=seleccionar_cursos).pack(side="right")
+        def seleccionar():
+            archivo = filedialog.askopenfilename(filetypes=[extensiones])
+            if archivo:
+                actualizar_func(archivo)
+                label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color="black")
+
+        ctk.CTkButton(frame, text="Seleccionar archivo", command=seleccionar, width=160).pack(side="right", padx=10)
+
+    # Curso
+    def actualizar_cursos(path): nonlocal archivo_cursos_path; archivo_cursos_path = path
+    crear_selector_archivo("Archivo de cursos (.csv / .xlsx)", ("Archivos", "*.csv *.xlsx *.xls"), actualizar_cursos)
 
     # Docentes
-    frame_docentes = tk.LabelFrame(ventana, text="Lista de docentes (.xlsx)", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
-    frame_docentes.pack(fill="x", padx=30, pady=(10, 5))
-    label_docentes = tk.Label(frame_docentes, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
-    label_docentes.pack(side="left", padx=(0, 10))
-
-    def seleccionar_docentes():
-        nonlocal archivo_docentes_path
-        archivo = filedialog.askopenfilename(title="Selecciona archivo de docentes", filetypes=[("Excel", "*.xlsx *.xls")])
-        if archivo:
-            archivo_docentes_path = archivo
-            label_docentes.config(text=f"📁 {os.path.basename(archivo)}", fg=PRIMARY)
-
-    tk.Button(frame_docentes, text="Seleccionar...", font=FONT_BUTTON, bg=ACCENT, fg="white", command=seleccionar_docentes).pack(side="right")
+    def actualizar_docentes(path): nonlocal archivo_docentes_path; archivo_docentes_path = path
+    crear_selector_archivo("Lista de docentes (.xlsx)", ("Archivos Excel", "*.xlsx *.xls"), actualizar_docentes)
 
     # Clasificación
-    frame_clasif = tk.LabelFrame(ventana, text="Archivo de Examen de Clasificación (.xlsx)", font=FONT_TEXT, bg=BG, fg=PRIMARY, padx=10, pady=10)
-    frame_clasif.pack(fill="x", padx=30, pady=(10, 5))
-    label_clasif = tk.Label(frame_clasif, text="📂 No seleccionado", fg="gray", bg=BG, font=FONT_TEXT)
-    label_clasif.pack(side="left", padx=(0, 10))
+    def actualizar_clasif(path): nonlocal archivo_clasif_path; archivo_clasif_path = path
+    crear_selector_archivo("Docentes para Examen de Clasificación (.xlsx)", ("Archivos Excel", "*.xlsx *.xls"), actualizar_clasif)
 
-    def seleccionar_clasif():
-        nonlocal archivo_clasif_path
-        archivo = filedialog.askopenfilename(title="Selecciona excel de examen de clasificación", filetypes=[("Excel", "*.xlsx *.xls")])
-        if archivo:
-            archivo_clasif_path = archivo
-            label_clasif.config(text=f"📁 {os.path.basename(archivo)}", fg=PRIMARY)
-
-    tk.Button(frame_clasif, text="Seleccionar...", font=FONT_BUTTON, bg=ACCENT, fg="white", command=seleccionar_clasif).pack(side="right")
-
-    # Procesar
+    # Botón de procesar
     def procesar():
         if not archivo_cursos_path or not archivo_docentes_path or not archivo_clasif_path:
-            messagebox.showerror("Error", "⚠️ Debes seleccionar ambos archivos.")
+            messagebox.showerror("Faltan archivos", "⚠️ Debes seleccionar los tres archivos requeridos.")
             return
         resultado = generar_planilla(
             archivo_cursos_path,
@@ -108,23 +92,22 @@ def iniciar_interfaz_planilla(callback_volver=None):
         else:
             messagebox.showinfo("Éxito", resultado)
 
-    tk.Button(ventana, text="🚀 Procesar y generar archivo", font=("Segoe UI", 12, "bold"), bg=PRIMARY, fg="white", command=procesar).pack(pady=30)
+    ctk.CTkButton(
+        ventana, text="🚀 Generar Planilla",
+        command=procesar, height=40, font=ctk.CTkFont(size=14, weight="bold")
+    ).pack(pady=30, padx=60, fill="x")
 
     def volver():
         ventana.destroy()
         if callback_volver:
             callback_volver()
 
-    tk.Button(
-        ventana, text="⬅ Volver al Menú Principal",
-        command=volver,
-        font=("Segoe UI", 10),
-        bg="#cccccc", fg="#222",
-        relief="flat", padx=8, pady=4
-    ).pack(pady=(10, 15), side="bottom")
+    ctk.CTkButton(
+        ventana, text="⬅ Volver al menú",
+        command=volver, fg_color="#cccccc", text_color="#222"
+    ).pack(pady=(10, 20))
 
-
-
-    tk.Label(ventana, text="CEID Generator - v1.0", font=FONT_FOOTER, bg=BG, fg=GRAY).pack(side="bottom", pady=(0, 12))
+    # Footer
+    ctk.CTkLabel(ventana, text="CEID Generator - v1.0 · Área de Sistemas", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 10))
 
     ventana.mainloop()
