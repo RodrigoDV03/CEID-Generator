@@ -104,7 +104,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     ctk.CTkButton(
         ventana, text="⬅ Volver al menú",
-        command=volver, fg_color="#cccccc", text_color="#222"
+        command=volver, fg_color="#ff6969", text_color="#222"
     ).pack(pady=(10, 20))
 
     # Footer

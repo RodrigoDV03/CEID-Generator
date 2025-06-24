@@ -3,7 +3,6 @@ import sys
 import pandas as pd
 from docx import Document
 from .utils import *
-from docx2pdf import convert
 
 def ruta_absoluta_relativa(path_relativo):
     if getattr(sys, 'frozen', False):
@@ -119,3 +118,5 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
 
                 ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
                 documento_cot.save(ruta_salida_cot)
+
+        print (f"{docente} - Documentos generados correctamente.")

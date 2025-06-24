@@ -92,9 +92,6 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año)
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
     df_control = pd.read_excel(ruta_docente)
 
-    generados = []
-    errores = []
-
     for _, fila in df.iterrows():
         try:
             estado = str(getattr(fila, "Contrato_o_tercero", "")).strip().upper()
@@ -116,7 +113,6 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año)
             ruta_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
 
             generar_conformidad_desde_excel(fila, plantilla, ruta_conformidad)
-            generados.append(os.path.join("FASE FINAL", nombre_docente, nombre_archivo_conformidad))
 
             # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
             if estado == "CONTRATO":
@@ -130,22 +126,19 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año)
                     monto_total = float(monto_total) if not pd.isna(monto_total) else 0
 
                     generar_control_avance(fila=fila, monto_subtotal=monto_total, ruta_salida=ruta_control, plantilla_control_path=plantilla_control, df_control=df_control)
-
-                    generados.append(os.path.join("FASE FINAL", nombre_docente, nombre_archivo_control))
-
                 except Exception as e:
-                    errores.append((str(getattr(fila, "Docente", "Desconocido")) + " [CONTROL]", str(e)))
-
+                    print(f"Error al generar control de avance para {nombre_docente}: {e}")
+                    continue
         except Exception as e:
-            errores.append((fila.get("Docente", "Desconocido"), str(e)))
+            print(f"Error procesando fila para {docente}: {e}")
+            continue
 
-    return generados, errores
+        print(f"{docente} - Documentos generados correctamente.")
 
 
 def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_path, df_control):
 
     nombre_docente = str(getattr(fila, "Docente", ""))
-    nombre_archivo_docente = limpiar_nombre_archivo(nombre_docente)
 
     # Buscar coincidencia en Excel fijo
     resultado = process.extractOne(nombre_docente, df_control["Docente"], scorer=fuzz.token_sort_ratio)

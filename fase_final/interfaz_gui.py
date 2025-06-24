@@ -1,19 +1,22 @@
+import sys
+import threading
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
-from datetime import datetime
-from tkinter import ttk, filedialog, messagebox
 import pandas as pd
 import os
+from tkinter import filedialog, messagebox
+from datetime import datetime
 from .generador import *
 
 def iniciar_interfaz_fase_final(callback_volver=None):
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
-    # --- VENTANA PRINCIPAL ---
+
     root = ctk.CTk()
     root.title("Fase Final | Generador de Archivos CEID")
     root.geometry("650x800")
-    root.resizable(False, False)
+    root.resizable(True, True)
+    root.after(100, lambda: root.state("zoomed"))
+
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
@@ -121,20 +124,49 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     # --- BOTÓN GENERAR ---
     def iniciar_generacion():
-        # if not ruta_excel or not archivo_docente or not hoja_var.get() or not carpeta_destino:
-        #     messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
-        #     return
-        try:
-            procesar_planilla(ruta_excel, archivo_docente, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get())
-            messagebox.showinfo("Éxito", f"Documentos de fase final generados correctamente.")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
+        if not ruta_excel or not archivo_docente or not hoja_var.get() or not carpeta_destino:
+            messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
+            return
+        def tarea():
+            try:
+                procesar_planilla(ruta_excel, archivo_docente, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get())
+                messagebox.showinfo("Éxito", f"Documentos de fase final generados correctamente.")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
+        threading.Thread(target=tarea).start()
 
     boton_generar = ctk.CTkButton(
         root, text="🚀 Generar Documentos", command=iniciar_generacion,
         state="disabled", height=40, font=ctk.CTkFont(size=14, weight="bold")
     )
     boton_generar.pack(pady=25, padx=60, fill="x")
+
+    # --- Consola embebida ---
+    consola_frame = ctk.CTkFrame(root, height=150)
+    consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
+
+    etiqueta("Consola de salida:", 15).pack(in_=consola_frame, anchor="w", padx=10, pady=(10, 2))
+
+    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
+    consola_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
+    consola_text.configure(state="disabled")  # Solo lectura
+
+    class TextRedirector:
+        def __init__(self, text_widget):
+            self.text_widget = text_widget
+
+        def write(self, message):
+            self.text_widget.configure(state="normal")
+            self.text_widget.insert("end", message)
+            self.text_widget.see("end")
+            self.text_widget.configure(state="disabled")
+
+        def flush(self):
+            pass
+
+    # Redirigir stdout y stderr
+    sys.stdout = TextRedirector(consola_text)
+    sys.stderr = TextRedirector(consola_text) 
 
     def volver():
         root.destroy()
@@ -143,7 +175,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     ctk.CTkButton(
         root, text="⬅ Volver al menú",
-        command=volver, fg_color="#cccccc", text_color="#222"
+        command=volver, fg_color="#ff6969", text_color="#222"
     ).pack(pady=(5, 15))
 
     # Footer

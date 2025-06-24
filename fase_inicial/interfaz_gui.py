@@ -1,8 +1,10 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
-from datetime import datetime
 import os
 import pandas as pd
+import sys
+import threading
+from tkinter import filedialog, messagebox
+from datetime import datetime
 from .generador_documentos import *
 
 def iniciar_interfaz_fase_inicial(callback_volver=None):
@@ -12,7 +14,9 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     ventana = ctk.CTk()
     ventana.title("Fase Inicial | Generador de Archivos CEID")
     ventana.geometry("650x700")
-    ventana.resizable(False, False)
+    ventana.resizable(True, True)
+    ventana.after(100, lambda: ventana.state("zoomed"))
+
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
@@ -99,17 +103,47 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
             return messagebox.showwarning("Falta hoja", "Selecciona una hoja del archivo.")
         if not carpeta_destino:
             return messagebox.showwarning("Falta carpeta", "Selecciona una carpeta de destino.")
-        try:
-            generar_documentos(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get())
-            messagebox.showinfo("Éxito", "¡Los documentos fueron generados correctamente!")
-        except Exception as e:
-            messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
+        def tarea():
+            try:
+                generar_documentos(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get())
+                messagebox.showinfo("Éxito", "¡Los documentos fueron generados correctamente!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
+
+        threading.Thread(target=tarea).start()
 
     boton_generar = ctk.CTkButton(
         ventana, text="🚀 Generar Documentos", command=generar,
         state="disabled", height=40, font=ctk.CTkFont(size=14, weight="bold")
     )
     boton_generar.pack(pady=25, padx=60, fill="x")
+
+    # --- Consola embebida ---
+    consola_frame = ctk.CTkFrame(ventana, height=150)
+    consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
+
+    etiqueta("Consola de salida:", 15).pack(in_=consola_frame, anchor="w", padx=10, pady=(10, 2))
+
+    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
+    consola_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
+    consola_text.configure(state="disabled")  # Solo lectura
+
+    class TextRedirector:
+        def __init__(self, text_widget):
+            self.text_widget = text_widget
+
+        def write(self, message):
+            self.text_widget.configure(state="normal")
+            self.text_widget.insert("end", message)
+            self.text_widget.see("end")
+            self.text_widget.configure(state="disabled")
+
+        def flush(self):
+            pass
+
+    # Redirigir stdout y stderr
+    sys.stdout = TextRedirector(consola_text)
+    sys.stderr = TextRedirector(consola_text)
 
     def volver():
         ventana.destroy()
@@ -118,8 +152,10 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     ctk.CTkButton(
         ventana, text="⬅ Volver al menú",
-        command=volver, fg_color="#cccccc", text_color="#222"
+        command=volver, fg_color="#ff6969", text_color="#222"
     ).pack(pady=(5, 15))
+
+
 
     # Footer
     ctk.CTkLabel(ventana, text="CEID Generator - FASE INICIAL", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 10))

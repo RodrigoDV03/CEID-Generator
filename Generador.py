@@ -33,8 +33,7 @@ def iniciar_interfaz_general():
     root.title("CEID - Sistema de Generación de Documentos")
     root.geometry("500x420")
     root.configure(fg_color=BG)
-    root.resizable(False, False)
-    
+    root.resizable(True, True)
 
     FONT_TITLE = ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
     FONT_BUTTON = ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
