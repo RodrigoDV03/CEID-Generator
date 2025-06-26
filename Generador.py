@@ -34,6 +34,8 @@ def iniciar_interfaz_general():
     root.geometry("500x420")
     root.configure(fg_color=BG)
     root.resizable(True, True)
+    root.after(100, lambda: root.state("zoomed"))
+
 
     FONT_TITLE = ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
     FONT_BUTTON = ctk.CTkFont(family="Segoe UI", size=14, weight="bold")

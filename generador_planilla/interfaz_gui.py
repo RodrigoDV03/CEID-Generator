@@ -14,7 +14,9 @@ def iniciar_interfaz_planilla(callback_volver=None):
     ventana = ctk.CTk()
     ventana.title("Generador de Planilla - CEID")
     ventana.geometry("650x720")
-    ventana.resizable(False, False)
+    ventana.resizable(True, True)
+    ventana.after(100, lambda: ventana.state("zoomed"))
+
 
     def titulo(texto):
         return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=22, weight="bold"))
