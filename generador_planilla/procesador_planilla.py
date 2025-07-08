@@ -16,7 +16,7 @@ def traducir_dias(dias_raw: str) -> str:
     dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
     return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
 
-def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: str, mes_seleccionado: str, numero_carga: int):
+def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: str, mes_seleccionado: str, numero_carga: int, ruta_planilla_anterior: str = None):
 
     try:
         extension = os.path.splitext(ruta_cursos)[-1].lower()
@@ -33,10 +33,47 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
     
         datos_docentes = pd.read_excel(ruta_docentes, sheet_name="list")
 
+
+
         datos['docente'] = datos['docente'].astype(str).str.strip()
         datos_docentes['Docente'] = datos_docentes['Docente'].astype(str).str.strip()
 
         datos = datos[~datos['docente'].isin(['', ',', None])]
+
+        if numero_carga == 2 and ruta_planilla_anterior and os.path.exists(ruta_planilla_anterior):
+            try:
+                df_raw = pd.read_excel(ruta_planilla_anterior, sheet_name="1 carga académica", header=None)
+
+                # Buscar la fila donde está la cabecera real (debe incluir "Docente" y "Curso")
+                fila_header = None
+                for idx, fila in df_raw.iterrows():
+                    if "Docente" in fila.values and "Curso" in fila.values:
+                        fila_header = idx
+                        break
+
+                if fila_header is None:
+                    raise ValueError("Columna 'Docente' no encontrada en la planilla anterior.")
+
+                planilla_anterior_df = pd.read_excel(
+                    ruta_planilla_anterior, sheet_name="1 carga académica", header=fila_header
+                )
+
+                planilla_anterior_df['Docente'] = planilla_anterior_df['Docente'].astype(str).str.strip()
+                planilla_anterior_df['Curso'] = planilla_anterior_df[['Idioma', 'Nivel', 'Ciclo']].astype(str).agg(' '.join, axis=1)
+
+                datos['Curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
+                datos['Docente'] = datos['docente'].astype(str).str.strip()
+
+                combinacion_anterior = set(zip(planilla_anterior_df['Docente'], planilla_anterior_df['Curso']))
+                datos = datos[~datos.apply(lambda row: (row['Docente'], row['Curso']) in combinacion_anterior, axis=1)]
+
+                print(f"🟡 Cursos nuevos tras comparación con primera planilla: {len(datos)}")
+
+            except Exception as e:
+                print(f"⚠️ Error al comparar con la primera planilla: {e}")
+
+
+
         datos['detalles_curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
         agrupar = (
@@ -61,7 +98,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         agrupar['Curso Dictado'] = agrupar['Categoria (Monto)'] * agrupar['cantidad_cursos'] * 28
         agrupar['Diseño de Examenes'] = agrupar['Categoria (Monto)'] * agrupar['cantidad_cursos'] * 4
 
-        # Examen de clasificación (manejo opcional)
         if os.path.exists(ruta_clasificacion):
             try:
                 clasif_df = pd.read_excel(ruta_clasificacion, header=1)
@@ -190,7 +226,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 ws["A1"].fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
                 ws["A1"].font = Font(bold=True, color="ffffff", size=22)
 
-                # Aplicar bordes, centrado y ajuste de columnas
                 thin_border = Border(
                     left=Side(style='thin'),
                     right=Side(style='thin'),
@@ -203,7 +238,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                         cell.border = thin_border
                         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
 
-                # Ajustar ancho de columnas automáticamente
                 for col in ws.columns:
                     max_length = 0
                     col_letter = get_column_letter(col[0].column)
@@ -215,7 +249,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                                     max_length = cell_len
                             except:
                                 pass
-                    adjusted_width = max_length + 2  # Un poco de margen extra
+                    adjusted_width = max_length + 2
                     ws.column_dimensions[col_letter].width = adjusted_width
 
             for col in range(1, max_col + 1):
@@ -227,13 +261,11 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             if hoja == f"Planilla {mes_seleccionado}":
                 fila_total = ws.max_row + 1
 
-                # Escribir la palabra "Totales" en la columna A y combinar de A hasta G
                 ws.merge_cells(f"A{fila_total}:G{fila_total}")
                 celda_total = ws[f"A{fila_total}"]
                 celda_total.alignment = Alignment(horizontal="center", vertical="center")
                 celda_total.fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
 
-                # Insertar fórmulas para H a M
                 columnas_sumar = ['H', 'I', 'J', 'K', 'L', 'M']
                 for col in columnas_sumar:
                     celda = ws[f"{col}{fila_total}"]

@@ -7,6 +7,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""
     archivo_docentes_path = ""
     archivo_clasif_path = ""
+    archivo_planilla_anterior_path = ""
 
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
@@ -48,6 +49,34 @@ def iniciar_interfaz_planilla(callback_volver=None):
     ctk.CTkRadioButton(marco_opciones, text="1 (Primera carga)", variable=carga_var, value=1).pack(anchor="w", padx=20)
     ctk.CTkRadioButton(marco_opciones, text="2 (Segunda carga)", variable=carga_var, value=2).pack(anchor="w", padx=20, pady=(0, 10))
 
+    # Planilla anterior (solo visible si es segunda carga)
+    marco_planilla_anterior = ctk.CTkFrame(ventana)
+    seccion_titulo("Planilla anterior - Solo para segunda carga").pack(in_=marco_planilla_anterior, anchor="w", padx=10, pady=(5, 2))
+    label_planilla_estado = ctk.CTkLabel(marco_planilla_anterior, text="📂 No seleccionado", text_color="gray")
+    label_planilla_estado.pack(side="left", padx=10)
+
+    def seleccionar_planilla_anterior():
+        archivo = filedialog.askopenfilename(filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        if archivo:
+            nonlocal archivo_planilla_anterior_path
+            archivo_planilla_anterior_path = archivo
+            label_planilla_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color="black")
+
+    btn_planilla_anterior = ctk.CTkButton(marco_planilla_anterior, text="Seleccionar planilla anterior", command=seleccionar_planilla_anterior, width=200)
+    btn_planilla_anterior.pack(side="right", padx=10)
+
+    def actualizar_visibilidad_planilla_anterior(*args):
+        if carga_var.get() == 2:
+            marco_planilla_anterior.pack(padx=30, pady=10, fill="x")
+        else:
+            marco_planilla_anterior.pack_forget()
+            nonlocal archivo_planilla_anterior_path
+            archivo_planilla_anterior_path = ""
+            label_planilla_estado.configure(text="📂 No seleccionado", text_color="gray")
+
+    carga_var.trace_add("write", actualizar_visibilidad_planilla_anterior)
+    actualizar_visibilidad_planilla_anterior()
+
     # Función para crear selector de archivo
     def crear_selector_archivo(texto_label, extensiones, actualizar_func):
         frame = ctk.CTkFrame(ventana)
@@ -87,7 +116,8 @@ def iniciar_interfaz_planilla(callback_volver=None):
             archivo_docentes_path,
             archivo_clasif_path,
             mes_var.get(),
-            carga_var.get()
+            carga_var.get(),
+            archivo_planilla_anterior_path if carga_var.get() == 2 else None
         )
         if resultado.startswith("Error"):
             messagebox.showerror("Error", resultado)
