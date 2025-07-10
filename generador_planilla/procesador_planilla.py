@@ -39,12 +39,12 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         datos_docentes['Docente'] = datos_docentes['Docente'].astype(str).str.strip()
 
         datos = datos[~datos['docente'].isin(['', ',', None])]
+        datos_csv_original = datos.copy()
 
         if numero_carga == 2 and ruta_planilla_anterior and os.path.exists(ruta_planilla_anterior):
             try:
                 df_raw = pd.read_excel(ruta_planilla_anterior, sheet_name="1 carga académica", header=None)
 
-                # Buscar la fila donde está la cabecera real (debe incluir "Docente" y "Curso")
                 fila_header = None
                 for idx, fila in df_raw.iterrows():
                     if "Docente" in fila.values and "Curso" in fila.values:
@@ -66,8 +66,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
 
                 combinacion_anterior = set(zip(planilla_anterior_df['Docente'], planilla_anterior_df['Curso']))
                 datos = datos[~datos.apply(lambda row: (row['Docente'], row['Curso']) in combinacion_anterior, axis=1)]
-
-                print(f"🟡 Cursos nuevos tras comparación con primera planilla: {len(datos)}")
 
             except Exception as e:
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
@@ -149,27 +147,90 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
             TABLA.to_excel(writer, sheet_name=f"Planilla {mes_seleccionado}", index=False)
             columnas_extra = ['Idioma', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
-            hoja_generador = (
-                TABLA
-                .merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left')
-                .rename(columns={
-                    'Cantidad Cursos': 'Cantidad_cursos',
-                    'Examen Clasif.': 'Examen_clasif',
-                    'Categoria (Letra)': 'Categoria_letra',
-                    'Categoria (Monto)': 'Categoria_monto',
-                    'Sub Total Pago S/.': 'Subtotal_pago',
-                    'Contrato o Tercero': 'Contrato_o_tercero',
-                    'Idioma': 'Docente_idioma',
-                    'N°. Ruc': 'N_Ruc',
-                    'Nro. Documento': 'Numero_dni',
-                    'Celular': 'Numero_celular',
-                    'Dirección': 'Domicilio_docente',
-                    'Correo personal': 'Correo_personal',
-                    'N° Contrato': 'Nro_contrato'
-                })
+
+            # === Construir hoja Planilla_Generador sin filtrar por carga ===
+            datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
+            datos_csv_original['docente'] = datos_csv_original['docente'].astype(str).str.strip()
+
+            agrupar_gen = (
+                datos_csv_original.groupby('docente')
+                    .agg(curso=('Curso', lambda x: ' / '.join(x)),
+                        cantidad_cursos=('Curso', 'count'))
+                    .reset_index()
             )
-            hoja_generador['Numero_dni'] = hoja_generador['Numero_dni'].apply(lambda x: str(int(float(x))).zfill(8) if pd.notna(x) else '')
-            hoja_generador.to_excel(writer, sheet_name="Planilla_Generador", index=False)
+
+            nombres_base = datos_docentes['Docente'].tolist()
+            agrupar_gen['Docente'] = [
+                process.extractOne(n, nombres_base, scorer=fuzz.token_sort_ratio)[0]
+                if process.extractOne(n, nombres_base, scorer=fuzz.token_sort_ratio)[1] >= 85 else None
+                for n in agrupar_gen['docente']
+            ]
+
+            agrupar_gen = agrupar_gen.merge(
+                datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Contrato o tercero']],
+                on='Docente', how='left'
+            )
+
+            agrupar_gen['Curso Dictado'] = agrupar_gen['Categoria (Monto)'] * agrupar_gen['cantidad_cursos'] * 28
+            agrupar_gen['Diseño de Examenes'] = agrupar_gen['Categoria (Monto)'] * agrupar_gen['cantidad_cursos'] * 4
+
+            # Clasificación sin distinguir carga
+            if os.path.exists(ruta_clasificacion):
+                try:
+                    clasif_df = pd.read_excel(ruta_clasificacion, header=1)
+                    clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
+                    clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
+
+                    agrupar_gen['docente_norm'] = agrupar_gen['Docente'].apply(normalizar_texto)
+                    agrupar_gen = agrupar_gen.merge(clasif_df[['docente_norm', 'Monto']], on='docente_norm', how='left')
+                    agrupar_gen['Examen Clasif.'] = agrupar_gen['Monto'].fillna(0)
+                    agrupar_gen.drop(columns=['docente_norm', 'Monto'], inplace=True)
+                except Exception as e:
+                    print(f"⚠️ Error al leer archivo de clasificación para Planilla_Generador: {e}")
+                    agrupar_gen['Examen Clasif.'] = 0
+            else:
+                agrupar_gen['Examen Clasif.'] = 0
+
+            TABLA_GENERADOR = pd.DataFrame({
+                'N°': range(1, len(agrupar_gen) + 1),
+                'Docente': agrupar_gen['Docente'],
+                'Sede': agrupar_gen['Sede'],
+                'Categoria (Letra)': agrupar_gen['Categoria (Letra)'],
+                'Categoria (Monto)': agrupar_gen['Categoria (Monto)'],
+                'N°. Ruc': agrupar_gen['N°. Ruc'],
+                'Curso': agrupar_gen['curso'],
+                'Curso Dictado': agrupar_gen['Curso Dictado'],
+                'Extra Curso': 0,
+                'Cantidad Cursos': agrupar_gen['cantidad_cursos'],
+                'Diseño de Examenes': agrupar_gen['Diseño de Examenes'],
+                'Examen Clasif.': agrupar_gen['Examen Clasif.'],
+                'Sub Total Pago S/.': 0,
+                'Contrato o Tercero': agrupar_gen['Contrato o tercero']
+            })
+            TABLA_GENERADOR['Sub Total Pago S/.'] = (
+                TABLA_GENERADOR['Curso Dictado'] + TABLA_GENERADOR['Extra Curso'] +
+                TABLA_GENERADOR['Diseño de Examenes'] + TABLA_GENERADOR['Examen Clasif.']
+            )
+
+            # Agregar a Excel
+            TABLA_GENERADOR.merge(
+                datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left'
+            ).rename(columns={
+                'Cantidad Cursos': 'Cantidad_cursos',
+                'Examen Clasif.': 'Examen_clasif',
+                'Categoria (Letra)': 'Categoria_letra',
+                'Categoria (Monto)': 'Categoria_monto',
+                'Sub Total Pago S/.': 'Subtotal_pago',
+                'Contrato o Tercero': 'Contrato_o_tercero',
+                'Idioma': 'Docente_idioma',
+                'N°. Ruc': 'N_Ruc',
+                'Nro. Documento': 'Numero_dni',
+                'Celular': 'Numero_celular',
+                'Dirección': 'Domicilio_docente',
+                'Correo personal': 'Correo_personal',
+                'N° Contrato': 'Nro_contrato'
+            }).to_excel(writer, sheet_name="Planilla_Generador", index=False)
+
 
             df_carga = pd.DataFrame({
                 'Dias': datos['dias'].apply(traducir_dias),
@@ -195,6 +256,94 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             df_carga = df_carga.sort_values(by='Docente', ascending=True).reset_index(drop=True)
             df_carga.insert(0, 'N°', range(1, len(df_carga) + 1))
             df_carga.to_excel(writer, sheet_name=nombre_hoja_carga, index=False)
+            # === CARGA ACADÉMICA CONSOLIDADA ===
+            df_carga_consol = pd.DataFrame({
+                'Dias': datos_csv_original['dias'].apply(traducir_dias),
+                'H. Inicio': datos_csv_original['horainicio'].astype(str).str[:5],
+                'H. Fin': datos_csv_original['horafin'].astype(str).str[:5],
+                'Idioma': datos_csv_original['idioma'],
+                'Nivel': datos_csv_original['nivel'].str.replace('Ã¡', 'á', regex=False),
+                'Ciclo': datos_csv_original['ciclo'],
+                'Curso': datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1),
+                'Sede': datos_csv_original['sede'],
+                'Sec.': '',
+                'Matr.': datos_csv_original['matriculados'],
+                'Docente': datos_csv_original['docente'],
+                'Modalidad': datos_csv_original['modalidad'],
+                'Estado Planilla': "Consolidado"
+            })
+            df_carga_consol = df_carga_consol.sort_values(by='Docente').reset_index(drop=True)
+            df_carga_consol.insert(0, 'N°', range(1, len(df_carga_consol) + 1))
+
+            df_carga_consol.to_excel(writer, sheet_name="Carga académica consolidada", index=False)
+
+            if numero_carga == 2:
+                datos_csv_original['Docente'] = datos_csv_original['docente'].astype(str).str.strip()
+                datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
+
+                agrupar_consol = (
+                    datos_csv_original.groupby('docente')
+                        .agg(curso=('Curso', lambda x: ' / '.join(x)),
+                            cantidad_cursos=('Curso', 'count'))
+                        .reset_index()
+                )
+
+                nombres_base = datos_docentes['Docente'].tolist()
+                agrupar_consol['Docente'] = [
+                    process.extractOne(n, nombres_base, scorer=fuzz.token_sort_ratio)[0]
+                    if process.extractOne(n, nombres_base, scorer=fuzz.token_sort_ratio)[1] >= 85 else None
+                    for n in agrupar_consol['docente']
+                ]
+
+                agrupar_consol = agrupar_consol.merge(
+                    datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Contrato o tercero']],
+                    on='Docente', how='left'
+                )
+
+                agrupar_consol['Curso Dictado'] = agrupar_consol['Categoria (Monto)'] * agrupar_consol['cantidad_cursos'] * 28
+                agrupar_consol['Diseño de Examenes'] = agrupar_consol['Categoria (Monto)'] * agrupar_consol['cantidad_cursos'] * 4
+
+                if os.path.exists(ruta_clasificacion):
+                    try:
+                        clasif_df = pd.read_excel(ruta_clasificacion, header=1)
+                        clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
+                        clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
+
+                        agrupar_consol['docente_norm'] = agrupar_consol['Docente'].apply(normalizar_texto)
+                        agrupar_consol = agrupar_consol.merge(clasif_df[['docente_norm', 'Monto']], on='docente_norm', how='left')
+                        agrupar_consol['Examen Clasif.'] = agrupar_consol['Monto'].fillna(0)
+                        agrupar_consol.drop(columns=['docente_norm', 'Monto'], inplace=True)
+                    except Exception as e:
+                        print(f"⚠️ Error al leer archivo de clasificación para planilla consolidada: {e}")
+                        agrupar_consol['Examen Clasif.'] = 0
+                else:
+                    agrupar_consol['Examen Clasif.'] = 0
+
+                TABLA_CONSOLIDADA = pd.DataFrame({
+                    'N°': range(1, len(agrupar_consol) + 1),
+                    'Docente': agrupar_consol['Docente'],
+                    'Sede': agrupar_consol['Sede'],
+                    'Categoria (Letra)': agrupar_consol['Categoria (Letra)'],
+                    'Categoria (Monto)': agrupar_consol['Categoria (Monto)'],
+                    'N°. Ruc': agrupar_consol['N°. Ruc'],
+                    'Curso': agrupar_consol['curso'],
+                    'Curso Dictado': agrupar_consol['Curso Dictado'],
+                    'Extra Curso': 0,
+                    'Cantidad Cursos': agrupar_consol['cantidad_cursos'],
+                    'Diseño de Examenes': agrupar_consol['Diseño de Examenes'],
+                    'Examen Clasif.': agrupar_consol['Examen Clasif.'],
+                    'Sub Total Pago S/.': 0,
+                    'Contrato o Tercero': agrupar_consol['Contrato o tercero']
+                })
+
+                TABLA_CONSOLIDADA['Sub Total Pago S/.'] = (
+                    TABLA_CONSOLIDADA['Curso Dictado'] + TABLA_CONSOLIDADA['Extra Curso'] +
+                    TABLA_CONSOLIDADA['Diseño de Examenes'] + TABLA_CONSOLIDADA['Examen Clasif.']
+                )
+
+                TABLA_CONSOLIDADA.to_excel(writer, sheet_name="Planilla consolidada", index=False)
+
+
 
         wb = load_workbook(ruta_salida)
         titulo_fusionado = (
@@ -211,7 +360,13 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
             (nombre_hoja_carga, 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL")
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+
+            ("Carga académica consolidada", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nCARGA ACADÉMICA CONSOLIDADA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+
+            ("Planilla consolidada", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nPLANILLA CONSOLIDADA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL")
         ]
 
         for hoja, titulo_fusionado in hojas_con_titulo:
@@ -273,7 +428,14 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     celda.font = Font(bold=True)
                     celda.alignment = Alignment(horizontal="center", vertical="center")
 
-        hojas_ordenadas = ["Examen de clasificación", nombre_hoja_carga, f"Planilla {mes_seleccionado}", "Planilla_Generador"]
+        hojas_ordenadas = [
+            "Examen de clasificación",
+            nombre_hoja_carga,
+            f"Planilla {mes_seleccionado}",
+            "Planilla_Generador",
+            "Carga académica consolidada",
+            "Planilla consolidada"
+        ]
         hojas_existentes = wb.sheetnames
         nuevas_hojas = [hoja for hoja in hojas_ordenadas if hoja in hojas_existentes]
         for idx, hoja in enumerate(nuevas_hojas):
