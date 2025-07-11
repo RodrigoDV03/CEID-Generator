@@ -3,8 +3,6 @@ import pandas as pd
 from num2words import num2words
 
 
-def limpiar_nombre_archivo(nombre):
-    return re.sub(r'[\\/*?:"<>|]', "", nombre)
 
 def limpiar_numero(valor):
     return "" if pd.isna(valor) else str(valor).split('.')[0]

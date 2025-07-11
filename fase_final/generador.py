@@ -16,7 +16,7 @@ def ruta_absoluta_relativa(path_relativo):
 def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
 
     docente = str(getattr(fila, "Docente", "N/A"))
-    nombre_docente = limpiar_nombre_archivo(docente)
+    nombre_docente = docente
 
     if not os.path.exists(plantilla_path):
         raise FileNotFoundError(f"No se encontró la plantilla: {plantilla_path}")
@@ -96,7 +96,7 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año)
         try:
             estado = str(getattr(fila, "Contrato_o_tercero", "")).strip().upper()
             docente = str(getattr(fila, "Docente", "N/A"))
-            nombre_docente = limpiar_nombre_archivo(docente)
+            nombre_docente = docente
 
             if estado == "CONTRATO":
                 plantilla = ruta_absoluta_relativa("Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx")
