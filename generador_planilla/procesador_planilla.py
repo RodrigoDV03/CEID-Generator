@@ -43,7 +43,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
 
         if numero_carga == 2 and ruta_planilla_anterior and os.path.exists(ruta_planilla_anterior):
             try:
-                df_raw = pd.read_excel(ruta_planilla_anterior, sheet_name="1 carga académica", header=None)
+                df_raw = pd.read_excel(ruta_planilla_anterior, sheet_name="1ra carga académica", header=None)
 
                 fila_header = None
                 for idx, fila in df_raw.iterrows():
@@ -55,7 +55,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     raise ValueError("Columna 'Docente' no encontrada en la planilla anterior.")
 
                 planilla_anterior_df = pd.read_excel(
-                    ruta_planilla_anterior, sheet_name="1 carga académica", header=fila_header
+                    ruta_planilla_anterior, sheet_name="1ra carga académica", header=fila_header
                 )
 
                 planilla_anterior_df['Docente'] = planilla_anterior_df['Docente'].astype(str).str.strip()
@@ -137,7 +137,11 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         año_actual = datetime.datetime.now().year
 
         estado_planilla = "Primera planilla" if numero_carga == 1 else "Segunda planilla"
-        nombre_hoja_carga = f"{numero_carga} carga académica"
+        if numero_carga == 1:
+            numero_carga_letra = "1ra"
+        else:
+            numero_carga_letra = "2da"
+        nombre_hoja_carga = f"{numero_carga_letra} carga académica"
 
         carpeta_salida = f"{mes_seleccionado} {año_actual}"
         os.makedirs(carpeta_salida, exist_ok=True)
@@ -145,7 +149,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         ruta_salida = os.path.join(carpeta_salida, nombre_salida)
 
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
-            TABLA.to_excel(writer, sheet_name=f"Planilla {mes_seleccionado}", index=False)
+            TABLA.to_excel(writer, sheet_name=f"{numero_carga_letra} Planilla {mes_seleccionado}", index=False)
             columnas_extra = ['Idioma', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
 
             # === Construir hoja Planilla_Generador sin filtrar por carga ===
@@ -342,13 +346,11 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 )
 
                 TABLA_CONSOLIDADA.to_excel(writer, sheet_name="Planilla consolidada", index=False)
-
-
-
+        
         wb = load_workbook(ruta_salida)
         titulo_fusionado = (
             "CENTRO DE IDIOMAS - FLCH - UNMSM\n"
-            f"{numero_carga} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\n"
+            f"{numero_carga_letra} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\n"
             "MODALIDAD: VIRTUAL Y PRESENCIAL"
         )
 
@@ -356,11 +358,11 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             ("Examen de clasificación", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
-            (f"Planilla {mes_seleccionado}", 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+            (f"{numero_carga_letra} Planilla {mes_seleccionado}", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
             (nombre_hoja_carga, 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
 
             ("Carga académica consolidada", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nCARGA ACADÉMICA CONSOLIDADA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
@@ -413,7 +415,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 celda.fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
                 celda.font = Font(bold=True, color="ffffff", size=12)
 
-            if hoja == f"Planilla {mes_seleccionado}":
+            if hoja == f"{numero_carga_letra} Planilla {mes_seleccionado}":
                 fila_total = ws.max_row + 1
 
                 ws.merge_cells(f"A{fila_total}:G{fila_total}")
@@ -431,7 +433,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         hojas_ordenadas = [
             "Examen de clasificación",
             nombre_hoja_carga,
-            f"Planilla {mes_seleccionado}",
+            f"{numero_carga_letra} Planilla {mes_seleccionado}",
             "Planilla_Generador",
             "Carga académica consolidada",
             "Planilla consolidada"
