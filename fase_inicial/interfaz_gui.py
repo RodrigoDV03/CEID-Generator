@@ -11,35 +11,45 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
+
     ventana = ctk.CTk()
     ventana.title("Fase Inicial | Generador de Archivos CEID")
-    ventana.geometry("650x700")
-    ventana.resizable(True, True)
+    ventana.geometry("800x750")
+    ventana.configure(fg_color="#f4f5f7")
     ventana.after(100, lambda: ventana.state("zoomed"))
 
+    # Fuentes y colores
+    FONT_TITLE = ctk.CTkFont(family="Segoe UI", size=26, weight="bold")
+    FONT_NORMAL = ctk.CTkFont(family="Segoe UI", size=11)
+    FONT_FOOTER = ctk.CTkFont(family="Segoe UI", size=8, slant="italic")
+
+    PRIMARY = "#2d415a"
+    ACCENT = "#4a90e2"
+    GRAY = "#a0a8b8"
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     año_var = ctk.StringVar(value=str(datetime.now().year))
+    numero_armada = ctk.StringVar()
     ruta_excel = None
     carpeta_destino = None
 
     def titulo(texto):
-        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=22, weight="bold"))
+        return ctk.CTkLabel(ventana, text=texto, font=FONT_TITLE, text_color=PRIMARY, fg_color="white")
 
-    def etiqueta(texto, size=13):
-        return ctk.CTkLabel(ventana, text=texto, font=ctk.CTkFont(size=size))
+    def etiqueta(texto):
+        return ctk.CTkLabel(ventana, text=texto, font=FONT_NORMAL, text_color=PRIMARY, fg_color="white")
 
     # Título principal
     titulo("📄 Generador de Archivos - Fase Inicial").pack(pady=(25, 10))
 
     # Sección archivo Excel
-    frame_excel = ctk.CTkFrame(ventana)
+    frame_excel = ctk.CTkFrame(ventana, fg_color="white")
     frame_excel.pack(padx=30, pady=10, fill="x")
 
-    etiqueta("Seleccionar archivo Excel del mes:", 15).pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
+    etiqueta("Seleccionar archivo Excel del mes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
     label_excel = ctk.CTkLabel(frame_excel, text="📂 No seleccionado", text_color="gray")
-    label_excel.pack(side="left", padx=10)
+    label_excel.pack(side="left", padx=10, pady=(0, 10))
 
     def seleccionar_archivo():
         nonlocal ruta_excel
@@ -55,45 +65,52 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 
-    ctk.CTkButton(frame_excel, text="Seleccionar archivo", command=seleccionar_archivo, width=160).pack(side="right", padx=10)
+    ctk.CTkButton(frame_excel, text="Seleccionar archivo", command=seleccionar_archivo, width=160, font=ctk.CTkFont(size=15, weight="bold")).pack(side="right", padx=10, pady=(0, 10))
 
     # Hoja de trabajo
-    frame_hoja = ctk.CTkFrame(ventana)
+    frame_hoja = ctk.CTkFrame(ventana, fg_color="white")
     frame_hoja.pack(padx=30, pady=(0, 10), fill="x")
 
-    etiqueta("Hoja de trabajo:", 15).pack(in_=frame_hoja, anchor="w", padx=10, pady=(10, 2))
+    etiqueta("Hoja de trabajo:").pack(in_=frame_hoja, anchor="w", padx=10, pady=(10, 2))
     hoja_menu = ctk.CTkOptionMenu(frame_hoja, variable=hoja_var, values=[])
     hoja_menu.pack(padx=10, pady=(0, 10), fill="x")
 
     # Mes y año
-    frame_fecha = ctk.CTkFrame(ventana)
+    frame_fecha = ctk.CTkFrame(ventana, fg_color="white")
     frame_fecha.pack(padx=30, pady=10, fill="x")
 
-    etiqueta("Mes:", 15).pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
-    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
-             "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    ctk.CTkOptionMenu(frame_fecha, variable=mes_var, values=meses).pack(padx=10, fill="x")
+    etiqueta("Mes:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
+    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    ctk.CTkOptionMenu(frame_fecha, variable=mes_var, values=meses).pack(padx=10, fill="x", pady=(0, 10))
 
-    etiqueta("Año:", 15).pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
+    etiqueta("Año:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
     años = [str(a) for a in range(datetime.now().year - 5, datetime.now().year + 6)]
     ctk.CTkOptionMenu(frame_fecha, variable=año_var, values=años).pack(padx=10, fill="x", pady=(0, 10))
 
+    # Número de armada
+    frame_armada = ctk.CTkFrame(ventana, fg_color="white")
+    frame_armada.pack(padx=30, pady=10, fill="x")
+
+    etiqueta("Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(10, 2))
+    armadas = ["primera", "segunda", "tercera"]
+    ctk.CTkOptionMenu(frame_armada, variable=numero_armada, values=armadas).pack(padx=10, fill="x", pady=(0, 10))
+
     # Selección de carpeta destino
-    frame_destino = ctk.CTkFrame(ventana)
+    frame_destino = ctk.CTkFrame(ventana, fg_color="white")
     frame_destino.pack(padx=30, pady=10, fill="x")
 
-    etiqueta("Seleccionar carpeta de destino:", 15).pack(in_=frame_destino, anchor="w", padx=10, pady=(10, 2))
+    etiqueta("Seleccionar carpeta de destino:").pack(in_=frame_destino, anchor="w", padx=10, pady=(10, 2))
     label_destino = ctk.CTkLabel(frame_destino, text="📂 No seleccionado", text_color="gray")
-    label_destino.pack(side="left", padx=10)
+    label_destino.pack(side="left", padx=10, pady=(0, 10))
 
     def seleccionar_carpeta():
         nonlocal carpeta_destino
         carpeta = filedialog.askdirectory(title="Seleccionar carpeta de destino")
         if carpeta:
             carpeta_destino = carpeta
-            label_destino.configure(text=f"📁 {os.path.dirname(carpeta)}", text_color="black")
+            label_destino.configure(text=f"📁 {os.path.basename(carpeta)}", text_color="black")
 
-    ctk.CTkButton(frame_destino, text="Seleccionar carpeta", command=seleccionar_carpeta, width=160).pack(side="right", padx=10)
+    ctk.CTkButton(frame_destino, text="Seleccionar carpeta", command=seleccionar_carpeta, width=160, font=ctk.CTkFont(size=15, weight="bold")).pack(side="right", padx=10, pady=(0, 10))
 
     # Botón generar documentos
     def generar():
@@ -103,9 +120,12 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
             return messagebox.showwarning("Falta hoja", "Selecciona una hoja del archivo.")
         if not carpeta_destino:
             return messagebox.showwarning("Falta carpeta", "Selecciona una carpeta de destino.")
+        if not numero_armada.get():
+            return messagebox.showwarning("Falta armada", "Selecciona un número de armada.")
+
         def tarea():
             try:
-                generar_documentos(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get())
+                generar_documentos(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
                 messagebox.showinfo("Éxito", "¡Los documentos fueron generados correctamente!")
             except Exception as e:
                 messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
@@ -114,19 +134,19 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     boton_generar = ctk.CTkButton(
         ventana, text="🚀 Generar Documentos", command=generar,
-        state="disabled", height=40, font=ctk.CTkFont(size=14, weight="bold")
+        state="disabled", height=40, font=ctk.CTkFont(size=15, weight="bold"),
+        fg_color=ACCENT, hover_color="#3a76c7", text_color="white"
     )
     boton_generar.pack(pady=25, padx=60, fill="x")
 
-    # --- Consola embebida ---
-    consola_frame = ctk.CTkFrame(ventana, height=150)
+    # Consola embebida
+    consola_frame = ctk.CTkFrame(ventana, height=150, fg_color="white")
     consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
 
-    etiqueta("Consola de salida:", 15).pack(in_=consola_frame, anchor="w", padx=10, pady=(10, 2))
-
+    etiqueta("Consola de salida:").pack(in_=consola_frame, anchor="w", padx=10, pady=(10, 2))
     consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
     consola_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
-    consola_text.configure(state="disabled")  # Solo lectura
+    consola_text.configure(state="disabled")
 
     class TextRedirector:
         def __init__(self, text_widget):
@@ -141,7 +161,6 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
         def flush(self):
             pass
 
-    # Redirigir stdout y stderr
     sys.stdout = TextRedirector(consola_text)
     sys.stderr = TextRedirector(consola_text)
 
@@ -151,13 +170,10 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
             callback_volver()
 
     ctk.CTkButton(
-        ventana, text="⬅ Volver al menú",
-        command=volver, fg_color="#ff6969", text_color="#222"
+        ventana, text="⬅ Volver al menú", command=volver,
+        fg_color="#ff6969", hover_color="#e55b5b", text_color="#222", font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(5, 15))
 
-
-
-    # Footer
-    ctk.CTkLabel(ventana, text="CEID Generator - FASE INICIAL", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 10))
+    ctk.CTkLabel(ventana, text="CEID Generator - FASE INICIAL", font=FONT_FOOTER, text_color=GRAY).pack(pady=(0, 10))
 
     ventana.mainloop()

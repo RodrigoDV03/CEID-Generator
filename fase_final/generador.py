@@ -13,7 +13,7 @@ def ruta_absoluta_relativa(path_relativo):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, path_relativo)
 
-def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
+def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida, numero_armada):
 
     docente = str(getattr(fila, "Docente", "N/A"))
     nombre_docente = docente
@@ -68,14 +68,14 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
                 run.text = run.text.replace("ruc", str(ruc))
             if "descripcion_cursos" in run.text:
                 run.text = run.text.replace("descripcion_cursos", str(descripcion_final))
-            if "numero_orden" in run.text:
-                run.text = run.text.replace("numero_orden", "______________")
             if "monto_subtotal" in run.text:
                 run.text = run.text.replace("monto_subtotal", f"S/. {monto_total_str} ({str(monto_total_letras)})")
             if "monto_hora" in run.text:
                 run.text = run.text.replace("monto_hora", f"S/. {monto_categoria:.2f} ({str(monto_categoria_letras)})")
             if "Nro_Contrato" in run.text:
                 run.text = run.text.replace("Nro_Contrato", str(nro_contrato))
+            if "numero_armada" in run.text:
+                run.text = run.text.replace("numero_armada", str(numero_armada))
 
     carpeta_final = os.path.dirname(ruta_salida)
     os.makedirs(carpeta_final, exist_ok=True)
@@ -88,7 +88,7 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida):
     return ruta_salida
 
 
-def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año):
+def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año, numero_armada):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
     df_control = pd.read_excel(ruta_docente)
 
@@ -112,7 +112,7 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año)
             nombre_archivo_conformidad = f"CONFORMIDAD - {nombre_docente} - {mes} {año}.docx"
             ruta_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
 
-            generar_conformidad_desde_excel(fila, plantilla, ruta_conformidad)
+            generar_conformidad_desde_excel(fila, plantilla, ruta_conformidad, numero_armada)
 
             # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
             if estado == "CONTRATO":

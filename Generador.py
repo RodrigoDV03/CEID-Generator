@@ -22,52 +22,55 @@ def iniciar_interfaz_general():
     def volver_menu():
         iniciar_interfaz_general()
 
-    # --- COLORES Y FUENTES UNIFICADOS ---
+    # --- PALETA DE COLORES Y FUENTES ---
     PRIMARY = "#2d415a"
     ACCENT = "#4a90e2"
-    BG = "#e0e2e6"
+    BG = "#e1e1d3"
+    CARD = "#f2f2e4"
     GRAY = "#a0a8b8"
+    HOVER = "#3a76c7"
 
 
     root = ctk.CTk()
     root.title("CEID - Sistema de Generación de Documentos")
-    root.geometry("500x420")
+    root.geometry("700x600")
     root.configure(fg_color=BG)
-    root.resizable(True, True)
+    root.resizable(False, False)
     root.after(100, lambda: root.state("zoomed"))
 
 
-    FONT_TITLE = ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
-    FONT_BUTTON = ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
-    FONT_FOOTER = ctk.CTkFont(family="Segoe UI", size=11)
+    FONT_TITLE = ctk.CTkFont("Segoe UI", 28, "bold")
+    FONT_BUTTON = ctk.CTkFont("Segoe UI", 16, "bold")
+    FONT_FOOTER = ctk.CTkFont("Segoe UI", weight="normal", slant="italic")
 
-
+    # --- TÍTULO ---
     ctk.CTkLabel(
-        root, text="CEID - Sistema de Documentos",
+        root, text="📚 CEID - Generador de Documentos",
         font=FONT_TITLE, text_color=PRIMARY
-    ).pack(pady=(30, 20))
+    ).pack(pady=(50, 20))
 
-    ctk.CTkButton(
-        root, text="📋 1. Generar Planilla",
-        width=300, height=40, font=FONT_BUTTON,
-        fg_color=ACCENT, hover_color="#3a76c7", text_color="white",
-        command=abrir_planilla
-    ).pack(pady=10)
+    # --- CONTENEDOR PRINCIPAL (FRAME) ---
+    main_frame = ctk.CTkFrame(root, fg_color=BG)
+    main_frame.pack(pady=10)
 
-    ctk.CTkButton(
-        root, text="📄 2. Generador fase inicial",
-        width=300, height=40, font=FONT_BUTTON,
-        fg_color=ACCENT, hover_color="#3a76c7", text_color="white",
-        command=abrir_fase_inicial
-    ).pack(pady=10)
+    def crear_card(texto, comando):
+        card = ctk.CTkFrame(main_frame, fg_color=CARD, corner_radius=15)
+        card.pack(pady=15, padx=20, fill="x", expand=True)
 
-    ctk.CTkButton(
-        root, text="📁 3. Generador fase final",
-        width=300, height=40, font=FONT_BUTTON,
-        fg_color=ACCENT, hover_color="#3a76c7", text_color="white",
-        command=abrir_fase_final
-    ).pack(pady=10)
+        boton = ctk.CTkButton(
+            card, text=texto,
+            font=FONT_BUTTON, height=50,
+            fg_color=ACCENT, hover_color=HOVER,
+            text_color="white", corner_radius=10,
+            command=comando
+        )
+        boton.pack(padx=30, pady=20)
 
+    crear_card("📋 1. Generar Planilla", abrir_planilla)
+    crear_card("📄 2. Generador Fase Inicial", abrir_fase_inicial)
+    crear_card("📁 3. Generador Fase Final", abrir_fase_final)
+
+    # --- FOOTER ---
     ctk.CTkLabel(
         root, text="CEID Generator - Menú Principal",
         font=FONT_FOOTER, text_color=GRAY

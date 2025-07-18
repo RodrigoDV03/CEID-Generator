@@ -11,7 +11,7 @@ def ruta_absoluta_relativa(path_relativo):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, path_relativo)
 
-def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año):
+def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
 
     datos = pd.read_excel(ruta_excel, sheet_name=hoja_seleccionada)
 
@@ -57,7 +57,11 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         monto_total = getattr(fila, "Subtotal_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
         tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
-        nro_contrato = str(getattr(fila, "Nro_Contrato", "N/A"))
+        nro_contrato_val = getattr(fila, "Nro_contrato", "N/A")
+        try:
+            nro_contrato = str(int(float(nro_contrato_val)))
+        except (ValueError, TypeError):
+            nro_contrato = str(nro_contrato_val)
 
         # -------- GENERAR OFICIO --------
         if tipo_contrato == "CONTRATO":
@@ -76,6 +80,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
                     run.text = run.text.replace("descripcion", descripcion_final)
                     run.text = run.text.replace("categoria", f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})")
                     run.text = run.text.replace("monto_subtotal", f"S/ {monto_total:,.2f} ({monto_total_letras})")
+                    run.text = run.text.replace("numero_armada", numero_armada)
             ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año}.docx")
             documento.save(ruta_salida_oficio)
 
