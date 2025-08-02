@@ -57,7 +57,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         monto_total = getattr(fila, "Subtotal_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
         tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
-        nro_contrato_val = getattr(fila, "Nro_contrato", "N/A")
+        nro_contrato_val = getattr(fila, "Nro_Contrato", "N/A")
         try:
             nro_contrato = str(int(float(nro_contrato_val)))
         except (ValueError, TypeError):
