@@ -45,7 +45,10 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
             categoria_valor = int(categoria_valor)
 
         clasif_cant_horas = clasif_valor / categoria_valor
-        horas_clasif = f"{int(round(clasif_cant_horas))} horas de examen de clasificación"
+        if clasif_cant_horas == 1:
+            horas_clasif = f"{int(round(clasif_cant_horas))} hora de examen de clasificación"
+        else:
+            horas_clasif = f"{int(round(clasif_cant_horas))} horas de examen de clasificación"
 
         if clasif_valor == 0:
             descripcion_final = f"{descripcion} y {horas_disenio}"
