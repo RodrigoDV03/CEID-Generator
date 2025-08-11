@@ -138,9 +138,9 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
 
         estado_planilla = "Primera planilla" if numero_carga == 1 else "Segunda planilla"
         if numero_carga == 1:
-            numero_carga_letra = "1ra"
+            numero_carga_letra = "Primera"
         else:
-            numero_carga_letra = "2da"
+            numero_carga_letra = "Segunda"
         nombre_hoja_carga = f"{numero_carga_letra} carga académica"
 
         carpeta_salida = f"{mes_seleccionado} {año_actual}"
@@ -350,7 +350,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         wb = load_workbook(ruta_salida)
         titulo_fusionado = (
             "CENTRO DE IDIOMAS - FLCH - UNMSM\n"
-            f"{numero_carga_letra} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\n"
+            f"{numero_carga_letra.upper()} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\n"
             "MODALIDAD: VIRTUAL Y PRESENCIAL"
         )
 
@@ -358,11 +358,11 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             ("Examen de clasificación", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
-            (f"{numero_carga_letra} Planilla {mes_seleccionado}", 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
-            
+            (f"{numero_carga_letra.upper()} Planilla {mes_seleccionado}", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra.upper()} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+
             (nombre_hoja_carga, 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra.upper()} CARGA ACADÉMICA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
 
             ("Carga académica consolidada", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nCARGA ACADÉMICA CONSOLIDADA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
