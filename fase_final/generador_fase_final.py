@@ -1,5 +1,4 @@
 import os
-import sys
 import pandas as pd
 from decimal import Decimal, ROUND_HALF_UP
 from docx import Document
@@ -7,14 +6,7 @@ from utils.functions import *
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
-def ruta_absoluta_relativa(path_relativo):
-    if getattr(sys, 'frozen', False):
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, path_relativo)
-
-def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida, numero_armada):
+def generador_conformidad(fila, plantilla_path, ruta_salida, numero_armada):
 
     docente = str(getattr(fila, "Docente", "N/A"))
     nombre_docente = docente
@@ -117,7 +109,7 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año,
             nombre_archivo_conformidad = f"CONFORMIDAD - {nombre_docente} - {mes} {año}.docx"
             ruta_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
 
-            generar_conformidad_desde_excel(fila, plantilla, ruta_conformidad, numero_armada)
+            generador_conformidad(fila, plantilla, ruta_conformidad, numero_armada)
 
             # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
             if estado == "CONTRATO":

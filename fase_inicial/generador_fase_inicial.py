@@ -1,15 +1,7 @@
 import os
-import sys
 import pandas as pd
 from docx import Document
 from utils.functions import *
-
-def ruta_absoluta_relativa(path_relativo):
-    if getattr(sys, 'frozen', False):
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, path_relativo)
 
 def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
 

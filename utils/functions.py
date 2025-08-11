@@ -1,5 +1,7 @@
 import re
 import pandas as pd
+import sys
+import os
 from num2words import num2words
 from decimal import Decimal, ROUND_HALF_UP
 import pandas as pd
@@ -63,3 +65,10 @@ def redactar_cursos(cadena):
     for curso in cursos[1:]:
         resultado += f", 28 horas de clases de {curso}"
     return resultado
+
+def ruta_absoluta_relativa(path_relativo):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, path_relativo)
