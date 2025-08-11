@@ -38,7 +38,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     ruta_planilla_anterior, sheet_name="Primera carga académica", header=fila_header
                 )
 
-                planilla_anterior_df['Docente'] = planilla_anterior_df['Docente'].astype(str).str.strip()
+                planilla_anterior_df = limpiar_docentes(planilla_anterior_df, 'Docente')
                 planilla_anterior_df['Curso'] = planilla_anterior_df[['Idioma', 'Nivel', 'Ciclo']].astype(str).agg(' '.join, axis=1)
 
                 datos['Curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
@@ -81,7 +81,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             
             # Construir hoja Planilla_Generador
             datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
-            datos_csv_original['docente'] = datos_csv_original['docente'].astype(str).str.strip()
+            datos_csv_original = limpiar_docentes(datos_csv_original, 'docente')
 
             agrupar_gen = agrupar_y_calcular(datos_csv_original, datos_docentes, 'Curso')
             agrupar_gen = agregar_clasificacion(agrupar_gen, ruta_clasificacion, normalizar_texto)
@@ -167,25 +167,11 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=ws.max_column):
                     for cell in row:
                         cell.border = thin_border
-                        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-
-                for col in ws.columns:
-                    max_length = 0
-                    col_letter = get_column_letter(col[0].column)
-                    for cell in col:
-                        if cell.value:
-                            try:
-                                cell_len = len(str(cell.value))
-                                if cell_len > max_length:
-                                    max_length = cell_len
-                            except:
-                                pass
-                    adjusted_width = max_length + 2
-                    ws.column_dimensions[col_letter].width = adjusted_width
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
 
                 for col in range(1, max_col + 1):
                     celda = ws.cell(row=2, column=col)
-                    celda.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                    celda.alignment = Alignment(horizontal='center', vertical='center')
                     celda.fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
                     celda.font = Font(bold=True, color="ffffff", size=12)
 
@@ -203,6 +189,14 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                         celda.value = f"=SUM({col}3:{col}{fila_total-1})"
                         celda.font = Font(bold=True)
                         celda.alignment = Alignment(horizontal="center", vertical="center")
+                        celda.border = thin_border
+
+                    columnas_moneda = ['E', 'H', 'K', 'L', 'M']
+                    for col in columnas_moneda:
+                        for row in range(3, fila_total + 1):
+                            celda = ws[f"{col}{row}"]
+                            celda.number_format = '"S/ "#,##0.00'
+                        
 
         hojas_ordenadas = [
             "Examen de clasificación",

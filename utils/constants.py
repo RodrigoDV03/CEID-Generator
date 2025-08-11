@@ -1,6 +1,5 @@
 from datetime import datetime
 import customtkinter as ctk
-import sys
 
 PRIMARY_COLOR = "#2d415a"
 ACCENT_COLOR = "#4a90e2"
