@@ -358,7 +358,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             ("Examen de clasificación", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
-            (f"{numero_carga_letra.upper()} Planilla {mes_seleccionado}", 
+            (f"{numero_carga_letra} Planilla {mes_seleccionado}", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra.upper()} PLANILLA - PERIODO {mes_seleccionado.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
 
             (nombre_hoja_carga, 
