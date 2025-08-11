@@ -39,8 +39,10 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 )
 
                 planilla_anterior_df = limpiar_docentes(planilla_anterior_df, 'Docente')
+                planilla_anterior_df['Nivel'] = planilla_anterior_df.apply(ajustar_nivel, axis=1)
                 planilla_anterior_df['Curso'] = planilla_anterior_df[['Idioma', 'Nivel', 'Ciclo']].astype(str).agg(' '.join, axis=1)
 
+                datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
                 datos['Curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
                 datos = limpiar_docentes(datos, 'Docente')
 
@@ -52,6 +54,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
 
 
 
+        datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
         datos['detalles_curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
         agrupar = agrupar_y_calcular(datos, datos_docentes, 'detalles_curso')
@@ -80,6 +83,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 clasif_df.to_excel(writer, sheet_name="Examen de clasificación", index=False)
             
             # Construir hoja Planilla_Generador
+            datos_csv_original['nivel'] = datos_csv_original.apply(ajustar_nivel, axis=1)
             datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
             datos_csv_original = limpiar_docentes(datos_csv_original, 'docente')
 
@@ -114,6 +118,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 df_carga_consol.to_excel(writer, sheet_name="Carga académica consolidada", index=False)
 
                 datos_csv_original = limpiar_docentes(datos_csv_original, 'Docente')
+                datos_csv_original['nivel'] = datos_csv_original.apply(ajustar_nivel, axis=1)
                 datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
                 agrupar_consol = agrupar_y_calcular(datos_csv_original, datos_docentes, 'Curso')

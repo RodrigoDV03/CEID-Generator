@@ -90,7 +90,30 @@ def construir_tabla(df):
     )
     return tabla
 
+def ajustar_nivel(row):
+        nivel = row['nivel']
+        idioma = row['idioma']
+        ciclo = row['ciclo']
+        if nivel == 'General':
+            if idioma == 'Inglés':
+                return 'Posgrado Intermedio'
+            elif idioma == 'Portugués':
+                try:
+                    ciclo_num = int(str(ciclo).strip())
+                except Exception:
+                    ciclo_num = None
+                if ciclo_num is not None:
+                    if 1 <= ciclo_num <= 4:
+                        return 'Posgrado Básico'
+                    elif 5 <= ciclo_num <= 8:
+                        return 'Posgrado Intermedio'
+        return nivel
+
 def crear_df_carga(datos, estado_planilla):
+    datos = datos.copy()
+
+    datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
+
     df = pd.DataFrame({
         'Dias': datos['dias'].apply(traducir_dias),
         'H. Inicio': datos['horainicio'].astype(str).str[:5],
