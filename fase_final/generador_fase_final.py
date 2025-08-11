@@ -1,8 +1,9 @@
 import os
 import sys
 import pandas as pd
+from decimal import Decimal, ROUND_HALF_UP
 from docx import Document
-from .utils import *
+from utils.functions import *
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
@@ -29,11 +30,11 @@ def generar_conformidad_desde_excel(fila, plantilla_path, ruta_salida, numero_ar
     horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
     clasif_valor = int(getattr(fila, "Examen_clasif", 0))
 
-    monto_categoria = float(getattr(fila, "Categoria_monto", 1))
-    if pd.isna(monto_categoria):
-        monto_categoria = 1
+    monto_categoria_raw = getattr(fila, "Categoria_monto", 1)
+    if pd.isna(monto_categoria_raw):
+        monto_categoria = Decimal("1.00")
     else:
-        monto_categoria = int(monto_categoria)
+        monto_categoria = Decimal(str(monto_categoria_raw)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     clasif_cant_horas = clasif_valor / monto_categoria if monto_categoria else 0
 
@@ -98,14 +99,14 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año,
 
     for _, fila in df.iterrows():
         try:
-            estado = str(getattr(fila, "Contrato_o_tercero", "")).strip().upper()
+            estado = str(getattr(fila, "Estado_docente", "")).strip().upper()
             docente = str(getattr(fila, "Docente", "N/A"))
             nombre_docente = docente
 
             if estado == "CONTRATO":
-                plantilla = ruta_absoluta_relativa("Modelos_documentos/CONFORMIDAD CONTRATO - MODELO.docx")
+                plantilla = ruta_absoluta_relativa("Modelos_documentos/conformidad_contrato.docx")
             elif estado == "TERCERO":
-                plantilla = ruta_absoluta_relativa("Modelos_documentos/CONFORMIDAD TERCERO - MODELO.docx")
+                plantilla = ruta_absoluta_relativa("Modelos_documentos/conformidad_tercero.docx")
             else:
                 raise ValueError(f"Estado inválido: {estado}")
 
@@ -120,7 +121,7 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año,
 
             # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
             if estado == "CONTRATO":
-                plantilla_control = ruta_absoluta_relativa("Modelos_documentos/Control de avance de pagos - MODELO.docx")
+                plantilla_control = ruta_absoluta_relativa("Modelos_documentos/control_pagos.docx")
                 nombre_archivo_control = f"CONTROL DE AVANCE - {nombre_docente} - {mes} {año}.docx"
                 ruta_control = os.path.join(carpeta_final, nombre_archivo_control)
 

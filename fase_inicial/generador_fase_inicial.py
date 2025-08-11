@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 from docx import Document
-from .utils import *
+from utils.functions import *
 
 def ruta_absoluta_relativa(path_relativo):
     if getattr(sys, 'frozen', False):
@@ -59,7 +59,7 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
         monto_categoria_letras = monto_a_letras(monto_categoria)
         monto_total = getattr(fila, "Subtotal_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
-        tipo_contrato = getattr(fila, "Contrato_o_tercero", "N/A")
+        tipo_contrato = getattr(fila, "Estado_docente", "N/A")
         nro_contrato_val = getattr(fila, "Nro_Contrato", "N/A")
         try:
             nro_contrato = str(int(float(nro_contrato_val)))
@@ -68,9 +68,9 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
 
         # -------- GENERAR OFICIO --------
         if tipo_contrato == "CONTRATO":
-            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/modelo_oficio_contrato_FLCH.docx')
+            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_contrato.docx')
         elif tipo_contrato == "TERCERO":
-            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/modelo_FLCH.docx')
+            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_tercero.docx')
         else:
             plantilla_oficio = None
 

@@ -1,6 +1,17 @@
 import re
 import pandas as pd
 from num2words import num2words
+from decimal import Decimal, ROUND_HALF_UP
+import pandas as pd
+import unicodedata
+
+def normalizar_texto(texto):
+    if pd.isna(texto):
+        return ''
+    texto = str(texto).lower().strip()
+    texto = unicodedata.normalize('NFKD', texto)
+    return ''.join([c for c in texto if not unicodedata.combining(c)])
+
 
 def limpiar_nombre_archivo(nombre):
     return re.sub(r'[\\/*?:"<>|]', "", nombre)
@@ -35,9 +46,9 @@ def reemplazar_en_tablas(documento, reemplazos):
 
 def monto_a_letras(monto):
     try:
-        monto = float(monto)
+        monto = Decimal(str(monto)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         entero = int(monto)
-        centavos = int(round((monto - entero) * 100))
+        centavos = int((monto - Decimal(entero)) * 100)
         return f"{num2words(entero, lang='es')} y {centavos:02d}/100 soles"
     except Exception:
         return "N/A"

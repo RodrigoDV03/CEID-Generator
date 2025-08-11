@@ -1,7 +1,8 @@
 import customtkinter as ctk
-from generador_planilla.interfaz_gui import iniciar_interfaz_planilla
-from fase_inicial.interfaz_gui import iniciar_interfaz_fase_inicial
-from fase_final.interfaz_gui import iniciar_interfaz_fase_final
+from generador_planilla.planilla_gui import iniciar_interfaz_planilla
+from fase_inicial.fase_inicial_gui import iniciar_interfaz_fase_inicial
+from fase_final.fase_final_gui import iniciar_interfaz_fase_final
+from utils.constants import *
 
 def iniciar_interfaz_general():
     ctk.set_appearance_mode("light")
@@ -22,46 +23,30 @@ def iniciar_interfaz_general():
     def volver_menu():
         iniciar_interfaz_general()
 
-    # --- PALETA DE COLORES Y FUENTES ---
-    PRIMARY = "#2d415a"
-    ACCENT = "#4a90e2"
-    BG = "#e1e1d3"
-    CARD = "#f2f2e4"
-    GRAY = "#a0a8b8"
-    HOVER = "#3a76c7"
-
 
     root = ctk.CTk()
     root.title("CEID - Sistema de Generación de Documentos")
     root.geometry("700x600")
-    root.configure(fg_color=BG)
+    root.configure(fg_color=BG_COLOR)
     root.resizable(False, False)
     root.after(100, lambda: root.state("zoomed"))
 
-
-    FONT_TITLE = ctk.CTkFont("Segoe UI", 28, "bold")
-    FONT_BUTTON = ctk.CTkFont("Segoe UI", 16, "bold")
-    FONT_FOOTER = ctk.CTkFont("Segoe UI", weight="normal", slant="italic")
-
     # --- TÍTULO ---
-    ctk.CTkLabel(
-        root, text="📚 CEID - Generador de Documentos",
-        font=FONT_TITLE, text_color=PRIMARY
-    ).pack(pady=(50, 20))
+    titulo(root, "CEID - Generador de Documentos").pack(pady=(50, 20))
 
     # --- CONTENEDOR PRINCIPAL (FRAME) ---
-    main_frame = ctk.CTkFrame(root, fg_color=BG)
+    main_frame = ctk.CTkFrame(root, fg_color=BG_COLOR)
     main_frame.pack(pady=10)
 
     def crear_card(texto, comando):
-        card = ctk.CTkFrame(main_frame, fg_color=CARD, corner_radius=15)
+        card = ctk.CTkFrame(main_frame, fg_color=CARD_COLOR, corner_radius=15)
         card.pack(pady=15, padx=20, fill="x", expand=True)
 
         boton = ctk.CTkButton(
             card, text=texto,
             font=FONT_BUTTON, height=50,
-            fg_color=ACCENT, hover_color=HOVER,
-            text_color="white", corner_radius=10,
+            fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR,
+            text_color=WHITE_COLOR, corner_radius=10,
             command=comando
         )
         boton.pack(padx=30, pady=20)
@@ -72,8 +57,8 @@ def iniciar_interfaz_general():
 
     # --- FOOTER ---
     ctk.CTkLabel(
-        root, text="CEID Generator - Menú Principal",
-        font=FONT_FOOTER, text_color=GRAY
+        root, text="Centro de Idiomas - FLCH - UNMSM",
+        font=FONT_FOOTER, text_color=GRAY_COLOR
     ).pack(side="bottom", pady=20)
 
     root.mainloop()

@@ -1,7 +1,8 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import os
-from .procesador_planilla import *
+from .generador_planilla import *
+from utils.constants import *
 
 def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""
@@ -12,37 +13,27 @@ def iniciar_interfaz_planilla(callback_volver=None):
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
-    ventana = ctk.CTk()
-    ventana.title("Generador de Planilla - CEID")
-    ventana.geometry("750x800")
-    ventana.after(100, lambda: ventana.state("zoomed"))
-    ventana.configure(fg_color="#f4f5f7")
+    root = ctk.CTk()
+    root.title("Generador de Planilla - CEID")
+    root.geometry("750x800")
+    root.after(100, lambda: root.state("zoomed"))
+    root.configure(fg_color="#f4f5f7")
 
-    # Fuentes y colores
-    FONT_TITLE = ctk.CTkFont(family="Segoe UI", size=26, weight="bold")
-    FONT_SECTION = ctk.CTkFont(family="Segoe UI", size=17, weight="bold")
-    FONT_NORMAL = ctk.CTkFont(family="Segoe UI", size=13)
-    FONT_FOOTER = ctk.CTkFont(family="Segoe UI", size=11, slant="italic")
-
-    PRIMARY = "#2d415a"
-    ACCENT = "#4a90e2"
-    GRAY = "#a0a8b8"
-    WHITE = "#ffffff"
 
     def titulo(texto):
-        return ctk.CTkLabel(ventana, text=texto, font=FONT_TITLE, text_color=PRIMARY)
+        return ctk.CTkLabel(root, text=texto, font=FONT_TITLE, text_color=PRIMARY_COLOR)
 
     def seccion_titulo(texto):
-        return ctk.CTkLabel(ventana, text=texto, font=FONT_SECTION, text_color=PRIMARY)
+        return ctk.CTkLabel(root, text=texto, font=FONT_SECTION, text_color=PRIMARY_COLOR)
 
     def etiqueta(texto):
-        return ctk.CTkLabel(ventana, text=texto, font=FONT_NORMAL)
+        return ctk.CTkLabel(root, text=texto, font=FONT_TEXT)
 
     # --- TÍTULO PRINCIPAL ---
     titulo("📄 Generador de Planilla - CEID").pack(pady=(25, 15))
 
     # --- SECCIÓN MES Y CARGA ---
-    marco_opciones = ctk.CTkFrame(ventana, fg_color=WHITE, corner_radius=12)
+    marco_opciones = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
     marco_opciones.pack(pady=10, padx=40, fill="x")
 
     etiqueta("Selecciona el mes:").pack(in_=marco_opciones, anchor="w", padx=15, pady=(15, 0))
@@ -58,9 +49,9 @@ def iniciar_interfaz_planilla(callback_volver=None):
     ctk.CTkRadioButton(marco_opciones, text="2 (Segunda carga)", variable=carga_var, value=2).pack(anchor="w", padx=25, pady=(0, 15))
 
     # --- PLANILLA ANTERIOR (solo si es segunda carga) ---
-    marco_planilla_anterior = ctk.CTkFrame(ventana, fg_color=WHITE, corner_radius=12)
+    marco_planilla_anterior = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
     seccion_titulo("📑 Planilla anterior - Solo para segunda carga").pack(in_=marco_planilla_anterior, anchor="w", padx=15, pady=(10, 5))
-    label_planilla_estado = ctk.CTkLabel(marco_planilla_anterior, text="📂 No seleccionado", text_color="gray")
+    label_planilla_estado = ctk.CTkLabel(marco_planilla_anterior, text="📂 No seleccionado", text_color=GRAY_COLOR)
     label_planilla_estado.pack(side="left", padx=15)
 
     def seleccionar_planilla_anterior():
@@ -87,18 +78,18 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     # --- SELECTORES DE ARCHIVO ---
     def crear_selector_archivo(texto_label, extensiones, actualizar_func):
-        frame = ctk.CTkFrame(ventana, fg_color=WHITE, corner_radius=12)
+        frame = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
         frame.pack(padx=40, pady=10, fill="x")
 
         seccion_titulo(texto_label).pack(in_=frame, anchor="w", padx=15, pady=(10, 5))
-        label_estado = ctk.CTkLabel(frame, text="📂 No seleccionado", text_color="gray")
+        label_estado = ctk.CTkLabel(frame, text="📂 No seleccionado", text_color=GRAY_COLOR)
         label_estado.pack(side="left", padx=15)
 
         def seleccionar():
             archivo = filedialog.askopenfilename(filetypes=[extensiones])
             if archivo:
                 actualizar_func(archivo)
-                label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color="black")
+                label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=BLACK_COLOR)
 
         ctk.CTkButton(frame, text="Seleccionar archivo", command=seleccionar, width=160).pack(side="right", padx=15)
 
@@ -129,27 +120,22 @@ def iniciar_interfaz_planilla(callback_volver=None):
             messagebox.showinfo("Éxito", resultado)
 
     ctk.CTkButton(
-        ventana, text="🚀 Generar Planilla",
+        root, text="🚀 Generar Planilla",
         command=procesar, height=45, font=ctk.CTkFont(size=15, weight="bold"),
-        fg_color=ACCENT, hover_color="#3a76c7", text_color="white"
+        fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_COLOR
     ).pack(pady=30, padx=80, fill="x")
 
     # --- BOTÓN VOLVER ---
     def volver():
-        ventana.destroy()
+        root.destroy()
         if callback_volver:
             callback_volver()
 
     ctk.CTkButton(
-        ventana, text="⬅ Volver al menú",
-        command=volver, fg_color="#f87171", hover_color="#f43f5e",
-        text_color="white", height=40
-    ).pack(pady=(10, 30), padx=80, fill="x")
+        root, text="⬅ Volver al menú", command=volver,
+        fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON
+    ).pack(pady=(5, 15))
 
-    # --- FOOTER ---
-    ctk.CTkLabel(
-        ventana, text="CEID Generator - v1.0 · Área de Sistemas",
-        font=FONT_FOOTER, text_color=GRAY
-    ).pack(pady=(0, 15))
+    ctk.CTkLabel(root, text="CEID Generator - GENERADOR DE PLANILLA", font=FONT_FOOTER, text_color=TEXT_COLOR).pack(pady=(0, 10))
 
-    ventana.mainloop()
+    root.mainloop()

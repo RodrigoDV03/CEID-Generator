@@ -6,7 +6,7 @@ from fuzzywuzzy import process, fuzz
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, Border, Side
-from .utils import *
+from utils.functions import *
 
 def traducir_dias(dias_raw: str) -> str:
     dias_dict = {
@@ -89,7 +89,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
         ]
 
         agrupar = agrupar.merge(
-            datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Contrato o tercero']],
+            datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Estado']],
             on='Docente', how='left'
         )
 
@@ -127,7 +127,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             'Diseño de Examenes': agrupar['Diseño de Examenes'],
             'Examen Clasif.': agrupar['Examen Clasif.'],
             'Sub Total Pago S/.': 0,
-            'Contrato o Tercero': agrupar['Contrato o tercero']
+            'Estado': agrupar['Estado']
         })
         TABLA['Sub Total Pago S/.'] = (
             TABLA['Curso Dictado'] + TABLA['Extra Curso'] +
@@ -171,7 +171,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             ]
 
             agrupar_gen = agrupar_gen.merge(
-                datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Contrato o tercero']],
+                datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Estado']],
                 on='Docente', how='left'
             )
 
@@ -209,7 +209,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 'Diseño de Examenes': agrupar_gen['Diseño de Examenes'],
                 'Examen Clasif.': agrupar_gen['Examen Clasif.'],
                 'Sub Total Pago S/.': 0,
-                'Contrato o Tercero': agrupar_gen['Contrato o tercero']
+                'Estado': agrupar_gen['Estado']
             })
             TABLA_GENERADOR['Sub Total Pago S/.'] = (
                 TABLA_GENERADOR['Curso Dictado'] + TABLA_GENERADOR['Extra Curso'] +
@@ -225,7 +225,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 'Categoria (Letra)': 'Categoria_letra',
                 'Categoria (Monto)': 'Categoria_monto',
                 'Sub Total Pago S/.': 'Subtotal_pago',
-                'Contrato o Tercero': 'Contrato_o_tercero',
+                'Estado': 'Estado_docente',
                 'Idioma': 'Docente_idioma',
                 'N°. Ruc': 'N_Ruc',
                 'Nro. Documento': 'Numero_dni',
@@ -300,7 +300,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 ]
 
                 agrupar_consol = agrupar_consol.merge(
-                    datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Contrato o tercero']],
+                    datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Estado']],
                     on='Docente', how='left'
                 )
 
@@ -337,7 +337,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     'Diseño de Examenes': agrupar_consol['Diseño de Examenes'],
                     'Examen Clasif.': agrupar_consol['Examen Clasif.'],
                     'Sub Total Pago S/.': 0,
-                    'Contrato o Tercero': agrupar_consol['Contrato o tercero']
+                    'Estado': agrupar_consol['Estado']
                 })
 
                 TABLA_CONSOLIDADA['Sub Total Pago S/.'] = (
