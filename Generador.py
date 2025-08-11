@@ -32,7 +32,7 @@ def iniciar_interfaz_general():
     root.after(100, lambda: root.state("zoomed"))
 
     # --- TÍTULO ---
-    titulo(root, "CEID - Generador de Documentos").pack(pady=(50, 20))
+    titulo(root, "CEID - Generador de Documentos")
 
     # --- CONTENEDOR PRINCIPAL (FRAME) ---
     main_frame = ctk.CTkFrame(root, fg_color=BG_COLOR)
@@ -56,11 +56,7 @@ def iniciar_interfaz_general():
     crear_card("📁 3. Generador Fase Final", abrir_fase_final)
 
     # --- FOOTER ---
-    ctk.CTkLabel(
-        root, text="Centro de Idiomas - FLCH - UNMSM",
-        font=FONT_FOOTER, text_color=GRAY_COLOR
-    ).pack(side="bottom", pady=20)
-
+    footer(root, "CEID Generator - FLCH - UNMSM")
     root.mainloop()
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     carpeta_destino = None
 
     # Título principal
-    titulo(root, "Fase Final | Generador de Archivos CEID").pack(pady=(20, 8))
+    titulo(root, "Fase Final | Generador de Archivos CEID")
 
     # ARCHIVO EXCEL
     frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
@@ -49,8 +49,8 @@ def iniciar_interfaz_fase_final(callback_volver=None):
                 hojas = pd.ExcelFile(ruta).sheet_names
                 hoja_menu.configure(values=hojas)
                 hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
-                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color="black")
-                boton_generar.configure(state="normal")
+                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
+                boton_gen.configure(state="normal")
                 ruta_excel = ruta
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
@@ -79,7 +79,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
             try:
                 pd.ExcelFile(archivo_docente)
                 label_docente.configure(text=f"📁 {os.path.basename(archivo_docente)}", text_color=BLACK_COLOR)
-                boton_generar.archivo_docente = archivo_docente
+                boton_gen.archivo_docente = archivo_docente
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{e}")
 
@@ -133,11 +133,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
         threading.Thread(target=tarea).start()
 
-    boton_generar = ctk.CTkButton(
-        root, text="🚀 Generar Documentos", command=iniciar_generacion,
-        state="disabled", height=40, fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON
-    )
-    boton_generar.pack(pady=25, padx=60, fill="x")
+    boton_gen = boton_generador(root, "Generar Documentos", iniciar_generacion)
 
     # CONSOLA EMBEBIDA
     consola_frame = ctk.CTkFrame(root, height=150, fg_color=WHITE_COLOR)
@@ -161,16 +157,8 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     sys.stdout = TextRedirector(consola_text)
     sys.stderr = TextRedirector(consola_text)
 
-    def volver():
-        root.destroy()
-        if callback_volver:
-            callback_volver()
+    boton_volver(root, callback_volver).pack(pady=(5, 15))
 
-    ctk.CTkButton(
-        root, text="⬅ Volver al menú", command=volver,
-        fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON
-    ).pack(pady=(5, 15))
-
-    ctk.CTkLabel(root, text="CEID Generator - FASE FINAL", font=FONT_FOOTER, text_color=TEXT_COLOR).pack(pady=(0, 10))
+    footer(root, "CEID Generator - FASE FINAL")
 
     root.mainloop()

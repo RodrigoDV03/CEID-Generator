@@ -1,5 +1,6 @@
 from datetime import datetime
 import customtkinter as ctk
+import sys
 
 PRIMARY_COLOR = "#2d415a"
 ACCENT_COLOR = "#4a90e2"
@@ -29,7 +30,13 @@ meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto
 años = [str(a) for a in range(datetime.now().year - 5, datetime.now().year + 6)]
 
 def titulo(master, texto):
-    return ctk.CTkLabel(master=master, text=texto, font=FONT_TITLE, text_color=PRIMARY_COLOR, fg_color=WHITE_COLOR)
+    titulo = ctk.CTkLabel(master=master, text=texto, font=FONT_TITLE, text_color=PRIMARY_COLOR, fg_color=WHITE_COLOR)
+    titulo.pack(pady=(25, 15))
+    return titulo
+
+
+def seccion_titulo(master, texto):
+    return ctk.CTkLabel(master=master, text=texto, font=FONT_SECTION, text_color=PRIMARY_COLOR)
 
 def etiqueta(master, texto):
     return ctk.CTkLabel(master=master, text=texto, font=FONT_TEXT, text_color=PRIMARY_COLOR, fg_color=WHITE_COLOR)
@@ -44,3 +51,33 @@ def crear_boton_archivo(frame, etiqueta_archivo, comando):
     boton.pack(side="right", padx=10, pady=(0, 7))
     etiqueta_archivo.pack(side="left", padx=10, pady=(0, 7))
     return boton
+
+def boton_generador(master, texto, comando):
+    boton = ctk.CTkButton(master=master, text=texto, command=comando, state="normal", height=45, fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON)
+    boton.pack(pady=(5, 15))
+    return boton
+
+def boton_volver(master, callback_volver=None):
+    def volver():
+        if master.winfo_exists():
+            master.destroy()
+        if callback_volver:
+            callback_volver()
+
+    boton_volver = ctk.CTkButton(
+        master,
+        text="⬅ Volver al menú",
+        command=volver,
+        fg_color=BUTTON_BG_COLOR,
+        hover_color=BUTTON_HOVER_BG_COLOR,
+        text_color=WHITE_COLOR,
+        font=FONT_BUTTON
+    )
+    boton_volver.pack(pady=(5, 15))
+
+    return boton_volver
+
+def footer(master, texto):
+    footer = ctk.CTkLabel(master=master, text=texto, font=FONT_FOOTER, text_color=TEXT_COLOR)
+    footer.pack(pady=(0, 10))
+    return footer

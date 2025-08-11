@@ -10,6 +10,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
     archivo_clasif_path = ""
     archivo_planilla_anterior_path = ""
 
+
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
@@ -17,40 +18,28 @@ def iniciar_interfaz_planilla(callback_volver=None):
     root.title("Generador de Planilla - CEID")
     root.geometry("750x800")
     root.after(100, lambda: root.state("zoomed"))
-    root.configure(fg_color="#f4f5f7")
+    root.configure(fg_color=BG_COLOR)
 
-
-    def titulo(texto):
-        return ctk.CTkLabel(root, text=texto, font=FONT_TITLE, text_color=PRIMARY_COLOR)
-
-    def seccion_titulo(texto):
-        return ctk.CTkLabel(root, text=texto, font=FONT_SECTION, text_color=PRIMARY_COLOR)
-
-    def etiqueta(texto):
-        return ctk.CTkLabel(root, text=texto, font=FONT_TEXT)
+    mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
 
     # --- TÍTULO PRINCIPAL ---
-    titulo("📄 Generador de Planilla - CEID").pack(pady=(25, 15))
+    titulo(root, "Generador de Planilla - CEID")
 
     # --- SECCIÓN MES Y CARGA ---
     marco_opciones = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
     marco_opciones.pack(pady=10, padx=40, fill="x")
 
-    etiqueta("Selecciona el mes:").pack(in_=marco_opciones, anchor="w", padx=15, pady=(15, 0))
-    mes_var = ctk.StringVar(value="Enero")
-    ctk.CTkOptionMenu(marco_opciones, variable=mes_var, values=[
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    ).pack(padx=15, pady=(0, 15), fill="x")
+    etiqueta(root, "Selecciona el mes:").pack(in_=marco_opciones, anchor="w", padx=15, pady=(15, 0))
+    crear_option_menu(marco_opciones, mes_var, meses).pack(padx=15, pady=(0, 15), fill="x")
 
-    etiqueta("Número de carga:").pack(in_=marco_opciones, anchor="w", padx=15)
+    etiqueta(root, "Número de carga:").pack(in_=marco_opciones, anchor="w", padx=15)
     carga_var = ctk.IntVar(value=1)
     ctk.CTkRadioButton(marco_opciones, text="1 (Primera carga)", variable=carga_var, value=1).pack(anchor="w", padx=25)
     ctk.CTkRadioButton(marco_opciones, text="2 (Segunda carga)", variable=carga_var, value=2).pack(anchor="w", padx=25, pady=(0, 15))
 
     # --- PLANILLA ANTERIOR (solo si es segunda carga) ---
     marco_planilla_anterior = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
-    seccion_titulo("📑 Planilla anterior - Solo para segunda carga").pack(in_=marco_planilla_anterior, anchor="w", padx=15, pady=(10, 5))
+    seccion_titulo(root, "Planilla anterior").pack(in_=marco_planilla_anterior, anchor="w", padx=15, pady=(10, 5))
     label_planilla_estado = ctk.CTkLabel(marco_planilla_anterior, text="📂 No seleccionado", text_color=GRAY_COLOR)
     label_planilla_estado.pack(side="left", padx=15)
 
@@ -59,7 +48,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
         if archivo:
             nonlocal archivo_planilla_anterior_path
             archivo_planilla_anterior_path = archivo
-            label_planilla_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color="black")
+            label_planilla_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=BLACK_COLOR)
 
     btn_planilla_anterior = ctk.CTkButton(marco_planilla_anterior, text="Seleccionar archivo", command=seleccionar_planilla_anterior, width=160)
     btn_planilla_anterior.pack(side="right", padx=15)
@@ -71,7 +60,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
             marco_planilla_anterior.pack_forget()
             nonlocal archivo_planilla_anterior_path
             archivo_planilla_anterior_path = ""
-            label_planilla_estado.configure(text="📂 No seleccionado", text_color="gray")
+            label_planilla_estado.configure(text="📂 No seleccionado", text_color=GRAY_COLOR)
 
     carga_var.trace_add("write", actualizar_visibilidad_planilla_anterior)
     actualizar_visibilidad_planilla_anterior()
@@ -81,7 +70,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
         frame = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
         frame.pack(padx=40, pady=10, fill="x")
 
-        seccion_titulo(texto_label).pack(in_=frame, anchor="w", padx=15, pady=(10, 5))
+        seccion_titulo(root, texto_label).pack(in_=frame, anchor="w", padx=15, pady=(10, 5))
         label_estado = ctk.CTkLabel(frame, text="📂 No seleccionado", text_color=GRAY_COLOR)
         label_estado.pack(side="left", padx=15)
 
@@ -119,23 +108,11 @@ def iniciar_interfaz_planilla(callback_volver=None):
         else:
             messagebox.showinfo("Éxito", resultado)
 
-    ctk.CTkButton(
-        root, text="🚀 Generar Planilla",
-        command=procesar, height=45, font=ctk.CTkFont(size=15, weight="bold"),
-        fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_COLOR
-    ).pack(pady=30, padx=80, fill="x")
+    boton_generador(root, "Generar Planilla", procesar)
 
     # --- BOTÓN VOLVER ---
-    def volver():
-        root.destroy()
-        if callback_volver:
-            callback_volver()
+    boton_volver(root, callback_volver).pack(pady=(5, 15))
 
-    ctk.CTkButton(
-        root, text="⬅ Volver al menú", command=volver,
-        fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON
-    ).pack(pady=(5, 15))
-
-    ctk.CTkLabel(root, text="CEID Generator - GENERADOR DE PLANILLA", font=FONT_FOOTER, text_color=TEXT_COLOR).pack(pady=(0, 10))
+    footer(root, "CEID Generator - GENERADOR DE PLANILLA")
 
     root.mainloop()
