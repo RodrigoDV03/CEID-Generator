@@ -57,22 +57,17 @@ def generador_conformidad(fila, plantilla_path, ruta_salida, numero_armada):
 
 
     doc = Document(plantilla_path)
-    for p in doc.paragraphs:
-        for run in p.runs:
-            if "nombre" in run.text:
-                run.text = run.text.replace("nombre", str(nombre_docente))
-            if "ruc" in run.text:
-                run.text = run.text.replace("ruc", str(ruc))
-            if "descripcion_cursos" in run.text:
-                run.text = run.text.replace("descripcion_cursos", str(descripcion_final))
-            if "monto_subtotal" in run.text:
-                run.text = run.text.replace("monto_subtotal", f"S/. {monto_total_str} ({str(monto_total_letras)})")
-            if "monto_hora" in run.text:
-                run.text = run.text.replace("monto_hora", f"S/. {monto_categoria:.2f} ({str(monto_categoria_letras)})")
-            if "Nro_Contrato" in run.text:
-                run.text = run.text.replace("Nro_Contrato", str(nro_contrato))
-            if "numero_armada" in run.text:
-                run.text = run.text.replace("numero_armada", str(numero_armada))
+    reemplazos_oficio = {
+        "nombre": nombre_docente,
+        "ruc": ruc,
+        "descripcion_cursos": descripcion_final,
+        "monto_subtotal": f"S/. {monto_total_str} ({str(monto_total_letras)})",
+        "monto_hora": f"S/. {monto_categoria:.2f} ({str(monto_categoria_letras)})",
+        "Nro_Contrato": nro_contrato,
+        "numero_armada": numero_armada
+    }
+    reemplazar_en_tablas(doc, reemplazos_oficio)
+    reemplazar_en_parrafos(doc, reemplazos_oficio)
 
     carpeta_final = os.path.dirname(ruta_salida)
     os.makedirs(carpeta_final, exist_ok=True)
@@ -84,8 +79,49 @@ def generador_conformidad(fila, plantilla_path, ruta_salida, numero_armada):
         raise
     return ruta_salida
 
+def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_path, df_control):
 
-def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año, numero_armada):
+    nombre_docente = str(getattr(fila, "Docente", ""))
+
+    # Buscar coincidencia en Excel fijo
+    resultado = process.extractOne(nombre_docente, df_control["Docente"], scorer=fuzz.token_sort_ratio)
+    mejor_match, score = resultado[0], resultado[1]
+
+    if score < 85:
+        raise ValueError(f"No se encontró coincidencia adecuada para '{nombre_docente}' (score: {score})")
+
+    fila_control = df_control[df_control["Docente"] == mejor_match].iloc[0]
+
+    idioma_docente = str(fila_control["Especialidad"])
+    monto_total = float(fila_control["Monto total"])
+    nro_contrato = str(fila_control["Nro Contrato"])
+    try:
+        nro_contrato = int(float(nro_contrato))
+    except (ValueError, TypeError):
+        pass
+
+    saldo_restante = monto_total - monto_subtotal
+
+    # Cargar plantilla
+    doc = Document(plantilla_control_path)
+
+    reemplazos_control = {
+        "Nombre_Docente": nombre_docente,
+        "Idioma_Docente": idioma_docente,
+        "Monto_Subtotal": f"S/ {monto_subtotal:,.2f}",
+        "Monto_Total": f"S/ {monto_total:,.2f}",
+        "Saldo_Restante": f"S/ {saldo_restante:,.2f}",
+        "Nro_Contrato": str(nro_contrato)
+    }
+
+    reemplazar_en_parrafos(doc, reemplazos_control)
+    reemplazar_en_tablas(doc, reemplazos_control)
+
+    os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
+    doc.save(ruta_salida)
+    return ruta_salida
+
+def procesar_planilla_fase_final(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año, numero_armada):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
     df_control = pd.read_excel(ruta_docente)
 
@@ -131,55 +167,3 @@ def procesar_planilla(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año,
             continue
 
         print(f"{docente} - Documentos generados correctamente.")
-
-
-def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_path, df_control):
-
-    nombre_docente = str(getattr(fila, "Docente", ""))
-
-    # Buscar coincidencia en Excel fijo
-    resultado = process.extractOne(nombre_docente, df_control["Docente"], scorer=fuzz.token_sort_ratio)
-    mejor_match, score = resultado[0], resultado[1]
-
-    if score < 85:
-        raise ValueError(f"No se encontró coincidencia adecuada para '{nombre_docente}' (score: {score})")
-
-    fila_control = df_control[df_control["Docente"] == mejor_match].iloc[0]
-
-    idioma_docente = str(fila_control["Especialidad"])
-    monto_total = float(fila_control["Monto total"])
-    nro_contrato = str(fila_control["Nro Contrato"])
-    try:
-        nro_contrato = int(float(nro_contrato))
-    except (ValueError, TypeError):
-        pass
-
-    saldo_restante = monto_total - monto_subtotal
-
-    # Cargar plantilla
-    doc = Document(plantilla_control_path)
-
-    reemplazos = {
-        "Nombre_Docente": nombre_docente,
-        "Idioma_Docente": idioma_docente,
-        "Monto_Subtotal": f"S/ {monto_subtotal:,.2f}",
-        "Monto_Total": f"S/ {monto_total:,.2f}",
-        "Saldo_Restante": f"S/ {saldo_restante:,.2f}",
-        "Nro_Contrato": str(nro_contrato)
-    }
-
-    for p in doc.paragraphs:
-        for key, val in reemplazos.items():
-            if key in p.text:
-                p.text = p.text.replace(key, val)
-
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for key, val in reemplazos.items():
-                    if key in cell.text:
-                        cell.text = cell.text.replace(key, val)
-
-    os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
-    doc.save(ruta_salida)
-    return ruta_salida

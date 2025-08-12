@@ -3,7 +3,7 @@ import pandas as pd
 from docx import Document
 from utils.functions import *
 
-def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
+def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
 
     datos = pd.read_excel(ruta_excel, sheet_name=hoja_seleccionada)
 
@@ -68,14 +68,16 @@ def generar_documentos(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año
 
         if plantilla_oficio and os.path.exists(plantilla_oficio):
             documento = Document(plantilla_oficio)
-            for parrafo in documento.paragraphs:
-                for run in parrafo.runs:
-                    run.text = run.text.replace("Nro_Contrato", nro_contrato)
-                    run.text = run.text.replace("docente", docente)
-                    run.text = run.text.replace("descripcion", descripcion_final)
-                    run.text = run.text.replace("categoria", f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})")
-                    run.text = run.text.replace("monto_subtotal", f"S/ {monto_total:,.2f} ({monto_total_letras})")
-                    run.text = run.text.replace("numero_armada", numero_armada)
+            reemplazos_oficio = {
+                "Nro_Contrato": nro_contrato,
+                "docente": docente,
+                "descripcion": descripcion_final,
+                "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                "numero_armada": numero_armada
+            }
+            reemplazar_en_parrafos(documento, reemplazos_oficio)
+            reemplazar_en_tablas(documento, reemplazos_oficio)
             ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año}.docx")
             documento.save(ruta_salida_oficio)
 

@@ -1,7 +1,6 @@
 import sys
 import threading
 import customtkinter as ctk
-from matplotlib.pylab import pad
 import pandas as pd
 import os
 from tkinter import filedialog, messagebox
@@ -126,7 +125,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
             return
         def tarea():
             try:
-                procesar_planilla(ruta_excel, archivo_docente, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
+                procesar_planilla_fase_final(ruta_excel, archivo_docente, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
                 messagebox.showinfo("Éxito", f"Documentos de fase final generados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
@@ -157,8 +156,10 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     sys.stdout = TextRedirector(consola_text)
     sys.stderr = TextRedirector(consola_text)
 
+    # BOTÓN VOLVER
     boton_volver(root, callback_volver).pack(pady=(5, 15))
 
+    # FOOTER
     footer(root, "CEID Generator - FASE FINAL")
 
     root.mainloop()

@@ -30,37 +30,25 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     # Título principal
     titulo(root, "Fase Inicial | Generador de Archivos CEID")
 
-    # Sección archivo Excel
+    # ARCHIVO EXCEL
     frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_excel.pack(padx=30, pady=10, fill="x")
 
-    etiqueta(root, "📄 Seleccionar planilla del mes:").pack(
-        in_=frame_excel, anchor="w", padx=10, pady=(10, 2)
-    )
-    label_excel = ctk.CTkLabel(
-        frame_excel, text="📂 No seleccionado", text_color=GRAY_COLOR
-    )
+    etiqueta(root, "📄 Seleccionar planilla del mes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
+    label_excel = ctk.CTkLabel(frame_excel, text="📂 No seleccionado", text_color=GRAY_COLOR)
     label_excel.pack(side="left", padx=10, pady=(0, 10))
 
     def seleccionar_archivo():
         nonlocal ruta_excel
-        ruta = filedialog.askopenfilename(
-            title="Seleccionar planilla del mes",
-            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
-        )
+        ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if ruta:
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names
                 hoja_menu.configure(values=hojas)
-                hoja_var.set(
-                    "Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0]
-                )
-                label_excel.configure(
-                    text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR
-                )
+                hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
+                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
                 boton_gen.configure(state="normal")
                 ruta_excel = ruta
-                print(f"[INFO] Archivo seleccionado: {ruta}")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 
@@ -91,22 +79,16 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     # Número de armada
     frame_armada = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_armada.pack(padx=30, pady=10, fill="x")
-    etiqueta(root, "🔢 Número de armada:").pack(
-        in_=frame_armada, anchor="w", padx=10, pady=(10, 2)
-    )
+    etiqueta(root, "🔢 Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(10, 2))
     armadas = ["primera", "segunda", "tercera"]
     crear_option_menu(frame_armada, numero_armada, armadas)
 
-    # Selección de carpeta destino
+    # CARPETA DE DESTINO
     frame_destino = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_destino.pack(padx=30, pady=10, fill="x")
 
-    etiqueta(root, "📂 Seleccionar carpeta de destino:").pack(
-        in_=frame_destino, anchor="w", padx=10, pady=(10, 2)
-    )
-    label_destino = ctk.CTkLabel(
-        frame_destino, text="📂 No seleccionado", text_color=GRAY_COLOR
-    )
+    etiqueta(root, "📂 Seleccionar carpeta de destino:").pack(in_=frame_destino, anchor="w", padx=10, pady=(10, 2))
+    label_destino = ctk.CTkLabel(frame_destino, text="📂 No seleccionado", text_color=GRAY_COLOR)
     label_destino.pack(side="left", padx=10, pady=(0, 10))
 
     def seleccionar_salida():
@@ -114,53 +96,27 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
         carpeta = filedialog.askdirectory(title="Seleccionar carpeta de destino")
         if carpeta:
             carpeta_destino = carpeta
-            label_destino.configure(
-                text=f"📁 {os.path.basename(carpeta)}", text_color=BLACK_COLOR
-            )
-            print(f"[INFO] Carpeta destino: {carpeta}")
-
+            label_destino.configure(text=f"📁 {os.path.basename(carpeta)}", text_color=BLACK_COLOR)
+    
     crear_boton_archivo(frame_destino, label_destino, seleccionar_salida)
 
-    # Botón generar documentos
+    # BOTÓN GENERAR
     def generar():
-        if not ruta_excel:
-            messagebox.showerror("Error", "Seleccione un archivo de planilla.")
+        if not ruta_excel or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
+            messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
             return
-        if not hoja_var.get():
-            messagebox.showerror("Error", "Seleccione una hoja de trabajo.")
-            return
-        if not carpeta_destino:
-            messagebox.showerror("Error", "Seleccione una carpeta de destino.")
-            return
-        if not numero_armada.get():
-            messagebox.showerror("Error", "Seleccione el número de armada.")
-            return
-
         def tarea():
             try:
-                print("[INFO] Generando documentos...")
-                generar_documentos(
-                    ruta_excel,
-                    hoja_var.get(),
-                    carpeta_destino,
-                    mes_var.get(),
-                    año_var.get(),
-                    numero_armada.get()
-                )
-                messagebox.showinfo(
-                    "Éxito",
-                    "Documentos de fase inicial generados correctamente."
-                )
-                print("[OK] Proceso finalizado con éxito.")
+                procesar_planilla_fase_inicial(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
+                messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente.")
             except Exception as e:
-                messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
-                print(f"[ERROR] {e}")
+                messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
 
         threading.Thread(target=tarea).start()
 
-    boton_gen = boton_generador(root, "🚀 Generar Documentos", generar)
+    boton_gen = boton_generador(root, "Generar Documentos", generar)
 
-    # Consola embebida
+    # CONSOLA EMBEBIDA
     consola_frame = ctk.CTkFrame(root, height=150, fg_color=WHITE_COLOR)
     consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
     consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
@@ -184,10 +140,10 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     sys.stdout = TextRedirector(consola_text)
     sys.stderr = TextRedirector(consola_text)
 
-    # Botón volver
+    # BOTÓN VOLVER
     boton_volver(root, callback_volver).pack(pady=(5, 15))
 
-    # Footer
+    # FOOTER
     footer(root, "CEID Generator - FASE INICIAL")
 
     root.mainloop()
