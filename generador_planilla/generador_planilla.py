@@ -38,16 +38,12 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     ruta_planilla_anterior, sheet_name="Primera carga académica", header=fila_header
                 )
 
-                planilla_anterior_df = limpiar_docentes(planilla_anterior_df, 'Docente')
-                planilla_anterior_df['Nivel'] = planilla_anterior_df.apply(ajustar_nivel, axis=1)
-                planilla_anterior_df['Curso'] = planilla_anterior_df[['Idioma', 'Nivel', 'Ciclo']].astype(str).agg(' '.join, axis=1)
-
                 datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
                 datos['Curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
-                datos = limpiar_docentes(datos, 'Docente')
+                datos = limpiar_docentes(datos, 'docente')
 
                 combinacion_anterior = set(zip(planilla_anterior_df['Docente'], planilla_anterior_df['Curso']))
-                datos = datos[~datos.apply(lambda row: (row['Docente'], row['Curso']) in combinacion_anterior, axis=1)]
+                datos = datos[~datos.apply(lambda row: (row['docente'], row['Curso']) in combinacion_anterior, axis=1)]
 
             except Exception as e:
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
@@ -85,7 +81,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             # Construir hoja Planilla_Generador
             datos_csv_original['nivel'] = datos_csv_original.apply(ajustar_nivel, axis=1)
             datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
-            datos_csv_original = limpiar_docentes(datos_csv_original, 'docente')
 
             agrupar_gen = agrupar_y_calcular(datos_csv_original, datos_docentes, 'Curso')
             agrupar_gen = agregar_clasificacion(agrupar_gen, ruta_clasificacion, normalizar_texto)
@@ -117,7 +112,6 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 df_carga_consol = crear_df_carga(datos_csv_original, 'Consolidado')
                 df_carga_consol.to_excel(writer, sheet_name="Carga académica consolidada", index=False)
 
-                datos_csv_original = limpiar_docentes(datos_csv_original, 'Docente')
                 datos_csv_original['nivel'] = datos_csv_original.apply(ajustar_nivel, axis=1)
                 datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
