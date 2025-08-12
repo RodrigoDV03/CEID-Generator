@@ -60,65 +60,55 @@ def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destin
 
         # -------- GENERAR OFICIO --------
         if tipo_contrato == "CONTRATO":
-            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_contrato.docx')
+            ruta_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_contrato.docx')
         elif tipo_contrato == "TERCERO":
-            plantilla_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_tercero.docx')
+            ruta_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_tercero.docx')
         else:
-            plantilla_oficio = None
+            ruta_oficio = None
 
-        if plantilla_oficio and os.path.exists(plantilla_oficio):
-            documento = Document(plantilla_oficio)
-            reemplazos_oficio = {
-                "Nro_Contrato": nro_contrato,
-                "docente": docente,
-                "descripcion": descripcion_final,
-                "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
-                "numero_armada": numero_armada
-            }
-            reemplazar_en_parrafos(documento, reemplazos_oficio)
-            reemplazar_en_tablas(documento, reemplazos_oficio)
-            ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año}.docx")
-            documento.save(ruta_salida_oficio)
+        reemplazos_oficio = {
+            "Nro_Contrato": nro_contrato,
+            "docente": docente,
+            "descripcion": descripcion_final,
+            "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+            "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+            "numero_armada": numero_armada
+        }
+        ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año}.docx")
+        generar_documento(ruta_oficio, reemplazos_oficio, ruta_salida_oficio)
 
         # -------- GENERAR TDR --------
         if tipo_contrato == "TERCERO":
             tipo_tdr = str(getattr(fila, "Categoria_letra", "")).strip().upper()
-            plantilla_tdr = ruta_absoluta_relativa(f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx')
-            if os.path.exists(plantilla_tdr):
-                documento_tdr = Document(plantilla_tdr)
-                reemplazos_tdr = {
-                    "descripcion": descripcion_final,
-                    "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
-                    "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
-                }
-                reemplazar_en_parrafos(documento_tdr, reemplazos_tdr)
-                reemplazar_en_tablas(documento_tdr, reemplazos_tdr)
-                ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente} - {mes} {año}.docx")
-                documento_tdr.save(ruta_salida_tdr)
+            ruta_tdr = ruta_absoluta_relativa(f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx')
+
+            reemplazos_tdr = {
+                "descripcion": descripcion_final,
+                "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+            }
+
+            ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente} - {mes} {año}.docx")
+            generar_documento(ruta_tdr, reemplazos_tdr, ruta_salida_tdr)
 
         # -------- GENERAR COTIZACIÓN --------
 
         if tipo_contrato == "TERCERO":
-            plantilla_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
-            if os.path.exists(plantilla_cotizacion):
-                documento_cot = Document(plantilla_cotizacion)
-                reemplazos = {
-                    "nombre_docente": docente,
-                    "direccion_cot": f"Dirección: {direccion}",
-                    "ruc_docente_cot": f"RUC N.º {ruc}",
-                    "correo_docente_cot": f"Correo: {correo}",
-                    "celular_cot": f"Teléfono: {celular}",
-                    "descripcion_servicio": descripcion_final,
-                    "categoria_monto": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
-                    "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
-                    "dni_cot": f"DNI: {dni_docente}"
-                }
+            ruta_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
 
-                reemplazar_en_parrafos(documento_cot, reemplazos)
-                reemplazar_en_tablas(documento_cot, reemplazos)
+            reemplazos = {
+                "nombre_docente": docente,
+                "direccion_cot": f"Dirección: {direccion}",
+                "ruc_docente_cot": f"RUC N.º {ruc}",
+                "correo_docente_cot": f"Correo: {correo}",
+                "celular_cot": f"Teléfono: {celular}",
+                "descripcion_servicio": descripcion_final,
+                "categoria_monto": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                "dni_cot": f"DNI: {dni_docente}"
+            }
 
-                ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
-                documento_cot.save(ruta_salida_cot)
+            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
+            generar_documento(ruta_cotizacion, reemplazos, ruta_salida_cot)
 
         print (f"{docente} - Documentos generados correctamente.")

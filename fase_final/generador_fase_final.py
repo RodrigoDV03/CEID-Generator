@@ -6,13 +6,13 @@ from utils.functions import *
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
-def generador_conformidad(fila, plantilla_path, ruta_salida, numero_armada):
+def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada):
 
     docente = str(getattr(fila, "Docente", "N/A"))
     nombre_docente = docente
 
-    if not os.path.exists(plantilla_path):
-        raise FileNotFoundError(f"No se encontró la plantilla: {plantilla_path}")
+    if not os.path.exists(ruta_conformidad):
+        raise FileNotFoundError(f"No se encontró la plantilla: {ruta_conformidad}")
 
     ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
     descripcion_raw = str(getattr(fila, "Curso", ""))
@@ -55,8 +55,7 @@ def generador_conformidad(fila, plantilla_path, ruta_salida, numero_armada):
     except (ValueError, TypeError):
         pass
 
-
-    doc = Document(plantilla_path)
+    doc = Document(ruta_conformidad)
     reemplazos_oficio = {
         "nombre": nombre_docente,
         "ruc": ruc,
@@ -69,17 +68,17 @@ def generador_conformidad(fila, plantilla_path, ruta_salida, numero_armada):
     reemplazar_en_tablas(doc, reemplazos_oficio)
     reemplazar_en_parrafos(doc, reemplazos_oficio)
 
-    carpeta_final = os.path.dirname(ruta_salida)
+    carpeta_final = os.path.dirname(ruta_destino)
     os.makedirs(carpeta_final, exist_ok=True)
 
     try:
-        doc.save(ruta_salida)
+        doc.save(ruta_destino)
     except Exception as e:
-        print(f"Error al guardar {ruta_salida}: {e}")
+        print(f"Error al guardar {ruta_destino}: {e}")
         raise
-    return ruta_salida
+    return ruta_destino
 
-def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_path, df_control):
+def generar_control_avance(fila, monto_subtotal, ruta_destino, ruta_control, df_control):
 
     nombre_docente = str(getattr(fila, "Docente", ""))
 
@@ -102,9 +101,7 @@ def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_
 
     saldo_restante = monto_total - monto_subtotal
 
-    # Cargar plantilla
-    doc = Document(plantilla_control_path)
-
+    doc = Document(ruta_control)
     reemplazos_control = {
         "Nombre_Docente": nombre_docente,
         "Idioma_Docente": idioma_docente,
@@ -117,9 +114,9 @@ def generar_control_avance(fila, monto_subtotal, ruta_salida, plantilla_control_
     reemplazar_en_parrafos(doc, reemplazos_control)
     reemplazar_en_tablas(doc, reemplazos_control)
 
-    os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
-    doc.save(ruta_salida)
-    return ruta_salida
+    os.makedirs(os.path.dirname(ruta_destino), exist_ok=True)
+    doc.save(ruta_destino)
+    return ruta_destino
 
 def procesar_planilla_fase_final(ruta_excel, ruta_docente, hoja, carpeta_salida, mes, año, numero_armada):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
@@ -132,9 +129,9 @@ def procesar_planilla_fase_final(ruta_excel, ruta_docente, hoja, carpeta_salida,
             nombre_docente = docente
 
             if estado == "CONTRATO":
-                plantilla = ruta_absoluta_relativa("Modelos_documentos/conformidad_contrato.docx")
+                ruta_conformidad = ruta_absoluta_relativa("Modelos_documentos/conformidad_contrato.docx")
             elif estado == "TERCERO":
-                plantilla = ruta_absoluta_relativa("Modelos_documentos/conformidad_tercero.docx")
+                ruta_conformidad = ruta_absoluta_relativa("Modelos_documentos/conformidad_tercero.docx")
             else:
                 raise ValueError(f"Estado inválido: {estado}")
 
@@ -143,13 +140,12 @@ def procesar_planilla_fase_final(ruta_excel, ruta_docente, hoja, carpeta_salida,
 
             # === GENERAR DOCUMENTO DE CONFORMIDAD ===
             nombre_archivo_conformidad = f"CONFORMIDAD - {nombre_docente} - {mes} {año}.docx"
-            ruta_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
+            ruta_destino = os.path.join(carpeta_final, nombre_archivo_conformidad)
+            generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada)
 
-            generador_conformidad(fila, plantilla, ruta_conformidad, numero_armada)
-
-            # === SI ES CONTRATO, GENERAR TAMBIÉN CONTROL DE AVANCE ===
+            # === SI ES CONTRATO, GENERAR CONTROL DE AVANCE ===
             if estado == "CONTRATO":
-                plantilla_control = ruta_absoluta_relativa("Modelos_documentos/control_pagos.docx")
+                ruta_control = ruta_absoluta_relativa("Modelos_documentos/control_pagos.docx")
                 nombre_archivo_control = f"CONTROL DE AVANCE - {nombre_docente} - {mes} {año}.docx"
                 ruta_control = os.path.join(carpeta_final, nombre_archivo_control)
 
@@ -157,8 +153,7 @@ def procesar_planilla_fase_final(ruta_excel, ruta_docente, hoja, carpeta_salida,
                     # Usa el monto_total calculado en generar_conformidad
                     monto_total = getattr(fila, "Subtotal_pago", 0)
                     monto_total = float(monto_total) if not pd.isna(monto_total) else 0
-
-                    generar_control_avance(fila=fila, monto_subtotal=monto_total, ruta_salida=ruta_control, plantilla_control_path=plantilla_control, df_control=df_control)
+                    generar_control_avance(fila, monto_total, ruta_destino, ruta_control, df_control)
                 except Exception as e:
                     print(f"Error al generar control de avance para {nombre_docente}: {e}")
                     continue

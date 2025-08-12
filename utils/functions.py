@@ -7,6 +7,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
 from num2words import num2words
 from decimal import Decimal, ROUND_HALF_UP
+from docx import Document
 import pandas as pd
 import unicodedata
 
@@ -235,3 +236,12 @@ def ruta_absoluta_relativa(path_relativo):
     else:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, path_relativo)
+
+def generar_documento(modelo_path, reemplazos, ruta_salida):
+    if modelo_path and os.path.exists(modelo_path):
+        doc = Document(modelo_path)
+        reemplazar_en_parrafos(doc, reemplazos)
+        reemplazar_en_tablas(doc, reemplazos)
+        doc.save(ruta_salida)
+        return True
+    return False
