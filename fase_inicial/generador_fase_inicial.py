@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from docx import Document
 from utils.functions import *
 
 def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):

@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from correos_auto.correos_gui import iniciar_interfaz_correos
 from generador_planilla.planilla_gui import iniciar_interfaz_planilla
 from fase_inicial.fase_inicial_gui import iniciar_interfaz_fase_inicial
 from fase_final.fase_final_gui import iniciar_interfaz_fase_final
@@ -19,6 +20,10 @@ def iniciar_interfaz_general():
     def abrir_fase_final():
         root.destroy()
         iniciar_interfaz_fase_final(volver_menu)
+
+    def abrir_envio_correos():
+        root.destroy()
+        iniciar_interfaz_correos(volver_menu)
 
     def volver_menu():
         iniciar_interfaz_general()
@@ -54,6 +59,7 @@ def iniciar_interfaz_general():
     crear_card("📋 1. Generar Planilla", abrir_planilla)
     crear_card("📄 2. Generador Fase Inicial", abrir_fase_inicial)
     crear_card("📁 3. Generador Fase Final", abrir_fase_final)
+    crear_card("📧 4. Envío de Correos", abrir_envio_correos)
 
     # --- FOOTER ---
     footer(root, "CEID Generator - FLCH - UNMSM")
