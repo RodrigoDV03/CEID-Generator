@@ -24,8 +24,6 @@ def extraer_nombre_docente(pdf_path):
     return None
 
 def extraer_servicios(pdf_path):
-    import re
-    import pdfplumber
 
     with pdfplumber.open(pdf_path) as pdf:
         texto = ""
@@ -90,15 +88,28 @@ def generar_cuerpo_correo_html(mes, anio, servicio):
     </p>
 
     <p>Atentamente,</p>
+
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Rodrigo Estéfano, Dávila Vásquez</p>
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Coordinación de procesos administrativos</p>
+
+    <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
+
+    <p style="font-size:7.5pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
+    <p style="font-size:7pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
   </body>
 </html>
 """
 
 
 def enviar_correo(pdf_path, destinatario, mes, anio, servicio):
-    remitente = "personalcontratado28.flch@unmsm.edu.pe"
-    cc = "coordinacionsistemasceid.flch@unmsm.edu.pe"
-    password = "vfrl usic kmfm fyah"
+    # remitente = "personalcontratado28.flch@unmsm.edu.pe"
+    # cc = "coordinacionsistemasceid.flch@unmsm.edu.pe"
+    # password = "vfrl usic kmfm fyah"
+
+
+    remitente = "bolsistaceid01.flch@unmsm.edu.pe"
+    cc = "rodrodv03@gmail.com"
+    password = "frsf imch edfs uwqy"
 
     asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
     cuerpo_html = generar_cuerpo_correo_html(mes, anio, servicio)
@@ -147,7 +158,7 @@ def procesar_correos(ruta_excel, hoja, mes, anio, lista_pdfs):
         correo_destinatario = docente_row['Correo Institucional'].values[0]
         servicio = extraer_servicios(pdf_path)
         enviar_correo(pdf_path, correo_destinatario, mes, anio, servicio)
-        print(f"Profesor: {mejor_match} (score={score})")
+        print(f"Profesor: {mejor_match}")
         print(f"Correo: {correo_destinatario}")
         print(f"Servicio: {servicio}")
         print(f"-------------------------------------------------------------")
