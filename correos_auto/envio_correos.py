@@ -89,8 +89,8 @@ def generar_cuerpo_correo_html(mes, anio, servicio):
 
     <p>Atentamente,</p>
 
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Rodrigo Estéfano, Dávila Vásquez</p>
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Coordinación de procesos administrativos</p>
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Secretaria DGI-CEID-FLCH-UNMSM</p>
 
     <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
 
@@ -101,15 +101,15 @@ def generar_cuerpo_correo_html(mes, anio, servicio):
 """
 
 
-def enviar_correo(pdf_path, destinatario, mes, anio, servicio):
-    # remitente = "personalcontratado28.flch@unmsm.edu.pe"
-    # cc = "coordinacionsistemasceid.flch@unmsm.edu.pe"
-    # password = "vfrl usic kmfm fyah"
+def enviar_correo(nombre, pdf_path, destinatario, mes, anio, servicio):
+    remitente = "personalcontratado28.flch@unmsm.edu.pe"
+    cc = "coordinacionsistemasceid.flch@unmsm.edu.pe"
+    password = "vfrl usic kmfm fyah"
 
 
-    remitente = "bolsistaceid01.flch@unmsm.edu.pe"
-    cc = "rodrodv03@gmail.com"
-    password = "frsf imch edfs uwqy"
+    # remitente = "bolsistaceid01.flch@unmsm.edu.pe"
+    # cc = "rodrodv03@gmail.com"
+    # password = "frsf imch edfs uwqy"
 
     asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
     cuerpo_html = generar_cuerpo_correo_html(mes, anio, servicio)
@@ -135,31 +135,53 @@ def enviar_correo(pdf_path, destinatario, mes, anio, servicio):
         servidor.login(remitente, password)
         servidor.sendmail(remitente, [destinatario, cc], msg.as_string())
 
-    print(f"Correo enviado a {destinatario} con CC a {cc}")
+    print(f"Correo enviado a {nombre}.")
 
-def procesar_correos(ruta_excel, hoja, mes, anio, lista_pdfs):
+def procesar_correos(ruta_excel, hoja, lista_pdfs):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
 
+    # Asegurar que la columna 'Docente' exista
+    if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
+        raise ValueError("El Excel debe contener columnas 'Docente' y 'Correo Institucional'.")
+
     nombres_excel = df['Docente'].astype(str).tolist()
+
+    resultados = []
 
     for pdf_path in lista_pdfs:
         nombre_docente = extraer_nombre_docente(pdf_path)
         if not nombre_docente:
-            print(f"No se encontró nombre en {pdf_path}, omitido.")
+            print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
             continue
 
         # Emparejamiento difuso con precisión mínima de 90
         mejor_match, score = process.extractOne(nombre_docente, nombres_excel)
         if score < 90:
-            print(f"No se encontró coincidencia suficiente para '{nombre_docente}' (score={score}), omitido.")
+            print(f"⚠ Coincidencia baja para '{nombre_docente}' (score={score}), omitido.")
             continue
 
-        docente_row = df[df['Docente'] == mejor_match]
-        correo_destinatario = docente_row['Correo Institucional'].values[0]
+        # Obtener correo del docente en Excel
+        fila_docente = df[df['Docente'] == mejor_match]
+        if fila_docente.empty:
+            print(f"⚠ No se encontró correo para {mejor_match}.")
+            continue
+
+        correo_docente = fila_docente['Correo Institucional'].values[0]
+
+        # Extraer servicio
         servicio = extraer_servicios(pdf_path)
-        enviar_correo(pdf_path, correo_destinatario, mes, anio, servicio)
-        print(f"Profesor: {mejor_match}")
-        print(f"Correo: {correo_destinatario}")
-        print(f"Servicio: {servicio}")
-        print(f"-------------------------------------------------------------")
-        servicio = None
+        if not servicio:
+            print(f"⚠ No se encontró servicio para {mejor_match}.")
+            continue
+
+        # Guardar datos en lista para envío posterior
+        resultados.append({
+            "pdf_path": pdf_path,
+            "nombre": mejor_match,
+            "correo": correo_docente,
+            "servicio": servicio
+        })
+
+        print(f"✅ {mejor_match} - {correo_docente} - {servicio}")
+
+    return resultados

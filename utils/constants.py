@@ -19,10 +19,10 @@ BLACK_COLOR = "#000000"
 
 FONT_TITLE = ("Segoe UI", 26, "bold")
 FONT_SECTION = ("Segoe UI", 17, "bold")
-FONT_TEXT = ("Segoe UI", 12)
-FONT_LABEL = ("Segoe UI", 11)
-FONT_BUTTON = ("Segoe UI", 10, "bold")
-FONT_FOOTER = ("Segoe UI", 9, "italic")
+FONT_TEXT = ("Segoe UI", 14)
+FONT_LABEL = ("Segoe UI", 12)
+FONT_BUTTON = ("Segoe UI", 12, "bold")
+FONT_FOOTER = ("Segoe UI", 8, "italic")
 
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
@@ -63,15 +63,7 @@ def boton_volver(master, callback_volver=None):
         if callback_volver:
             callback_volver()
 
-    boton_volver = ctk.CTkButton(
-        master,
-        text="⬅ Volver al menú",
-        command=volver,
-        fg_color=BUTTON_BG_COLOR,
-        hover_color=BUTTON_HOVER_BG_COLOR,
-        text_color=WHITE_COLOR,
-        font=FONT_BUTTON
-    )
+    boton_volver = ctk.CTkButton(master, text="⬅ Volver al menú", command=volver, fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON)
     boton_volver.pack(pady=(5, 15))
 
     return boton_volver

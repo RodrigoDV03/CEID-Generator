@@ -12,9 +12,10 @@ def iniciar_interfaz_correos(callback_volver=None):
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
+    data_para_envio = []
 
     root = ctk.CTk()
-    root.title("Fase Inicial | Envio de correos")
+    root.title("Envío de correos | CEID")
     root.geometry("800x750")
     root.configure(fg_color=BG_COLOR)
     root.after(100, lambda: root.state("zoomed"))
@@ -22,12 +23,11 @@ def iniciar_interfaz_correos(callback_volver=None):
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     año_var = ctk.StringVar(value=str(datetime.now().year))
-    numero_armada = ctk.StringVar()
 
     ruta_excel = None
 
     # Título principal
-    titulo(root, "Fase Inicial | Envio de correos")
+    titulo(root, "Envío de correos | CEID")
 
     # ARCHIVO EXCEL
     frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
@@ -46,7 +46,7 @@ def iniciar_interfaz_correos(callback_volver=None):
                 hoja_menu.configure(values=hojas)
                 hoja_var.set("list")
                 label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
-                boton_gen.configure(state="normal")
+                boton_gen_data.configure(state="normal")
                 ruta_excel = ruta
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
@@ -85,37 +85,35 @@ def iniciar_interfaz_correos(callback_volver=None):
     frame_fecha = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_fecha.pack(padx=30, pady=10, fill="x")
 
-    etiqueta(root, "📆 Mes:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
+    etiqueta(root, "Mes:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
     crear_option_menu(frame_fecha, mes_var, meses)
 
-    etiqueta(root, "📆 Año:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
+    etiqueta(root, "Año:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
     crear_option_menu(frame_fecha, año_var, años)
 
-    # BOTÓN GENERAR
-    def generar():
+    # BOTÓN GENERAR DATA
+    def generar_data():
+        nonlocal data_para_envio
         if not ruta_excel or not hoja_var.get() or not pdfs_seleccionados:
             messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
             return
         def tarea():
+            nonlocal data_para_envio
             try:
-                procesar_correos(
-                    ruta_excel,
-                    hoja_var.get(),
-                    mes_var.get(),
-                    año_var.get(),
-                    pdfs_seleccionados  # Aquí los PDFs seleccionados
-                )
-                messagebox.showinfo("Éxito", f"Correos enviados correctamente.")
+                data_para_envio = procesar_correos(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                if not data_para_envio:
+                    messagebox.showwarning("Aviso", "No se generó ninguna coincidencia para envío.")
+                else:
+                    messagebox.showinfo("Éxito", f"Datos generados ({len(data_para_envio)} docentes). Revise antes de enviar.")
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo procesar el envío: {e}")
-
+                messagebox.showerror("Error", f"No se pudo procesar: {e}")
 
         threading.Thread(target=tarea).start()
 
-    boton_gen = boton_generador(root, "Enviar correos", generar)
+    boton_gen_data = boton_generador(root, "Generar Datos", generar_data)
 
     # CONSOLA EMBEBIDA
-    consola_frame = ctk.CTkFrame(root, height=150, fg_color=WHITE_COLOR)
+    consola_frame = ctk.CTkFrame(root, height=200, fg_color=WHITE_COLOR)
     consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
     consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
     consola_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
@@ -137,6 +135,32 @@ def iniciar_interfaz_correos(callback_volver=None):
 
     sys.stdout = TextRedirector(consola_text)
     sys.stderr = TextRedirector(consola_text)
+
+    # BOTÓN ENVIAR CORREOS
+    def enviar():
+        if not data_para_envio:
+            messagebox.showerror("Error", "No hay datos para enviar. Primero genere la data.")
+            return
+
+        respuesta = messagebox.askyesno("Confirmación", f"Se enviarán {len(data_para_envio)} correos. ¿Continuar?")
+        if not respuesta:
+            return
+
+        boton_envio.configure(state="disabled")  # Deshabilita el botón mientras se envía
+
+        def tarea_envio():
+            try:
+                for item in data_para_envio:
+                    enviar_correo(nombre=item['nombre'], pdf_path=item['pdf_path'], destinatario=item['correo'], mes=mes_var.get(), anio=año_var.get(), servicio=item['servicio'])
+                messagebox.showinfo("Éxito", "Todos los correos fueron enviados correctamente.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Fallo en el envío: {e}")
+            finally:
+                boton_envio.configure(state="normal")  # Habilita el botón al terminar
+
+        threading.Thread(target=tarea_envio).start()
+
+    boton_envio = boton_generador(root, "Enviar Correos", enviar)
 
     # BOTÓN VOLVER
     boton_volver(root, callback_volver).pack(pady=(5, 15))
