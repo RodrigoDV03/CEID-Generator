@@ -63,7 +63,7 @@ def iniciar_interfaz_general():
     crear_card("📋 1. Generar Planilla", abrir_planilla)
     crear_card("📄 2. Generador Fase Inicial", abrir_fase_inicial)
     crear_card("📁 3. Generador Fase Final", abrir_fase_final)
-    crear_card(" 4. Control de pagos", abrir_control_pagos)
+    crear_card("📊 4. Control de pagos", abrir_control_pagos)
     crear_card("📧 5. Envío de Correos", abrir_envio_correos)
 
     # --- FOOTER ---

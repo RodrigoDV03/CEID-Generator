@@ -45,8 +45,12 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Subtotal_pago"]
         return None if fila.empty else float(fila.values[0])
 
+    # Abrir dos veces: uno para editar, otro para leer valores calculados
     wb = load_workbook(control_path)
+    wb_values = load_workbook(control_path, data_only=True)
     ws = wb.active
+    ws_values = wb_values.active
+
     # "APELLIDOS Y NOMBRES"
     header_row = None
     for r in range(1, min(ws.max_row, 15) + 1):
@@ -57,14 +61,12 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     if header_row is None:
         raise RuntimeError("No se encontró la fila de encabezados con 'APELLIDOS Y NOMBRES'.")
 
-    # Armamos un índice {titulo: índice_columna(1-based)}
     headers = {}
     for cell in ws[header_row]:
         key = _norm(cell.value)
         if key:
-            headers[key] = cell.column  # 1-based
+            headers[key] = cell.column
 
-    # Nombres de cabecera tal cual están en el archivo
     req = [
         "APELLIDOS Y NOMBRES",
         "MONTO TOTAL PARA CONTRATO S/",
@@ -86,7 +88,6 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     col_idx_armada  = headers[col_armada_name.upper()]
     col_idx_saldo   = headers["SALDO RESTANTE"]
 
-    # Letras de columna para armar fórmula
     L_total   = get_column_letter(col_idx_total)
     L_primera = get_column_letter(col_idx_primera)
     L_segunda = get_column_letter(col_idx_segunda)
@@ -102,10 +103,42 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         if monto is None:
             continue  # sin coincidencia
 
-        ws.cell(row=r, column=col_idx_armada).value = float(monto)
+        total   = ws_values.cell(row=r, column=col_idx_total).value or 0
+        primera = ws_values.cell(row=r, column=col_idx_primera).value or 0
+        segunda = ws_values.cell(row=r, column=col_idx_segunda).value or 0
+        tercera = ws_values.cell(row=r, column=col_idx_tercera).value or 0
+    
+        # Calcular saldo actual en memoria
+        saldo_actual = float(total) - float(primera) - float(segunda) - float(tercera)
 
+        if monto <= saldo_actual:
+            ws.cell(row=r, column=col_idx_armada).value = float(monto)
+            excedente = 0
+        else:
+            ws.cell(row=r, column=col_idx_armada).value = float(saldo_actual)
+            excedente = monto - saldo_actual
+
+        # Mantener la fórmula en "Saldo Restante"
         formula = f"={L_total}{r}-SUM({L_primera}{r},{L_segunda}{r},{L_tercera}{r})"
         ws.cell(row=r, column=col_idx_saldo).value = formula
+
+        # Registrar el excedente en una columna nueva
+        col_idx_excedente = headers.get("EXCEDENTE")
+        if not col_idx_excedente:
+            col_idx_excedente = ws.max_column + 1
+            ws.cell(row=header_row, column=col_idx_excedente).value = "Excedente"
+            headers["EXCEDENTE"] = col_idx_excedente
+        ws.cell(row=r, column=col_idx_excedente).value = excedente
+
+        # ---- Condicionales de impresión usando saldo_actual y excedente ----
+        if saldo_actual == 0.00 and excedente == 0:
+            print(f"Monto total del contrato de {nombre} copado.")
+
+        if excedente > 0:
+            print(f"Existe un excedente para {nombre} - Monto excedente: {excedente}")
+
+        if 0 < saldo_actual <= 1280:
+            print(f"El monto del contrato de {nombre} está por acabar - Saldo restante: {saldo_actual}")
 
     wb.save(control_path)
     print(f"Archivo actualizado guardado en: {control_path}")
