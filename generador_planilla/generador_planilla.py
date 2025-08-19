@@ -39,6 +39,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 )
 
                 datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
+                datos['modalidad'] = datos.apply(ajustar_modalidad, axis=1)
                 datos['Curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
                 datos = limpiar_docentes(datos, 'docente')
 
@@ -51,6 +52,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
 
 
         datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
+        datos['modalidad'] = datos.apply(ajustar_modalidad, axis=1)
         datos['detalles_curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
         agrupar = agrupar_y_calcular(datos, datos_docentes, 'detalles_curso')
@@ -80,6 +82,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
             
             # Construir hoja Planilla_Generador
             datos_csv_original['nivel'] = datos_csv_original.apply(ajustar_nivel, axis=1)
+            datos_csv_original['modalidad'] = datos_csv_original.apply(ajustar_modalidad, axis=1)
             datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
             agrupar_gen = agrupar_y_calcular(datos_csv_original, datos_docentes, 'Curso')
@@ -93,7 +96,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 'Examen Clasif.': 'Examen_clasif',
                 'Categoria (Letra)': 'Categoria_letra',
                 'Categoria (Monto)': 'Categoria_monto',
-                'Sub Total Pago S/.': 'Subtotal_pago',
+                'Total Pago S/.': 'Subtotal_pago',
                 'Estado': 'Estado_docente',
                 'Idioma': 'Docente_idioma',
                 'N°. Ruc': 'N_Ruc',
@@ -113,6 +116,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                 df_carga_consol.to_excel(writer, sheet_name="Carga académica consolidada", index=False)
 
                 datos_csv_original['nivel'] = datos_csv_original.apply(ajustar_nivel, axis=1)
+                datos_csv_original['modalidad'] = datos_csv_original.apply(ajustar_modalidad, axis=1)
                 datos_csv_original['Curso'] = datos_csv_original[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
 
                 agrupar_consol = agrupar_y_calcular(datos_csv_original, datos_docentes, 'Curso')
@@ -174,7 +178,7 @@ def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: s
                     celda.fill = openpyxl.styles.PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
                     celda.font = Font(bold=True, color="ffffff", size=12)
 
-                if hoja == f"{numero_carga_letra} Planilla {mes_seleccionado}":
+                if hoja == f"{numero_carga_letra} Planilla {mes_seleccionado}" or hoja == "Planilla consolidada":
                     fila_total = ws.max_row + 1
 
                     ws.merge_cells(f"A{fila_total}:G{fila_total}")

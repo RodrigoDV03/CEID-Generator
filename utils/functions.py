@@ -82,10 +82,10 @@ def construir_tabla(df):
         'Cantidad Cursos': df['cantidad_cursos'],
         'Diseño de Examenes': df['Diseño de Examenes'],
         'Examen Clasif.': df['Examen Clasif.'],
-        'Sub Total Pago S/.': 0,
+        'Total Pago S/.': 0,
         'Estado': df['Estado']
     })
-    tabla['Sub Total Pago S/.'] = (
+    tabla['Total Pago S/.'] = (
         tabla['Curso Dictado'] + tabla['Extra Curso'] +
         tabla['Diseño de Examenes'] + tabla['Examen Clasif.']
     )
@@ -109,6 +109,16 @@ def ajustar_nivel(row):
                     elif 5 <= ciclo_num <= 8:
                         return 'Posgrado Intermedio'
         return nivel
+
+def ajustar_modalidad(row):
+    dias = row['dias']
+    hora_fin = row['horafin']
+    modalidad = row['modalidad']
+
+    if (hora_fin == '22:30:00'or hora_fin == '15:00:00') and (dias == '{MONDAY,TUESDAY,WEDNESDAY,THURSDAY}' or dias == '{SATURDAY,SUNDAY}'):
+        modalidad = 'INTENSIVO VIRTUAL'
+
+    return modalidad
 
 def crear_df_carga(datos, estado_planilla):
     datos = datos.copy()
