@@ -111,7 +111,10 @@ def enviar_correo(nombre, pdf_path, destinatario, mes, anio, servicio):
     # cc = "rodrodv03@gmail.com"
     # password = "frsf imch edfs uwqy"
 
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
+    nombre_formato = nombre.split(",")[0].strip()
+
+    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio} - {nombre_formato}"
+
     cuerpo_html = generar_cuerpo_correo_html(mes, anio, servicio)
 
     # Crear mensaje
@@ -182,6 +185,6 @@ def procesar_correos(ruta_excel, hoja, lista_pdfs):
             "servicio": servicio
         })
 
-        print(f"✅ {mejor_match} - {correo_docente} - {servicio}")
+        print(f"{mejor_match} - {correo_docente} - {servicio}")
 
     return resultados
