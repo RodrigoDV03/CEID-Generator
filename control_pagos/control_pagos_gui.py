@@ -22,7 +22,6 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     numero_armada = ctk.StringVar()
     ruta_planilla = None
     ruta_control = None
-    carpeta_destino = None
 
     # Título principal
     titulo(root, "Control de Pagos | Generador de Archivos CEID")
@@ -77,23 +76,6 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     armadas = ["Primera", "Segunda", "Tercera"]
     crear_option_menu(frame_armada, numero_armada, armadas)
 
-    # CARPETA DE DESTINO
-    frame_destino = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
-    frame_destino.pack(padx=20, pady=8, fill="x")
-
-    etiqueta(root, "Seleccionar carpeta de destino:").pack(in_=frame_destino, anchor="w", padx=10, pady=(7, 0))
-    label_destino = ctk.CTkLabel(frame_destino, text="📂 No seleccionado", text_color=GRAY_COLOR)
-    label_destino.pack(side="left", padx=10, pady=(0, 7))
-
-    def seleccionar_salida():
-        nonlocal carpeta_destino
-        ruta = filedialog.askdirectory(title="Seleccionar carpeta de destino")
-        if ruta:
-            carpeta_destino = ruta
-            label_destino.configure(text=f"📂 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
-
-    crear_boton_archivo(frame_destino, label_destino, seleccionar_salida)
-
     # BOTÓN GENERAR
     def generar():
         if not ruta_planilla or not hoja_var.get() or not ruta_control or not numero_armada.get():
@@ -101,7 +83,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
             return
         def tarea():
             try:
-                actualizar_control_pagos(ruta_planilla, ruta_control, numero_armada.get(), carpeta_destino)
+                actualizar_control_pagos(ruta_planilla, ruta_control, numero_armada.get())
                 messagebox.showinfo("Éxito", f"Control de pagos actualizado.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
