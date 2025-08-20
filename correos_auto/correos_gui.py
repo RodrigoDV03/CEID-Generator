@@ -23,23 +23,31 @@ def iniciar_interfaz_correos(callback_volver=None):
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     año_var = ctk.StringVar(value=str(datetime.now().year))
+    tipo_var = ctk.StringVar(value="Docente")
 
     ruta_excel = None
 
     # Título principal
     titulo(root, "Envío de correos | CEID")
 
+    # SELECCIÓN DE DESTINATARIO
+    frame_tipo = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_tipo.pack(padx=30, pady=10, fill="x")
+
+    etiqueta(root, "Tipo de destinatario:").pack(in_=frame_tipo, anchor="w", padx=10, pady=(10, 2))
+    crear_option_menu(frame_tipo, tipo_var, ["Docente", "Administrativo"])
+
     # ARCHIVO EXCEL
     frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_excel.pack(padx=30, pady=10, fill="x")
 
-    etiqueta(root, "📄 Seleccionar excel de docentes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
+    etiqueta(root, "Seleccionar excel de docentes o administrativos:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
     label_excel = ctk.CTkLabel(frame_excel, text="📂 No seleccionado", text_color=GRAY_COLOR)
     label_excel.pack(side="left", padx=10, pady=(0, 10))
 
     def seleccionar_archivo():
         nonlocal ruta_excel
-        ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        ruta = filedialog.askopenfilename(title="Seleccionar excel de docentes o administrativos", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if ruta:
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names
@@ -63,7 +71,7 @@ def iniciar_interfaz_correos(callback_volver=None):
     frame_pdfs = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_pdfs.pack(padx=30, pady=10, fill="x")
 
-    etiqueta(root, "📄 Seleccionar PDFs de órdenes de servicio:").pack(in_=frame_pdfs, anchor="w", padx=10, pady=(10, 2))
+    etiqueta(root, "Seleccionar PDFs de órdenes de servicio:").pack(in_=frame_pdfs, anchor="w", padx=10, pady=(10, 2))
     label_pdfs = ctk.CTkLabel(frame_pdfs, text="📂 Ningún PDF seleccionado", text_color=GRAY_COLOR)
     label_pdfs.pack(side="left", padx=10, pady=(0, 10))
 
@@ -100,11 +108,15 @@ def iniciar_interfaz_correos(callback_volver=None):
         def tarea():
             nonlocal data_para_envio
             try:
-                data_para_envio = procesar_correos(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                if tipo_var.get() == "Docente":
+                    data_para_envio = procesar_correos_docente(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                else:
+                    data_para_envio = procesar_correos_administrativos(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+
                 if not data_para_envio:
                     messagebox.showwarning("Aviso", "No se generó ninguna coincidencia para envío.")
                 else:
-                    messagebox.showinfo("Éxito", f"Datos generados ({len(data_para_envio)} docentes). Revise antes de enviar.")
+                    messagebox.showinfo("Éxito", f"Datos generados. Revisar antes de enviar.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar: {e}")
 
@@ -151,12 +163,29 @@ def iniciar_interfaz_correos(callback_volver=None):
         def tarea_envio():
             try:
                 for item in data_para_envio:
-                    enviar_correo(nombre=item['nombre'], pdf_path=item['pdf_path'], destinatario=item['correo'], mes=mes_var.get(), anio=año_var.get(), servicio=item['servicio'])
+                    if tipo_var.get() == "Docente":
+                        enviar_correo_docente(
+                            nombre=item['nombre'],
+                            pdf_path=item['pdf_path'],
+                            destinatario=item['correo'],
+                            mes=mes_var.get(),
+                            anio=año_var.get(),
+                            servicio=item['servicio']
+                        )
+                    else:
+                        enviar_correo_administrativo(
+                            nombre=item['nombre'],
+                            pdf_path=item['pdf_path'],
+                            destinatario=item['correo'],
+                            mes=mes_var.get(),
+                            anio=año_var.get(),
+                        )
+
                 messagebox.showinfo("Éxito", "Todos los correos fueron enviados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"Fallo en el envío: {e}")
             finally:
-                boton_envio.configure(state="normal")  # Habilita el botón al terminar
+                boton_envio.configure(state="normal")
 
         threading.Thread(target=tarea_envio).start()
 

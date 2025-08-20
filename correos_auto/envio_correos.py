@@ -9,7 +9,7 @@ from email import encoders
 import os
 from fuzzywuzzy import process
 
-def extraer_nombre_docente(pdf_path):
+def extraer_nombre(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         texto = ""
         for pagina in pdf.pages:
@@ -63,7 +63,7 @@ def extraer_servicios(pdf_path):
 
 
 
-def generar_cuerpo_correo_html(mes, anio, servicio):
+def generar_cuerpo_correo_docente_html(mes, anio, servicio):
     return f"""
 <html>
   <body style="font-family: Verdana; font-size: 10pt;">
@@ -100,28 +100,50 @@ def generar_cuerpo_correo_html(mes, anio, servicio):
 </html>
 """
 
+def generar_cuerpo_correo_administrativo_html(mes, anio):
+    return f"""
+<html>
+  <body style="font-family: Verdana; font-size: 10pt;">
+    <p>Buen día:</p>
 
-def enviar_correo(nombre, pdf_path, destinatario, mes, anio, servicio):
+    <p>
+      Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+    </p>
+
+    <p>
+      Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
+    </p>
+
+    <p>Atentamente,</p>
+
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Secretaria DGI-CEID-FLCH-UNMSM</p>
+
+    <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
+
+    <p style="font-size:7.5pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
+    <p style="font-size:7pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
+  </body>
+</html>
+"""
+
+def enviar_correo_docente(nombre, pdf_path, destinatario, mes, anio, servicio):
     remitente = "personalcontratado28.flch@unmsm.edu.pe"
-    cc = "coordinacionsistemasceid.flch@unmsm.edu.pe"
     password = "vfrl usic kmfm fyah"
 
-
     # remitente = "bolsistaceid01.flch@unmsm.edu.pe"
-    # cc = "rodrodv03@gmail.com"
     # password = "frsf imch edfs uwqy"
 
     nombre_formato = nombre.split(",")[0].strip()
 
     asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio} - {nombre_formato}"
 
-    cuerpo_html = generar_cuerpo_correo_html(mes, anio, servicio)
+    cuerpo_html = generar_cuerpo_correo_docente_html(mes, anio, servicio)
 
     # Crear mensaje
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
-    msg['Cc'] = cc
     msg['Subject'] = asunto
     msg.attach(MIMEText(cuerpo_html, 'html'))
 
@@ -136,11 +158,47 @@ def enviar_correo(nombre, pdf_path, destinatario, mes, anio, servicio):
     # Enviar
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as servidor:
         servidor.login(remitente, password)
-        servidor.sendmail(remitente, [destinatario, cc], msg.as_string())
+        servidor.sendmail(remitente, [destinatario], msg.as_string())
 
     print(f"Correo enviado a {nombre}.")
 
-def procesar_correos(ruta_excel, hoja, lista_pdfs):
+def enviar_correo_administrativo(nombre, pdf_path, destinatario, mes, anio):
+    remitente = "personalcontratado28.flch@unmsm.edu.pe"
+    password = "vfrl usic kmfm fyah"
+
+    # remitente = "bolsistaceid01.flch@unmsm.edu.pe"
+    # password = "frsf imch edfs uwqy"
+
+    # nombre_formato = nombre.split(",")[0].strip()
+
+    # asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio} - {nombre_formato}"
+    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
+
+    cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, anio)
+
+    # Crear mensaje
+    msg = MIMEMultipart()
+    msg['From'] = remitente
+    msg['To'] = destinatario
+    msg['Subject'] = asunto
+    msg.attach(MIMEText(cuerpo_html, 'html'))
+
+    # Adjuntar PDF
+    with open(pdf_path, 'rb') as adjunto:
+        parte = MIMEBase('application', 'octet-stream')
+        parte.set_payload(adjunto.read())
+        encoders.encode_base64(parte)
+        parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(pdf_path)}')
+        msg.attach(parte)
+
+    # Enviar
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as servidor:
+        servidor.login(remitente, password)
+        servidor.sendmail(remitente, [destinatario], msg.as_string())
+
+    print(f"Correo enviado a {nombre}.")
+
+def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
 
     # Asegurar que la columna 'Docente' exista
@@ -152,14 +210,14 @@ def procesar_correos(ruta_excel, hoja, lista_pdfs):
     resultados = []
 
     for pdf_path in lista_pdfs:
-        nombre_docente = extraer_nombre_docente(pdf_path)
+        nombre_docente = extraer_nombre(pdf_path)
         if not nombre_docente:
             print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
             continue
 
-        # Emparejamiento difuso con precisión mínima de 90
+        # Emparejamiento difuso con precisión mínima de 80
         mejor_match, score = process.extractOne(nombre_docente, nombres_excel)
-        if score < 90:
+        if score < 80:
             print(f"⚠ Coincidencia baja para '{nombre_docente}' (score={score}), omitido.")
             continue
 
@@ -186,5 +244,47 @@ def procesar_correos(ruta_excel, hoja, lista_pdfs):
         })
 
         print(f"{mejor_match} - {correo_docente} - {servicio}")
+
+    return resultados
+
+def procesar_correos_administrativos(ruta_excel, hoja, lista_pdfs):
+    df = pd.read_excel(ruta_excel, sheet_name=hoja)
+
+    # Asegurar que la columna 'Nombre' exista
+    if 'Nombre' not in df.columns or 'Correo Institucional' not in df.columns:
+        raise ValueError("El Excel debe contener columnas 'Nombre' y 'Correo Institucional'.")
+
+    nombres_excel = df['Nombre'].astype(str).tolist()
+
+    resultados = []
+
+    for pdf_path in lista_pdfs:
+        nombre_administrativo = extraer_nombre(pdf_path)
+        if not nombre_administrativo:
+            print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
+            continue
+
+        # Emparejamiento difuso con precisión mínima de 80
+        mejor_match, score = process.extractOne(nombre_administrativo, nombres_excel)
+        if score < 80:
+            print(f"⚠ Coincidencia baja para '{nombre_administrativo}' (score={score}), omitido.")
+            continue
+
+        # Obtener correo del administrativo en Excel
+        fila_administrativo = df[df['Nombre'] == mejor_match]
+        if fila_administrativo.empty:
+            print(f"⚠ No se encontró correo para {mejor_match}.")
+            continue
+
+        correo_administrativo = fila_administrativo['Correo Institucional'].values[0]
+
+        # Guardar datos en lista para envío posterior
+        resultados.append({
+            "pdf_path": pdf_path,
+            "nombre": mejor_match,
+            "correo": correo_administrativo
+        })
+
+        print(f"{mejor_match} - {correo_administrativo}")
 
     return resultados
