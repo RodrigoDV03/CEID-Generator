@@ -93,9 +93,9 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     boton_gen = boton_generador(root, "Actualizar control de pagos", generar)
 
     # CONSOLA EMBEBIDA
-    consola_frame = ctk.CTkFrame(root, height=150, fg_color=WHITE_COLOR)
+    consola_frame = ctk.CTkFrame(root, height=500, fg_color=WHITE_COLOR)
     consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
-    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
+    consola_text = ctk.CTkTextbox(consola_frame, height=400, wrap="word")
     consola_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
     consola_text.configure(state="disabled")
 

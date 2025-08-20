@@ -93,6 +93,14 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     L_segunda = get_column_letter(col_idx_segunda)
     L_tercera = get_column_letter(col_idx_tercera)
 
+    def es_cero(x, tol=1e-6):
+        return abs(float(x)) < tol
+
+    # --- listas para agrupar mensajes ---
+    mensajes_copado = []
+    mensajes_por_acabar = []
+    mensajes_excedente = []
+
     first_data_row = header_row + 1
     for r in range(first_data_row, ws.max_row + 1):
         nombre = ws.cell(row=r, column=col_idx_nombre).value
@@ -108,7 +116,6 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         segunda = ws_values.cell(row=r, column=col_idx_segunda).value or 0
         tercera = ws_values.cell(row=r, column=col_idx_tercera).value or 0
     
-        # Calcular saldo actual en memoria
         saldo_actual = float(total) - float(primera) - float(segunda) - float(tercera)
 
         if monto <= saldo_actual:
@@ -130,15 +137,37 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
             headers["EXCEDENTE"] = col_idx_excedente
         ws.cell(row=r, column=col_idx_excedente).value = excedente
 
-        # ---- Condicionales de impresión usando saldo_actual y excedente ----
-        if saldo_actual == 0.00 and excedente == 0:
-            print(f"Monto total del contrato de {nombre} copado.")
+        # --- Recalcular saldo después de asignar ---
+        nueva_primera = ws.cell(row=r, column=col_idx_primera).value or 0
+        nueva_segunda = ws.cell(row=r, column=col_idx_segunda).value or 0
+        nueva_tercera = ws.cell(row=r, column=col_idx_tercera).value or 0
+        nuevo_saldo = float(total) - float(nueva_primera) - float(nueva_segunda) - float(nueva_tercera)
+
+        # ---- Acumular mensajes ----
+        if es_cero(nuevo_saldo) and es_cero(excedente):
+            mensajes_copado.append(f"- {nombre}")
+
+        if 0 < nuevo_saldo <= 1280:
+            mensajes_por_acabar.append(f"- {nombre} - Saldo restante: {nuevo_saldo}")
 
         if excedente > 0:
-            print(f"Existe un excedente para {nombre} - Monto excedente: {excedente}")
-
-        if 0 < saldo_actual <= 1280:
-            print(f"El monto del contrato de {nombre} está por acabar - Saldo restante: {saldo_actual}")
+            mensajes_excedente.append(f"- {nombre} - Monto excedente: {excedente}")
 
     wb.save(control_path)
     print(f"Archivo actualizado guardado en: {control_path}")
+
+    # --- Imprimir bloques ---
+    if mensajes_copado:
+        print("\n=== CONTRATOS TERMINADOS ===")
+        for m in mensajes_copado:
+            print(m)
+
+    if mensajes_por_acabar:
+        print("\n=== CONTRATOS POR ACABAR ===")
+        for m in mensajes_por_acabar:
+            print(m)
+
+    if mensajes_excedente:
+        print("\n=== CONTRATOS CON EXCEDENTE ===")
+        for m in mensajes_excedente:
+            print(m)
