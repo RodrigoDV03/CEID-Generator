@@ -25,8 +25,8 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     año_var = ctk.StringVar(value=str(datetime.now().year))
     numero_armada = ctk.StringVar()
 
-    ruta_excel = None
-    archivo_docente = None
+    ruta_planilla = None
+    excel_control_pagos = None
     carpeta_destino = None
 
     # Título principal
@@ -41,7 +41,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     label_excel.pack(side="left", padx=10, pady=(0, 7))
 
     def seleccionar_archivo():
-        nonlocal ruta_excel
+        nonlocal ruta_planilla
         ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if ruta:
             try:
@@ -50,7 +50,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
                 hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
                 label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
                 boton_gen.configure(state="normal")
-                ruta_excel = ruta
+                ruta_planilla = ruta
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 
@@ -72,13 +72,13 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     label_docente = ctk.CTkLabel(frame_docente, text="📂 No seleccionado", text_color=GRAY_COLOR)
 
     def seleccionar_docente():
-        nonlocal archivo_docente
-        archivo_docente = filedialog.askopenfilename(title="Seleccionar excel de docentes de contrato", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
-        if archivo_docente:
+        nonlocal excel_control_pagos
+        excel_control_pagos = filedialog.askopenfilename(title="Seleccionar excel de docentes de contrato", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        if excel_control_pagos:
             try:
-                pd.ExcelFile(archivo_docente)
-                label_docente.configure(text=f"📁 {os.path.basename(archivo_docente)}", text_color=BLACK_COLOR)
-                boton_gen.archivo_docente = archivo_docente
+                pd.ExcelFile(excel_control_pagos)
+                label_docente.configure(text=f"📁 {os.path.basename(excel_control_pagos)}", text_color=BLACK_COLOR)
+                boton_gen.excel_control_pagos = excel_control_pagos
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{e}")
 
@@ -120,12 +120,12 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     # BOTÓN GENERAR
     def iniciar_generacion():
-        if not ruta_excel or not archivo_docente or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
+        if not ruta_planilla or not excel_control_pagos or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
             messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
             return
         def tarea():
             try:
-                procesar_planilla_fase_final(ruta_excel, archivo_docente, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
+                procesar_planilla_fase_final(ruta_planilla, excel_control_pagos, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
                 messagebox.showinfo("Éxito", f"Documentos de fase final generados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
