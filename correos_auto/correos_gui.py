@@ -6,7 +6,7 @@ import threading
 from tkinter import filedialog, messagebox
 from datetime import datetime
 from .envio_correos import *
-from utils.constants import *
+from utils.gui_constants import *
 
 def iniciar_interfaz_correos(callback_volver=None):
     ctk.set_appearance_mode("light")

@@ -5,7 +5,7 @@ import datetime
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, Border, Side
-from utils.functions import *
+from functions import *
 
 def generar_planilla(ruta_cursos: str, ruta_docentes: str, ruta_clasificacion: str, mes_seleccionado: str, numero_carga: int, ruta_planilla_anterior: str = None):
 

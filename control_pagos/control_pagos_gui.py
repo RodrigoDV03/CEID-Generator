@@ -5,7 +5,7 @@ import sys
 import threading
 from tkinter import filedialog, messagebox
 from .control_pagos import *
-from utils.constants import *
+from utils.gui_constants import *
 
 def iniciar_interfaz_control_pagos(callback_volver=None):
     ctk.set_appearance_mode("light")

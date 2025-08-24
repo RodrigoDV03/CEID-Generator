@@ -1,10 +1,10 @@
 import os
 import pandas as pd
-from utils.functions import *
+from functions import *
 
-def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
+def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
 
-    datos = pd.read_excel(ruta_excel, sheet_name=hoja_seleccionada)
+    datos = pd.read_excel(planilla_path, sheet_name=hoja_seleccionada)
 
     carpeta_principal = os.path.join(carpeta_destino, 'FASE INICIAL')
     os.makedirs(carpeta_principal, exist_ok=True)
@@ -46,8 +46,7 @@ def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destin
         else:
             descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
 
-        monto_categoria = getattr(fila, "Categoria_monto", 0)
-        monto_categoria_letras = monto_a_letras(monto_categoria)
+        monto_categoria_letras = monto_a_letras(categoria_valor)
         monto_total = getattr(fila, "Subtotal_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
         tipo_contrato = getattr(fila, "Estado_docente", "N/A")
@@ -69,7 +68,7 @@ def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destin
             "Nro_Contrato": nro_contrato,
             "docente": docente,
             "descripcion": descripcion_final,
-            "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+            "categoria": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
             "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
             "numero_armada": numero_armada
         }
@@ -83,7 +82,7 @@ def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destin
 
             reemplazos_tdr = {
                 "descripcion": descripcion_final,
-                "categoria": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                "categoria": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
                 "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
             }
 
@@ -102,7 +101,7 @@ def procesar_planilla_fase_inicial(ruta_excel, hoja_seleccionada, carpeta_destin
                 "correo_docente_cot": f"Correo: {correo}",
                 "celular_cot": f"Teléfono: {celular}",
                 "descripcion_servicio": descripcion_final,
-                "categoria_monto": f"S/ {monto_categoria:,.2f} ({monto_categoria_letras})",
+                "categoria_monto": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
                 "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
                 "dni_cot": f"DNI: {dni_docente}"
             }

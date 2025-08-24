@@ -1,14 +1,8 @@
-import re
 import pandas as pd
-import sys
 import os
 from fuzzywuzzy import process, fuzz
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
-from num2words import num2words
-from decimal import Decimal, ROUND_HALF_UP
-from docx import Document
-import pandas as pd
 import unicodedata
 
 # FUNCIONES PARA GENERACIÓN DE PLANILLA
@@ -144,25 +138,6 @@ def crear_df_carga(datos, estado_planilla):
     df.insert(0, 'N°', range(1, len(df) + 1))
     return df
 
-def formatear_hoja(ws, titulo):
-    ws.insert_rows(1)
-    max_col = ws.max_column
-    ws.merge_cells(f"A1:{get_column_letter(max_col)}1")
-    ws["A1"].value = titulo
-    ws["A1"].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    ws["A1"].fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-    ws["A1"].font = Font(bold=True, color="ffffff", size=22)
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=ws.max_column):
-        for cell in row:
-            cell.border = thin_border
-            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-
 def ordenar_hojas_excel(wb, hojas_ordenadas):
     hojas_existentes = wb.sheetnames
     nuevas_hojas = [hoja for hoja in hojas_ordenadas if hoja in hojas_existentes]
@@ -170,67 +145,6 @@ def ordenar_hojas_excel(wb, hojas_ordenadas):
         wb._sheets.insert(idx, wb[hoja])
     wb._sheets = wb._sheets[:len(nuevas_hojas)] + [s for s in wb._sheets if s.title not in nuevas_hojas]
     return wb
-
-# FUNCIONES PARA DOCUMENTOS DE FASE INICIAL Y FINAL
-
-def normalizar_texto(texto):
-    if pd.isna(texto):
-        return ''
-    texto = str(texto).lower().strip()
-    texto = unicodedata.normalize('NFKD', texto)
-    return ''.join([c for c in texto if not unicodedata.combining(c)])
-
-
-def limpiar_nombre_archivo(nombre):
-    return re.sub(r'[\\/*?:"<>|]', "", nombre)
-
-
-def limpiar_numero(valor):
-    return "" if pd.isna(valor) else str(valor).split('.')[0]
-
-
-def reemplazar_en_parrafos(documento, reemplazos):
-    for parrafo in documento.paragraphs:
-        for marcador, valor in reemplazos.items():
-            if marcador in parrafo.text:
-                texto_nuevo = parrafo.text.replace(marcador, valor)
-                for run in parrafo.runs:
-                    run.text = ''
-                if parrafo.runs:
-                    parrafo.runs[0].text = texto_nuevo
-
-def reemplazar_en_tablas(documento, reemplazos):
-    for tabla in documento.tables:
-        for fila in tabla.rows:
-            for celda in fila.cells:
-                for parrafo in celda.paragraphs:
-                    for marcador, valor in reemplazos.items():
-                        if marcador in parrafo.text:
-                            texto_nuevo = parrafo.text.replace(marcador, valor)
-                            for run in parrafo.runs:
-                                run.text = ''
-                            if parrafo.runs:
-                                parrafo.runs[0].text = texto_nuevo
-
-def monto_a_letras(monto):
-    try:
-        monto = Decimal(str(monto)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        entero = int(monto)
-        centavos = int((monto - Decimal(entero)) * 100)
-        return f"{num2words(entero, lang='es')} y {centavos:02d}/100 soles"
-    except Exception:
-        return "N/A"
-
-def redactar_cursos(cadena):
-    if not isinstance(cadena, str):
-        return "N/A"
-    cursos = [c.strip() for c in cadena.split("/") if c.strip()]
-    if not cursos:
-        return "N/A"
-    resultado = f"servicio de dictado de 28 horas de clases de {cursos[0]}"
-    for curso in cursos[1:]:
-        resultado += f", 28 horas de clases de {curso}"
-    return resultado
 
 def traducir_dias(dias_raw: str) -> str:
     dias_dict = {
@@ -240,24 +154,9 @@ def traducir_dias(dias_raw: str) -> str:
     dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
     return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
 
-def ruta_absoluta_relativa(path_relativo):
-    if getattr(sys, 'frozen', False):
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, path_relativo)
-
-def generar_documento(modelo_path, reemplazos, ruta_salida):
-    if modelo_path and os.path.exists(modelo_path):
-        doc = Document(modelo_path)
-        reemplazar_en_parrafos(doc, reemplazos)
-        reemplazar_en_tablas(doc, reemplazos)
-        doc.save(ruta_salida)
-        return True
-    return False
-
-def formato_soles(valor):
-    try:
-        return f"S/ {float(valor):,.2f}"
-    except Exception:
-        return f"S/ {valor}"
+def normalizar_texto(texto):
+    if pd.isna(texto):
+        return ''
+    texto = str(texto).lower().strip()
+    texto = unicodedata.normalize('NFKD', texto)
+    return ''.join([c for c in texto if not unicodedata.combining(c)])

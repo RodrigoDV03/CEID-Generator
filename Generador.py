@@ -1,10 +1,10 @@
 import customtkinter as ctk
 from correos_auto.correos_gui import iniciar_interfaz_correos
 from generador_planilla.planilla_gui import iniciar_interfaz_planilla
-from fase_inicial.fase_inicial_gui import iniciar_interfaz_fase_inicial
-from fase_final.fase_final_gui import iniciar_interfaz_fase_final
+from fases.fase_inicial.fase_inicial_gui import iniciar_interfaz_fase_inicial
+from fases.fase_final.fase_final_gui import iniciar_interfaz_fase_final
 from control_pagos.control_pagos_gui import iniciar_interfaz_control_pagos
-from utils.constants import *
+from utils.gui_constants import *
 
 def iniciar_interfaz_general():
     ctk.set_appearance_mode("light")

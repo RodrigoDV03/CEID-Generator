@@ -6,7 +6,7 @@ import threading
 from tkinter import filedialog, messagebox
 from datetime import datetime
 from .generador_fase_inicial import *
-from utils.constants import *
+from utils.gui_constants import *
 
 def iniciar_interfaz_fase_inicial(callback_volver=None):
     ctk.set_appearance_mode("light")
@@ -24,7 +24,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     año_var = ctk.StringVar(value=str(datetime.now().year))
     numero_armada = ctk.StringVar()
 
-    ruta_excel = None
+    planilla_path = None
     carpeta_destino = None
 
     # Título principal
@@ -39,7 +39,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     label_excel.pack(side="left", padx=10, pady=(0, 10))
 
     def seleccionar_archivo():
-        nonlocal ruta_excel
+        nonlocal planilla_path
         ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if ruta:
             try:
@@ -48,7 +48,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
                 hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
                 label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
                 boton_gen.configure(state="normal")
-                ruta_excel = ruta
+                planilla_path = ruta
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 
@@ -102,12 +102,12 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     # BOTÓN GENERAR
     def generar():
-        if not ruta_excel or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
+        if not planilla_path or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
             messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
             return
         def tarea():
             try:
-                procesar_planilla_fase_inicial(ruta_excel, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
+                procesar_planilla_fase_inicial(planilla_path, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
                 messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
