@@ -1,8 +1,6 @@
 import pandas as pd
 import os
 from fuzzywuzzy import process, fuzz
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
 import unicodedata
 
 # FUNCIONES PARA GENERACIÓN DE PLANILLA

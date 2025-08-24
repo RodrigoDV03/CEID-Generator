@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from functions import *
+from fases.functions import *
 
 def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, año, numero_armada):
 

@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from functions import *
+from fases.functions import *
 
 def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada):
 
