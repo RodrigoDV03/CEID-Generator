@@ -33,7 +33,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         if pd.isna(categoria_valor):
             categoria_valor = 1
         else:
-            categoria_valor = int(categoria_valor)
+            categoria_valor = float(categoria_valor)
 
         clasif_cant_horas = clasif_valor / categoria_valor
         if clasif_cant_horas == 1:
@@ -91,22 +91,23 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
 
         # -------- GENERAR COTIZACIÓN --------
 
-        if tipo_contrato == "TERCERO":
-            ruta_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
+            if tipo_contrato == "TERCERO":
+                ruta_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
+                ruta_firma = ruta_absoluta_relativa(f'firmas_docentes/{nombre_docente}.png')
 
-            reemplazos = {
-                "nombre_docente": docente,
-                "direccion_cot": f"Dirección: {direccion}",
-                "ruc_docente_cot": f"RUC N.º {ruc}",
-                "correo_docente_cot": f"Correo: {correo}",
-                "celular_cot": f"Teléfono: {celular}",
-                "descripcion_servicio": descripcion_final,
-                "categoria_monto": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
-                "dni_cot": f"DNI: {dni_docente}"
-            }
+                reemplazos = {
+                    "nombre_docente": docente,
+                    "direccion_cot": f"Dirección: {direccion}",
+                    "ruc_docente_cot": f"RUC N.º {ruc}",
+                    "correo_docente_cot": f"Correo: {correo}",
+                    "celular_cot": f"Teléfono: {celular}",
+                    "descripcion_servicio": descripcion_final,
+                    "categoria_monto": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
+                    "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                    "dni_cot": f"DNI: {dni_docente}"
+                }
 
-            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
-            generar_documento(ruta_cotizacion, reemplazos, ruta_salida_cot)
+                ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
+                generar_documento(ruta_cotizacion, reemplazos, ruta_salida_cot, ruta_firma)
 
         print (f"{docente} - Documentos generados correctamente.")

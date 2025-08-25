@@ -19,11 +19,11 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     root.configure(fg_color=BG_COLOR)
     root.after(100, lambda: root.state("zoomed"))
 
-
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     año_var = ctk.StringVar(value=str(datetime.now().year))
     numero_armada = ctk.StringVar()
+    tipo_fase_final = ctk.StringVar(value="planilla docente (con contrato)")
 
     planilla_path = None
     excel_control_pagos = None
@@ -31,6 +31,15 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     # Título principal
     titulo(root, "Fase Final | Generador de Archivos CEID")
+
+    # --- NUEVO BLOQUE PARA TIPO DE CONFORMIDAD ---
+    frame_tipo = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_tipo.pack(padx=20, pady=8, fill="x")
+
+    etiqueta(root, "Elaborar fase final para:").pack(in_=frame_tipo, anchor="w", padx=10, pady=(7, 0))
+    tipo_menu = crear_option_menu(frame_tipo, tipo_fase_final, ["planilla docente (con contrato)", "planilla docente (sin contrato)", "administrativo"])
+    tipo_menu.pack(padx=10, pady=(0, 7), fill="x")
+    # ---------------------------------------------
 
     # ARCHIVO EXCEL
     frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
@@ -64,7 +73,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     hoja_menu = crear_option_menu(frame_hoja, hoja_var, [])
     hoja_menu.pack(padx=10, pady=(0, 7), fill="x")
 
-    # ARCHIVO DOCENTE CONTRATO
+    # ARCHIVO DOCENTE CONTRATO (SOLO SI DOCENTE)
     frame_docente = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_docente.pack(padx=20, pady=8, fill="x")
 
@@ -83,6 +92,17 @@ def iniciar_interfaz_fase_final(callback_volver=None):
                 messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{e}")
 
     crear_boton_archivo(frame_docente, label_docente, seleccionar_docente)
+
+    def actualizar_visibilidad(*args):
+        if tipo_fase_final.get() == "planilla docente (con contrato)":
+            # Reposicionar frame_docente después de frame_hoja
+            frame_docente.pack_forget()
+            frame_docente.pack(after=frame_hoja, padx=20, pady=8, fill="x")
+        else:
+            frame_docente.pack_forget()
+
+    tipo_fase_final.trace_add("write", actualizar_visibilidad)  # 👈 NEW
+    actualizar_visibilidad()  # inicializar estado
 
     # MES Y AÑO
     frame_fecha = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
@@ -120,12 +140,26 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     # BOTÓN GENERAR
     def iniciar_generacion():
-        if not planilla_path or not excel_control_pagos or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
+        if not planilla_path or not hoja_var.get() or not carpeta_destino or not numero_armada.get():
             messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
             return
+
+        if tipo_fase_final.get() == "planilla docente (con contrato)" and not excel_control_pagos:
+            messagebox.showerror("Error", "Debe seleccionar el excel de docentes de contrato.")
+            return
+
         def tarea():
             try:
-                procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
+                procesar_planilla_fase_final(
+                    planilla_path,
+                    excel_control_pagos if tipo_fase_final.get() == "planilla docente (con contrato)" else None,
+                    hoja_var.get(),
+                    carpeta_destino,
+                    mes_var.get(),
+                    año_var.get(),
+                    numero_armada.get(),
+                    tipo_fase_final.get()
+                )
                 messagebox.showinfo("Éxito", f"Documentos de fase final generados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")

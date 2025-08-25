@@ -5,7 +5,7 @@ import re
 from docx import Document
 from decimal import Decimal, ROUND_HALF_UP
 from num2words import num2words
-
+from docx.shared import Inches
 
 def limpiar_nombre_archivo(nombre):
     return re.sub(r'[\\/*?:"<>|]', "", nombre)
@@ -65,11 +65,32 @@ def ruta_absoluta_relativa(path_relativo):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, path_relativo)
 
-def generar_documento(modelo_path, reemplazos, ruta_salida):
+def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
     if modelo_path and os.path.exists(modelo_path):
         doc = Document(modelo_path)
-        reemplazar_en_parrafos(doc, reemplazos)
-        reemplazar_en_tablas(doc, reemplazos)
+
+        # Reemplazar solo texto (sin la firma)
+        reemplazos_sin_firma = {k: v for k, v in reemplazos.items() if k != "firma_docente"}
+        reemplazar_en_parrafos(doc, reemplazos_sin_firma)
+        reemplazar_en_tablas(doc, reemplazos_sin_firma)
+        
+        # Insertar la firma donde está el marcador
+        if firma_path and os.path.exists(firma_path):
+            for parrafo in doc.paragraphs:
+                if "firma_docente" in parrafo.text:
+                    parrafo.text = ""
+                    run = parrafo.add_run()
+                    run.add_picture(firma_path, height=Inches(1), width=Inches(1))
+
+            for tabla in doc.tables:
+                for fila in tabla.rows:
+                    for celda in fila.cells:
+                        for parrafo in celda.paragraphs:
+                            if "firma_docente" in parrafo.text:
+                                parrafo.text = ""
+                                run = parrafo.add_run()
+                                run.add_picture(firma_path, width=Inches(2))
+
         doc.save(ruta_salida)
         return True
     return False
