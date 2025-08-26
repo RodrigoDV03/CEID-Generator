@@ -52,6 +52,11 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
     except (ValueError, TypeError):
         nro_contrato = str(nro_contrato_val)
 
+    if tipo_fase_final == "administrativo":
+        modalidad_servicio = "presencial"
+    else:
+        modalidad_servicio = "híbrida"
+
     reemplazos_conformidad = {
         "nombre": str(nombre_docente),
         "ruc": str(ruc),
@@ -59,7 +64,8 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
         "monto_subtotal": f"S/. {monto_total:,.2f} ({str(monto_total_letras)})",
         "monto_hora": f"S/. {categoria_valor:,.2f} ({str(monto_categoria_letras)})",
         "Nro_Contrato": str(nro_contrato),
-        "numero_armada": str(numero_armada)
+        "numero_armada": str(numero_armada),
+        "modalidad_servicio": str(modalidad_servicio)
     }
 
     carpeta_final = os.path.dirname(ruta_destino)

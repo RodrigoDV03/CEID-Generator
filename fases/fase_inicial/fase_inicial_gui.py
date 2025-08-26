@@ -23,12 +23,23 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     año_var = ctk.StringVar(value=str(datetime.now().year))
     numero_armada = ctk.StringVar()
+    tipo_fase_inicial = ctk.StringVar(value="planilla docente")
+
 
     planilla_path = None
     carpeta_destino = None
 
     # Título principal
     titulo(root, "Fase Inicial | Generador de Archivos CEID")
+
+    # --- NUEVO BLOQUE PARA TIPO DE FASE INICIAL ---
+    frame_tipo = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_tipo.pack(padx=20, pady=8, fill="x")
+
+    etiqueta(root, "Elaborar fase inicial para:").pack(in_=frame_tipo, anchor="w", padx=10, pady=(7, 0))
+    tipo_menu = crear_option_menu(frame_tipo, tipo_fase_inicial, ["planilla docente", "administrativo"])
+    tipo_menu.pack(padx=10, pady=(0, 7), fill="x")
+    # ---------------------------------------------
 
     # ARCHIVO EXCEL
     frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
@@ -80,7 +91,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     frame_armada = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
     frame_armada.pack(padx=30, pady=10, fill="x")
     etiqueta(root, "🔢 Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(10, 2))
-    armadas = ["primera", "segunda", "tercera"]
+    armadas = ["primera", "segunda", "tercera", "sin armada"]
     crear_option_menu(frame_armada, numero_armada, armadas)
 
     # CARPETA DE DESTINO
@@ -107,7 +118,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
             return
         def tarea():
             try:
-                procesar_planilla_fase_inicial(planilla_path, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get())
+                procesar_planilla_fase_inicial(planilla_path, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get(), tipo_fase_inicial.get())
                 messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")

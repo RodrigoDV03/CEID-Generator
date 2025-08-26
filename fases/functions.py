@@ -80,7 +80,7 @@ def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
                 if "firma_docente" in parrafo.text:
                     parrafo.text = ""
                     run = parrafo.add_run()
-                    run.add_picture(firma_path, height=Inches(1), width=Inches(1))
+                    run.add_picture(firma_path)
 
             for tabla in doc.tables:
                 for fila in tabla.rows:
@@ -89,7 +89,7 @@ def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
                             if "firma_docente" in parrafo.text:
                                 parrafo.text = ""
                                 run = parrafo.add_run()
-                                run.add_picture(firma_path, width=Inches(2))
+                                run.add_picture(firma_path)
 
         doc.save(ruta_salida)
         return True
