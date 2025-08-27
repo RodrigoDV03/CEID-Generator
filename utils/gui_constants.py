@@ -68,7 +68,7 @@ def boton_volver(master, callback_volver=None):
 
     return boton_volver
 
-def footer(master, texto):
-    footer = ctk.CTkLabel(master=master, text=texto, font=FONT_FOOTER, text_color=TEXT_COLOR)
+def footer(master):
+    footer = ctk.CTkLabel(master=master, text="CEID Generator - FLCH - UNMSM", font=FONT_FOOTER, text_color=TEXT_COLOR)
     footer.pack(pady=(0, 10))
     return footer

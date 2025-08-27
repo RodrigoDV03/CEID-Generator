@@ -170,9 +170,9 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     # CONSOLA EMBEBIDA
     consola_frame = ctk.CTkFrame(root, height=150, fg_color=WHITE_COLOR)
-    consola_frame.pack(padx=20, pady=(10, 20), fill="both", expand=False)
+    consola_frame.pack(padx=20, pady=(5, 10), fill="both", expand=False)
     consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word")
-    consola_text.pack(padx=10, pady=(0, 7), fill="both", expand=True)
+    consola_text.pack(padx=10, pady=(0, 4), fill="both", expand=True)
     consola_text.configure(state="disabled")
 
     class TextRedirector:
@@ -191,9 +191,9 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     sys.stderr = TextRedirector(consola_text)
 
     # BOTÓN VOLVER
-    boton_volver(root, callback_volver).pack(pady=(5, 15))
+    boton_volver(root, callback_volver).pack(pady=(3, 10))
 
     # FOOTER
-    footer(root, "CEID Generator - FASE FINAL")
+    footer(root)
 
     root.mainloop()

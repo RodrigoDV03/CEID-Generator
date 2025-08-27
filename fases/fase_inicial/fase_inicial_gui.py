@@ -155,6 +155,6 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     boton_volver(root, callback_volver).pack(pady=(5, 15))
 
     # FOOTER
-    footer(root, "CEID Generator - FASE INICIAL")
+    footer(root)
 
     root.mainloop()

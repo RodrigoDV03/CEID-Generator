@@ -195,6 +195,6 @@ def iniciar_interfaz_correos(callback_volver=None):
     boton_volver(root, callback_volver).pack(pady=(5, 15))
 
     # FOOTER
-    footer(root, "CEID Generator - ENVÍO DE CORREOS")
+    footer(root)
 
     root.mainloop()

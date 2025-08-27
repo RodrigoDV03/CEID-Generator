@@ -120,6 +120,6 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     boton_volver(root, callback_volver).pack(pady=(5, 15))
 
     # FOOTER
-    footer(root, "CEID Generator - CONTROL DE AVANCE DE PAGOS")
+    footer(root)
 
     root.mainloop()

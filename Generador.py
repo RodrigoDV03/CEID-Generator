@@ -67,7 +67,7 @@ def iniciar_interfaz_general():
     crear_card("📧 5. Envío de Correos", abrir_envio_correos)
 
     # --- FOOTER ---
-    footer(root, "CEID Generator - FLCH - UNMSM")
+    footer(root)
     root.mainloop()
 
 if __name__ == "__main__":

@@ -113,6 +113,6 @@ def iniciar_interfaz_planilla(callback_volver=None):
     # --- BOTÓN VOLVER ---
     boton_volver(root, callback_volver).pack(pady=(5, 15))
 
-    footer(root, "CEID Generator - GENERADOR DE PLANILLA")
+    footer(root)
 
     root.mainloop()
