@@ -84,8 +84,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
             "Nro_Contrato": nro_contrato,
             "docente": docente,
             "descripcion": descripcion_final,
-            "categoria": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
-            "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+            "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
+            "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
             "numero_armada": numero_armada,
             "modalidad_servicio": modalidad_servicio
         }
@@ -96,15 +96,15 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 doc = Document(ruta_salida_oficio)
                 for parrafo in doc.paragraphs:
                     for run in parrafo.runs:
-                        if ", monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text:
-                            run.text = run.text.replace(", monto por hora: S/ 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/ 1.00 (uno y 00/100 soles)", "")
+                        if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
+                            run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                 for tabla in doc.tables:
                     for fila in tabla.rows:
                         for celda in fila.cells:
                             for parrafo in celda.paragraphs:
                                 for run in parrafo.runs:
-                                    if ", monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text:
-                                        run.text = run.text.replace(", monto por hora: S/ 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/ 1.00 (uno y 00/100 soles)", "")
+                                    if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
+                                        run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                 doc.save(ruta_salida_oficio)
 
         # -------- GENERAR TDR --------
@@ -114,8 +114,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
 
             reemplazos_tdr = {
                 "descripcion": descripcion_final,
-                "categoria": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
+                "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
                 "modalidad_servicio": modalidad_servicio
             }
 
@@ -129,8 +129,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                     "experiencia_laboral": experiencia_laboral,
                     "requisitos_adicional": requisitos_adi,
                     "actividades_admin": actividades_admin,
-                    "categoria": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
-                    "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                    "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
+                    "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
                     "modalidad_servicio": modalidad_servicio
                 }
 
@@ -141,15 +141,15 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                     doc = Document(ruta_salida_tdr)
                     for parrafo in doc.paragraphs:
                         for run in parrafo.runs:
-                            if ", monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text:
-                                run.text = run.text.replace(", monto por hora: S/ 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/ 1.00 (uno y 00/100 soles)", "")
+                            if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
+                                run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                     for tabla in doc.tables:
                         for fila in tabla.rows:
                             for celda in fila.cells:
                                 for parrafo in celda.paragraphs:
                                     for run in parrafo.runs:
-                                        if ", monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text:
-                                            run.text = run.text.replace(", monto por hora: S/ 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/ 1.00 (uno y 00/100 soles)", "")
+                                        if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
+                                            run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                     doc.save(ruta_salida_tdr)
 
         # -------- GENERAR COTIZACIÓN --------
@@ -178,8 +178,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "celular_cot": f"Teléfono: {celular}",
                 "descripcion_servicio": descripcion_final,
                 "actividades_admin": actividades_admin,
-                "categoria_monto": f"S/ {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/ {monto_total:,.2f} ({monto_total_letras})",
+                "categoria_monto": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
+                "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
                 "dni_cot": f"DNI: {dni_docente}",
                 "modalidad_servicio": modalidad_servicio
             }
@@ -191,15 +191,15 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                     doc = Document(ruta_salida_cot)
                     for parrafo in doc.paragraphs:
                         for run in parrafo.runs:
-                            if ", monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text:
-                                run.text = run.text.replace(", monto por hora: S/ 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/ 1.00 (uno y 00/100 soles)", "")
+                            if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
+                                run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                     for tabla in doc.tables:
                         for fila in tabla.rows:
                             for celda in fila.cells:
                                 for parrafo in celda.paragraphs:
                                     for run in parrafo.runs:
-                                        if ", monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/ 1.00 (uno y 00/100 soles)" in run.text:
-                                            run.text = run.text.replace(", monto por hora: S/ 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/ 1.00 (uno y 00/100 soles)", "")
+                                        if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
+                                            run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                     doc.save(ruta_salida_cot)
 
         print (f"{docente} - Documentos generados correctamente.")

@@ -33,7 +33,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     titulo(root, "Fase Final | Generador de Archivos CEID")
 
     # --- NUEVO BLOQUE PARA TIPO DE CONFORMIDAD ---
-    frame_tipo = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_tipo = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_tipo.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Elaborar fase final para:").pack(in_=frame_tipo, anchor="w", padx=10, pady=(7, 0))
@@ -42,7 +42,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     # ---------------------------------------------
 
     # ARCHIVO EXCEL
-    frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_excel = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_excel.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Seleccionar Planilla del mes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(7, 0))
@@ -57,7 +57,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
                 hojas = pd.ExcelFile(ruta).sheet_names
                 hoja_menu.configure(values=hojas)
                 hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
-                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
+                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=WHITE_COLOR)
                 boton_gen.configure(state="normal")
                 planilla_path = ruta
             except Exception as e:
@@ -66,7 +66,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     crear_boton_archivo(frame_excel, label_excel, seleccionar_archivo)
 
     # Hoja de trabajo
-    frame_hoja = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_hoja = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_hoja.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Hoja de trabajo:").pack(in_=frame_hoja, anchor="w", padx=10, pady=(7, 0))
@@ -74,7 +74,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     hoja_menu.pack(padx=10, pady=(0, 7), fill="x")
 
     # ARCHIVO DOCENTE CONTRATO (SOLO SI DOCENTE)
-    frame_docente = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_docente = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_docente.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Seleccionar excel de docentes de contrato:").pack(in_=frame_docente, anchor="w", padx=10, pady=(7, 0))
@@ -86,7 +86,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
         if excel_control_pagos:
             try:
                 pd.ExcelFile(excel_control_pagos)
-                label_docente.configure(text=f"📁 {os.path.basename(excel_control_pagos)}", text_color=BLACK_COLOR)
+                label_docente.configure(text=f"📁 {os.path.basename(excel_control_pagos)}", text_color=WHITE_COLOR)
                 boton_gen.excel_control_pagos = excel_control_pagos
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{e}")
@@ -105,7 +105,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     actualizar_visibilidad()  # inicializar estado
 
     # MES Y AÑO
-    frame_fecha = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_fecha = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_fecha.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Mes:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(7, 0))
@@ -116,13 +116,13 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     crear_option_menu(frame_fecha, año_var, años)
 
     # Número de armada
-    frame_armada = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_armada = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_armada.pack(padx=20, pady=8, fill="x")
     etiqueta(root, "Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(7, 0))
     crear_option_menu(frame_armada, numero_armada, ["primera", "segunda", "tercera"])
 
     # CARPETA DE DESTINO
-    frame_destino = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_destino = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_destino.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Seleccionar carpeta de destino:").pack(in_=frame_destino, anchor="w", padx=10, pady=(7, 0))
@@ -134,7 +134,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
         ruta = filedialog.askdirectory(title="Seleccionar carpeta de destino")
         if ruta:
             carpeta_destino = ruta
-            label_destino.configure(text=f"📂 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
+            label_destino.configure(text=f"📂 {os.path.basename(ruta)}", text_color=WHITE_COLOR)
 
     crear_boton_archivo(frame_destino, label_destino, seleccionar_salida)
 

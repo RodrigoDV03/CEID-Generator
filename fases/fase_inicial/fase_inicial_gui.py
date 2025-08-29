@@ -33,7 +33,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     titulo(root, "Fase Inicial | Generador de Archivos CEID")
 
     # --- NUEVO BLOQUE PARA TIPO DE FASE INICIAL ---
-    frame_tipo = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_tipo = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_tipo.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Elaborar fase inicial para:").pack(in_=frame_tipo, anchor="w", padx=10, pady=(7, 0))
@@ -42,7 +42,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     # ---------------------------------------------
 
     # ARCHIVO EXCEL
-    frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_excel = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_excel.pack(padx=30, pady=10, fill="x")
 
     etiqueta(root, "📄 Seleccionar planilla del mes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
@@ -57,7 +57,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
                 hojas = pd.ExcelFile(ruta).sheet_names
                 hoja_menu.configure(values=hojas)
                 hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
-                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
+                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=WHITE_COLOR)
                 boton_gen.configure(state="normal")
                 planilla_path = ruta
             except Exception as e:
@@ -66,7 +66,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     crear_boton_archivo(frame_excel, label_excel, seleccionar_archivo)
 
     # Hoja de trabajo
-    frame_hoja = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_hoja = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_hoja.pack(padx=30, pady=(0, 10), fill="x")
 
     etiqueta(root, "📑 Hoja de trabajo:").pack(
@@ -77,7 +77,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
 
     # Mes y año
-    frame_fecha = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_fecha = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_fecha.pack(padx=30, pady=10, fill="x")
 
     etiqueta(root, "📆 Mes:").pack(in_=frame_fecha, anchor="w", padx=10, pady=(10, 2))
@@ -88,14 +88,14 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
 
     # Número de armada
-    frame_armada = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_armada = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_armada.pack(padx=30, pady=10, fill="x")
     etiqueta(root, "🔢 Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(10, 2))
     armadas = ["primera", "segunda", "tercera", "sin armada"]
     crear_option_menu(frame_armada, numero_armada, armadas)
 
     # CARPETA DE DESTINO
-    frame_destino = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_destino = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_destino.pack(padx=30, pady=10, fill="x")
 
     etiqueta(root, "📂 Seleccionar carpeta de destino:").pack(in_=frame_destino, anchor="w", padx=10, pady=(10, 2))
@@ -107,7 +107,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
         carpeta = filedialog.askdirectory(title="Seleccionar carpeta de destino")
         if carpeta:
             carpeta_destino = carpeta
-            label_destino.configure(text=f"📁 {os.path.basename(carpeta)}", text_color=BLACK_COLOR)
+            label_destino.configure(text=f"📁 {os.path.basename(carpeta)}", text_color=WHITE_COLOR)
     
     crear_boton_archivo(frame_destino, label_destino, seleccionar_salida)
 

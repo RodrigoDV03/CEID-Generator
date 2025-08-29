@@ -27,7 +27,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     titulo(root, "Control de Pagos | Generador de Archivos CEID")
 
     # ARCHIVO EXCEL
-    frame_excel = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_excel = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_excel.pack(padx=30, pady=10, fill="x")
 
     etiqueta(root, "📄 Seleccionar planilla del mes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
@@ -41,7 +41,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names
                 hoja_var.set("Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0])
-                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=BLACK_COLOR)
+                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=WHITE_COLOR)
                 boton_gen.configure(state="normal")
                 ruta_planilla = ruta
             except Exception as e:
@@ -50,7 +50,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     crear_boton_archivo(frame_excel, label_excel, seleccionar_archivo)
 
     # ARCHIVO DOCENTE CONTRATO
-    frame_contrato = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_contrato = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_contrato.pack(padx=20, pady=8, fill="x")
 
     etiqueta(root, "Seleccionar excel de docentes de contrato:").pack(in_=frame_contrato, anchor="w", padx=10, pady=(7, 0))
@@ -62,7 +62,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
         if ruta_control:
             try:
                 pd.ExcelFile(ruta_control)
-                label_docente.configure(text=f"📁 {os.path.basename(ruta_control)}", text_color=BLACK_COLOR)
+                label_docente.configure(text=f"📁 {os.path.basename(ruta_control)}", text_color=WHITE_COLOR)
                 boton_gen.ruta_control = ruta_control
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{e}")
@@ -70,7 +70,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     crear_boton_archivo(frame_contrato, label_docente, seleccionar_docente)
 
     # Número de armada
-    frame_armada = ctk.CTkFrame(root, fg_color=WHITE_COLOR)
+    frame_armada = ctk.CTkFrame(root, fg_color=BG_COLOR)
     frame_armada.pack(padx=30, pady=10, fill="x")
     etiqueta(root, "🔢 Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(10, 2))
     armadas = ["Primera", "Segunda", "Tercera"]

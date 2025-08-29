@@ -1,16 +1,16 @@
 from datetime import datetime
 import customtkinter as ctk
 
-PRIMARY_COLOR = "#2d415a"
-ACCENT_COLOR = "#4a90e2"
-BG_COLOR = "#f4f6fa"
-TEXT_COLOR = "#333333"
+PRIMARY_COLOR = "#fafbfc"
+ACCENT_COLOR = "#f38b1a"
+BG_COLOR = "#114b98"
+TEXT_COLOR = "#ffffff"
 DISABLED_COLOR = "#bbbbbb"
-CARD_COLOR = "#f2f2e4"
-HOVER_COLOR = "#3a76c7"
+CARD_COLOR = "#f38b1a"
+HOVER_COLOR = "#e8aa69"
 
-BUTTON_BG_COLOR = "#f87171"
-BUTTON_HOVER_BG_COLOR = "#f43f5e"
+BUTTON_BG_COLOR = "#f38b1a"
+BUTTON_HOVER_BG_COLOR = "#e8aa69"
 
 
 WHITE_COLOR = "#ffffff"
@@ -29,7 +29,7 @@ meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto
 años = [str(a) for a in range(datetime.now().year - 5, datetime.now().year + 6)]
 
 def titulo(master, texto):
-    titulo = ctk.CTkLabel(master=master, text=texto, font=FONT_TITLE, text_color=PRIMARY_COLOR, fg_color=WHITE_COLOR)
+    titulo = ctk.CTkLabel(master=master, text=texto, font=FONT_TITLE, text_color=PRIMARY_COLOR)
     titulo.pack(pady=(25, 15))
     return titulo
 
@@ -38,21 +38,21 @@ def seccion_titulo(master, texto):
     return ctk.CTkLabel(master=master, text=texto, font=FONT_SECTION, text_color=PRIMARY_COLOR)
 
 def etiqueta(master, texto):
-    return ctk.CTkLabel(master=master, text=texto, font=FONT_TEXT, text_color=PRIMARY_COLOR, fg_color=WHITE_COLOR)
+    return ctk.CTkLabel(master=master, text=texto, font=FONT_TEXT, text_color=PRIMARY_COLOR)
 
 def crear_option_menu(frame, variable, opciones):
-    menu = ctk.CTkOptionMenu(frame, variable=variable, values=opciones)
+    menu = ctk.CTkOptionMenu(frame, variable=variable, values=opciones, fg_color=BUTTON_BG_COLOR)
     menu.pack(padx=10, fill="x", pady=(0, 7))
     return menu
 
 def crear_boton_archivo(frame, etiqueta_archivo, comando):
-    boton = ctk.CTkButton(frame, text="Seleccionar archivo", command=comando, width=160)
+    boton = ctk.CTkButton(frame, text="Seleccionar archivo", command=comando, width=160, fg_color=BUTTON_BG_COLOR)
     boton.pack(side="right", padx=10, pady=(0, 7))
     etiqueta_archivo.pack(side="left", padx=10, pady=(0, 7))
     return boton
 
 def boton_generador(master, texto, comando):
-    boton = ctk.CTkButton(master=master, text=texto, command=comando, state="normal", height=45, fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON)
+    boton = ctk.CTkButton(master=master, text=texto, command=comando, state="normal", height=45, fg_color=BUTTON_BG_COLOR, hover_color=HOVER_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON)
     boton.pack(pady=(5, 15))
     return boton
 

@@ -34,8 +34,8 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     etiqueta(root, "Número de carga:").pack(in_=marco_opciones, anchor="w", padx=15)
     carga_var = ctk.IntVar(value=1)
-    ctk.CTkRadioButton(marco_opciones, text="1 (Primera carga)", variable=carga_var, value=1).pack(anchor="w", padx=25)
-    ctk.CTkRadioButton(marco_opciones, text="2 (Segunda carga)", variable=carga_var, value=2).pack(anchor="w", padx=25, pady=(0, 15))
+    ctk.CTkRadioButton(marco_opciones, text="1 (Primera carga)", variable=carga_var, value=1, text_color=WHITE_COLOR).pack(anchor="w", padx=25)
+    ctk.CTkRadioButton(marco_opciones, text="2 (Segunda carga)", variable=carga_var, value=2, text_color=WHITE_COLOR).pack(anchor="w", padx=25, pady=(0, 15))
 
     # --- PLANILLA ANTERIOR (solo si es segunda carga) ---
     marco_planilla_anterior = ctk.CTkFrame(root, fg_color=BG_COLOR, corner_radius=12)
@@ -78,9 +78,9 @@ def iniciar_interfaz_planilla(callback_volver=None):
             archivo = filedialog.askopenfilename(filetypes=[extensiones])
             if archivo:
                 actualizar_func(archivo)
-                label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=BLACK_COLOR)
+                label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=WHITE_COLOR)
 
-        ctk.CTkButton(frame, text="Seleccionar archivo", command=seleccionar, width=160).pack(side="right", padx=15)
+        ctk.CTkButton(frame, text="Seleccionar archivo", command=seleccionar, width=160, fg_color=BUTTON_BG_COLOR).pack(side="right", padx=15)
 
     def actualizar_cursos(path): nonlocal archivo_cursos_path; archivo_cursos_path = path
     def actualizar_docentes(path): nonlocal archivo_docentes_path; archivo_docentes_path = path
