@@ -4,17 +4,15 @@ import pandas as pd
 import sys
 import threading
 from tkinter import filedialog, messagebox
-from .control_pagos import *
+from .control_pagos import actualizar_control_pagos
 from utils.gui_constants import *
 
 def iniciar_interfaz_control_pagos(callback_volver=None):
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
-
     root = ctk.CTk()
     root.title("Control de Pagos | Generador de Archivos CEID")
-    root.geometry("800x750")
     root.configure(fg_color=BG_COLOR)
     root.after(100, lambda: root.state("zoomed"))
 
@@ -23,20 +21,22 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
     ruta_planilla = None
     ruta_control = None
 
-    # Título principal
+    # --- TÍTULO PRINCIPAL ---
     titulo(root, "Control de Pagos | Generador de Archivos CEID")
 
-    # ARCHIVO EXCEL
-    frame_excel = ctk.CTkFrame(root, fg_color=BG_COLOR)
-    frame_excel.pack(padx=30, pady=10, fill="x")
+    # --- CARD PRINCIPAL ---
+    card = ctk.CTkFrame(root, fg_color=SECTION_COLOR, corner_radius=15)
+    card.pack(padx=40, pady=20, fill="both", expand=False)
 
-    etiqueta(root, "📄 Seleccionar planilla del mes:").pack(in_=frame_excel, anchor="w", padx=10, pady=(10, 2))
-    label_excel = ctk.CTkLabel(frame_excel, text="📂 No seleccionado", text_color=GRAY_COLOR)
-    label_excel.pack(side="left", padx=10, pady=(0, 10))
+    # --- PLANILLA DEL MES ---
+    etiqueta(card, "Seleccionar planilla del mes:")
 
     def seleccionar_archivo():
         nonlocal ruta_planilla
-        ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        ruta = filedialog.askopenfilename(
+            title="Seleccionar planilla del mes",
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+        )
         if ruta:
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names
@@ -47,36 +47,31 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
 
-    crear_boton_archivo(frame_excel, label_excel, seleccionar_archivo)
+    boton_excel, label_excel = crear_boton_archivo(card, "📂 No seleccionado", seleccionar_archivo)
 
-    # ARCHIVO DOCENTE CONTRATO
-    frame_contrato = ctk.CTkFrame(root, fg_color=BG_COLOR)
-    frame_contrato.pack(padx=20, pady=8, fill="x")
-
-    etiqueta(root, "Seleccionar excel de docentes de contrato:").pack(in_=frame_contrato, anchor="w", padx=10, pady=(7, 0))
-    label_docente = ctk.CTkLabel(frame_contrato, text="📂 No seleccionado", text_color=GRAY_COLOR)
+    # --- ARCHIVO DOCENTES CONTRATO ---
+    etiqueta(card, "Seleccionar Excel de docentes de contrato:")
 
     def seleccionar_docente():
         nonlocal ruta_control
-        ruta_control = filedialog.askopenfilename(title="Seleccionar excel de docentes de contrato", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        ruta_control = filedialog.askopenfilename(
+            title="Seleccionar excel de docentes de contrato",
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+        )
         if ruta_control:
             try:
                 pd.ExcelFile(ruta_control)
                 label_docente.configure(text=f"📁 {os.path.basename(ruta_control)}", text_color=WHITE_COLOR)
-                boton_gen.ruta_control = ruta_control
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{e}")
 
-    crear_boton_archivo(frame_contrato, label_docente, seleccionar_docente)
+    boton_docente, label_docente = crear_boton_archivo(card, "📂 No seleccionado", seleccionar_docente)
 
-    # Número de armada
-    frame_armada = ctk.CTkFrame(root, fg_color=BG_COLOR)
-    frame_armada.pack(padx=30, pady=10, fill="x")
-    etiqueta(root, "🔢 Número de armada:").pack(in_=frame_armada, anchor="w", padx=10, pady=(10, 2))
-    armadas = ["Primera", "Segunda", "Tercera"]
-    crear_option_menu(frame_armada, numero_armada, armadas)
+    # --- NÚMERO DE ARMADA ---
+    etiqueta(card, "Número de armada:")
+    crear_option_menu(card, numero_armada, ["Primera", "Segunda", "Tercera"])
 
-    # BOTÓN GENERAR
+    # --- BOTÓN GENERAR ---
     def generar():
         if not ruta_planilla or not hoja_var.get() or not ruta_control or not numero_armada.get():
             messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
@@ -90,36 +85,33 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
 
         threading.Thread(target=tarea).start()
 
-    boton_gen = boton_generador(root, "Actualizar control de pagos", generar)
+    boton_gen = boton_generador(card, "Actualizar Control de Pagos", generar)
 
-    # CONSOLA EMBEBIDA
-    consola_frame = ctk.CTkFrame(root, height=500, fg_color=WHITE_COLOR)
-    consola_frame.pack(padx=30, pady=(10, 20), fill="both", expand=False)
-    consola_text = ctk.CTkTextbox(consola_frame, height=400, wrap="word")
-    consola_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
+    # --- CONSOLA EMBEBIDA ---
+    consola_frame = ctk.CTkFrame(root, fg_color=CONSOLE_BG, corner_radius=12)
+    consola_frame.pack(padx=40, pady=(10, 20), fill="both", expand=True)
+    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word", fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
+    consola_text.pack(padx=10, pady=10, fill="both", expand=True)
     consola_text.configure(state="disabled")
 
     class TextRedirector:
         def __init__(self, text_widget):
             self.text_widget = text_widget
-
         def write(self, message):
             if self.text_widget.winfo_exists():
                 self.text_widget.configure(state="normal")
                 self.text_widget.insert("end", message)
                 self.text_widget.see("end")
                 self.text_widget.configure(state="disabled")
-
-        def flush(self):
-            pass
+        def flush(self): pass
 
     sys.stdout = TextRedirector(consola_text)
     sys.stderr = TextRedirector(consola_text)
 
-    # BOTÓN VOLVER
-    boton_volver(root, callback_volver).pack(pady=(5, 15))
+    # --- BOTÓN VOLVER ---
+    boton_volver(root, callback_volver)
 
-    # FOOTER
+    # --- FOOTER ---
     footer(root)
 
     root.mainloop()

@@ -33,41 +33,49 @@ def iniciar_interfaz_general():
     def volver_menu():
         iniciar_interfaz_general()
 
-
+    # --- Ventana ---
     root = ctk.CTk()
     root.title("CEID - Sistema de Generación de Documentos")
-    root.geometry("700x600")
     root.configure(fg_color=BG_COLOR)
     root.after(100, lambda: root.state("zoomed"))
 
-    # --- TÍTULO ---
+    # --- Header ---
     titulo(root, "CEID - Generador de Documentos")
 
-    # --- CONTENEDOR PRINCIPAL (FRAME) ---
-    main_frame = ctk.CTkFrame(root, fg_color=BG_COLOR)
-    main_frame.pack(pady=10)
+    # --- Contenedor principal ---
+    main_frame = ctk.CTkFrame(root, fg_color="transparent")
+    main_frame.pack(expand=True)
 
-    def crear_card(texto, comando):
-        card = ctk.CTkFrame(main_frame, fg_color=CARD_COLOR, corner_radius=15)
-        card.pack(pady=15, padx=20, fill="x", expand=True)
+    # Configuración grid
+    main_frame.grid_rowconfigure((0, 1, 2), weight=1, uniform="row")
+    main_frame.grid_columnconfigure((0, 1), weight=1, uniform="col")
 
-        boton = ctk.CTkButton(
-            card, text=texto,
-            font=FONT_BUTTON, height=50,
-            fg_color=ACCENT_COLOR, hover_color=HOVER_COLOR,
-            text_color=WHITE_COLOR, corner_radius=10,
+    # --- Cards estilo botón ---
+    def crear_card(row, col, texto, comando):
+        card = ctk.CTkButton(
+            main_frame,
+            text=texto,
+            font=FONT_BUTTON,
+            height=120,
+            width=260,
+            fg_color=BUTTON_BG_COLOR,
+            hover_color=BUTTON_HOVER_BG_COLOR,
+            text_color=WHITE_COLOR,
+            corner_radius=20,
             command=comando
         )
-        boton.pack(padx=30, pady=20)
+        card.grid(row=row, column=col, padx=30, pady=25, sticky="nsew")
 
-    crear_card("📋 1. Generar Planilla", abrir_planilla)
-    crear_card("📄 2. Generador Fase Inicial", abrir_fase_inicial)
-    crear_card("📁 3. Generador Fase Final", abrir_fase_final)
-    crear_card("📊 4. Control de pagos", abrir_control_pagos)
-    crear_card("📧 5. Envío de Correos", abrir_envio_correos)
+    # Añadir opciones
+    crear_card(0, 0, "Generar Planilla", abrir_planilla)
+    crear_card(0, 1, "Generar Fase Inicial", abrir_fase_inicial)
+    crear_card(1, 0, "Generar Fase Final", abrir_fase_final)
+    crear_card(1, 1, "Control de Pagos Docente", abrir_control_pagos)
+    crear_card(2, 0, "Envío de Correos", abrir_envio_correos)
 
-    # --- FOOTER ---
+    # --- Footer ---
     footer(root)
+
     root.mainloop()
 
 if __name__ == "__main__":
