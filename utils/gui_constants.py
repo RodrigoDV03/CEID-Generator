@@ -46,7 +46,7 @@ def crear_option_menu(frame, variable, opciones):
     return menu
 
 def crear_boton_archivo(frame, etiqueta_archivo, comando):
-    boton = ctk.CTkButton(frame, text="Seleccionar archivo", command=comando, width=160, fg_color=BUTTON_BG_COLOR)
+    boton = ctk.CTkButton(frame, text="Seleccionar archivo", command=comando, width=160, fg_color=BUTTON_BG_COLOR, hover_color=HOVER_COLOR)
     boton.pack(side="right", padx=10, pady=(0, 7))
     etiqueta_archivo.pack(side="left", padx=10, pady=(0, 7))
     return boton
