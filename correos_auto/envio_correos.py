@@ -1,5 +1,5 @@
 import pandas as pd
-import pdfplumber
+from PyPDF2 import PdfReader
 import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -10,25 +10,45 @@ import os
 from fuzzywuzzy import process
 
 def extraer_nombre(pdf_path):
-    with pdfplumber.open(pdf_path) as pdf:
-        texto = ""
-        for pagina in pdf.pages:
-            texto += pagina.extract_text() + "\n"
+    reader = PdfReader(pdf_path)
+    texto = ""
 
-    # Buscar patrón de nombre en el PDF
+    # Concatenar el texto de todas las páginas
+    for pagina in reader.pages:
+        texto += pagina.extract_text() + "\n"
+
+    # Buscar patrón específico: Concepto:UNMSM seguido de números y nombre
+    # Patrón mejorado que busca "Concepto:" seguido opcionalmente de "UNMSM", números y nombre
+    match = re.search(r"Concepto:\s*UNMSM\s*\n?\s*\d+\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)", texto, re.IGNORECASE)
+    if match:
+        nombre_raw = match.group(1)
+        # Limpiar espacios múltiples
+        return re.sub(r"\s+", " ", nombre_raw).strip()
+
+    # Patrón alternativo: buscar números seguidos directamente de nombre (sin "Concepto:")
+    match = re.search(r"\d{8,}\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)", texto)
+    if match:
+        nombre_raw = match.group(1)
+        # Limpiar espacios múltiples
+        return re.sub(r"\s+", " ", nombre_raw).strip()
+
+    # Patrón original como fallback
     match = re.search(r"\b([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)\b", texto)
     if match:
         nombre_raw = match.group(1)
         # Limpiar espacios múltiples
         return re.sub(r"\s+", " ", nombre_raw).strip()
+
     return None
 
 def extraer_servicios(pdf_path):
 
-    with pdfplumber.open(pdf_path) as pdf:
-        texto = ""
-        for pagina in pdf.pages:
-            texto += pagina.extract_text() + "\n"
+    reader = PdfReader(pdf_path)
+    texto = ""
+
+    # Concatenar el texto de todas las páginas
+    for pagina in reader.pages:
+        texto += pagina.extract_text() + "\n"
 
     lineas = texto.splitlines()
 
