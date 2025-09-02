@@ -56,10 +56,10 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     # Mes y Año
     etiqueta(card, "Mes:")
-    crear_option_menu(card, mes_var, [datetime(2000, m, 1).strftime("%B").capitalize() for m in range(1, 13)])
+    crear_option_menu(card, mes_var, meses)
 
     etiqueta(card, "Año:")
-    crear_option_menu(card, año_var, [str(y) for y in range(2020, 2031)])
+    crear_option_menu(card, año_var, años)
 
     # Número de armada
     etiqueta(card, "Número de armada:")

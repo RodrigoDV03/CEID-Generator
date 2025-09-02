@@ -132,13 +132,20 @@ def generar_control_avance(fila_control, doc_control, ruta_destino):
 
 def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpeta_salida, mes, año, numero_armada, tipo_fase_final):
     df = pd.read_excel(planilla_path, sheet_name=hoja)
+    df.columns = df.columns.str.strip()
 
     if tipo_fase_final == "planilla docente (con contrato)":
         df_control = pd.read_excel(excel_control_pagos, sheet_name=0, header=1)
 
     for _, fila in df.iterrows():
         try:
-            docente = str(getattr(fila, "Docente", "N/A")).strip()
+            # Obtener el nombre del docente de la columna ya limpia
+            docente = str(getattr(fila, "Docente", "N/A"))
+            # Debug: mostrar información si el docente es N/A
+            if docente == "N/A":
+                print(f"No se pudo obtener el nombre del docente. Columnas disponibles: {list(df.columns)}")
+                continue  # Saltar esta fila si no hay nombre de docente
+
             estado = str(getattr(fila, "Estado_docente", "")).strip().upper()
 
             if estado == "CONTRATO" or estado == "Contrato":

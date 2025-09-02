@@ -220,6 +220,7 @@ def enviar_correo_administrativo(nombre, pdf_path, destinatario, mes, anio):
 
 def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
+    df.columns = df.columns.str.strip()
 
     # Asegurar que la columna 'Docente' exista
     if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
@@ -269,12 +270,13 @@ def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
 
 def procesar_correos_administrativos(ruta_excel, hoja, lista_pdfs):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
+    df.columns = df.columns.str.strip()
 
-    # Asegurar que la columna 'Nombre' exista
-    if 'Nombre' not in df.columns or 'Correo Institucional' not in df.columns:
-        raise ValueError("El Excel debe contener columnas 'Nombre' y 'Correo Institucional'.")
+    # Asegurar que la columna 'Docente' exista
+    if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
+        raise ValueError("El Excel debe contener columnas 'Docente' y 'Correo Institucional'.")
 
-    nombres_excel = df['Nombre'].astype(str).tolist()
+    nombres_excel = df['Docente'].astype(str).tolist()
 
     resultados = []
 
@@ -291,7 +293,7 @@ def procesar_correos_administrativos(ruta_excel, hoja, lista_pdfs):
             continue
 
         # Obtener correo del administrativo en Excel
-        fila_administrativo = df[df['Nombre'] == mejor_match]
+        fila_administrativo = df[df['Docente'] == mejor_match]
         if fila_administrativo.empty:
             print(f"⚠ No se encontró correo para {mejor_match}.")
             continue

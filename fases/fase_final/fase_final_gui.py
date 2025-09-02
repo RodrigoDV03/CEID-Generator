@@ -92,7 +92,7 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     # Número de armada
     etiqueta(card, "Número de armada:")
-    crear_option_menu(card, numero_armada, ["primera", "segunda", "tercera"])
+    crear_option_menu(card, numero_armada, ["primera", "segunda", "tercera", "sin armada"])
 
     # CARPETA DE DESTINO
     etiqueta(card, "Seleccionar carpeta de destino:")

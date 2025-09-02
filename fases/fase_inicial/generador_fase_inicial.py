@@ -5,12 +5,22 @@ from fases.functions import *
 def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, año, numero_armada, tipo_fase_inicial):
 
     datos = pd.read_excel(planilla_path, sheet_name=hoja_seleccionada)
+    
+    # Limpiar nombres de columnas (eliminar espacios extra)
+    datos.columns = datos.columns.str.strip()
 
     carpeta_principal = os.path.join(carpeta_destino, 'FASE INICIAL')
     os.makedirs(carpeta_principal, exist_ok=True)
 
     for i, fila in enumerate(datos.itertuples(index=False), start=1):
+        # Obtener el nombre del docente de la columna ya limpia
         docente = str(getattr(fila, "Docente", "N/A"))
+        
+        # Debug: mostrar información si el docente es N/A
+        if docente == "N/A":
+            print(f"Fila {i}: No se pudo obtener el nombre del docente. Columnas disponibles: {list(datos.columns)}")
+            continue  # Saltar esta fila si no hay nombre de docente
+        
         nombre_docente = limpiar_nombre_archivo(docente)
         carpeta_docente = os.path.join(carpeta_principal, nombre_docente)
         os.makedirs(carpeta_docente, exist_ok=True)
@@ -120,7 +130,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
             }
 
             if tipo_fase_inicial == "administrativo":
-                ruta_tdr = ruta_absoluta_relativa('./Modelos_documentos/tdr_admin.docx')
+                ruta_tdr = ruta_absoluta_relativa('./Modelos_documentos/tdr_administrativo.docx')
 
                 reemplazos_tdr = {
                     "descripcion": descripcion_final,
@@ -202,4 +212,4 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                                             run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                     doc.save(ruta_salida_cot)
 
-        print (f"{docente} - Documentos generados correctamente.")
+        print(f"{docente} - Documentos generados correctamente.")
