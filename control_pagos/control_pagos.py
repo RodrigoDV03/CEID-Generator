@@ -33,17 +33,56 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     # Matching Docente y Subtotal_Pago
     nombres_planilla = df_planilla["Docente"].dropna().tolist()
 
+    def crear_mapeo_montos(df_planilla, nombres_planilla):
+        mapeo_montos = {}
+        nombres_control_unicos = set()
+        
+        wb_temp = load_workbook(control_path, data_only=True)
+        ws_temp = wb_temp.active
+        
+        header_row_temp = None
+        for r in range(1, min(ws_temp.max_row, 15) + 1):
+            values = [str(c.value).strip() if c.value is not None else "" for c in ws_temp[r]]
+            if any(v.upper() == "APELLIDOS Y NOMBRES" for v in values):
+                header_row_temp = r
+                break
+        
+        if header_row_temp:
+            for row in range(header_row_temp + 1, ws_temp.max_row + 1):
+                nombre_cell = None
+                for col in range(1, ws_temp.max_column + 1):
+                    header_val = str(ws_temp.cell(header_row_temp, col).value or "").strip().upper()
+                    if header_val == "APELLIDOS Y NOMBRES":
+                        nombre_cell = ws_temp.cell(row, col)
+                        break
+                
+                if nombre_cell and nombre_cell.value:
+                    nombres_control_unicos.add(str(nombre_cell.value).strip())
+        
+        for docente_control in nombres_control_unicos:
+            if isinstance(docente_control, str):
+                match = process.extractOne(docente_control, nombres_planilla)
+                if match:
+                    nombre_match, score = match
+                    if score >= 85:
+                        fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Subtotal_pago"]
+                        if not fila.empty:
+                            mapeo_montos[docente_control] = float(fila.values[0])
+                        else:
+                            mapeo_montos[docente_control] = None
+                    else:
+                        mapeo_montos[docente_control] = None
+                else:
+                    mapeo_montos[docente_control] = None
+        
+        return mapeo_montos
+
+    mapeo_montos = crear_mapeo_montos(df_planilla, nombres_planilla)
+
     def monto_por_nombre(docente_control):
         if not isinstance(docente_control, str):
             return None
-        match = process.extractOne(docente_control, nombres_planilla)
-        if not match:
-            return None
-        nombre_match, score = match
-        if score < 85:
-            return None
-        fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Subtotal_pago"]
-        return None if fila.empty else float(fila.values[0])
+        return mapeo_montos.get(docente_control.strip(), None)
 
     # Abrir dos veces: uno para editar, otro para leer valores calculados
     wb = load_workbook(control_path)

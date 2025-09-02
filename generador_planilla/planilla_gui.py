@@ -53,12 +53,9 @@ def iniciar_interfaz_planilla(callback_volver=None):
         if archivo:
             nonlocal archivo_planilla_anterior_path
             archivo_planilla_anterior_path = archivo
-            label_planilla_estado.configure(text=f"📁 {os.path.basename(archivo)}",
-                                            text_color=BG_COLOR)
+            label_planilla_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=WHITE_COLOR)
 
-    btn_planilla_anterior = ctk.CTkButton(marco_planilla_anterior, text="Seleccionar archivo",
-                                          command=seleccionar_planilla_anterior, width=160,
-                                          fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR)
+    btn_planilla_anterior = ctk.CTkButton(marco_planilla_anterior, text="Seleccionar archivo", command=seleccionar_planilla_anterior, width=160, fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR)
     btn_planilla_anterior.pack(side="right", padx=15)
 
     def actualizar_visibilidad_planilla_anterior(*args):
@@ -93,9 +90,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
                 actualizar_func(archivo)
                 label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=WHITE_COLOR)
 
-        ctk.CTkButton(container, text="Seleccionar archivo", command=seleccionar,
-                      width=160, fg_color=BUTTON_BG_COLOR,
-                      hover_color=BUTTON_HOVER_BG_COLOR).pack(side="right", padx=10)
+        ctk.CTkButton(container, text="Seleccionar archivo", command=seleccionar, width=160, fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR).pack(side="right", padx=10)
 
     def actualizar_cursos(path): nonlocal archivo_cursos_path; archivo_cursos_path = path
     def actualizar_docentes(path): nonlocal archivo_docentes_path; archivo_docentes_path = path

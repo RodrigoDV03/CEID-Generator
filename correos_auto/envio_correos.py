@@ -191,7 +191,6 @@ def enviar_correo_administrativo(nombre, pdf_path, destinatario, mes, anio):
 
     # nombre_formato = nombre.split(",")[0].strip()
 
-    # asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio} - {nombre_formato}"
     asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
 
     cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, anio)
@@ -218,6 +217,38 @@ def enviar_correo_administrativo(nombre, pdf_path, destinatario, mes, anio):
 
     print(f"Correo enviado a {nombre}.")
 
+def crear_mapeo_correos(lista_pdfs, nombres_excel, df, tipo_correo="docente"):
+    mapeo = {}
+    
+    for pdf_path in lista_pdfs:
+        nombre_extraido = extraer_nombre(pdf_path)
+        if not nombre_extraido:
+            continue
+            
+        if nombre_extraido not in mapeo:  # Evitar recálculos
+            resultado = process.extractOne(nombre_extraido, nombres_excel)
+            if resultado and resultado[1] >= 80:
+                mejor_match = resultado[0]
+                fila = df[df['Docente'] == mejor_match]
+                if not fila.empty:
+                    correo = fila['Correo Institucional'].values[0]
+                    if tipo_correo == "docente":
+                        servicio = extraer_servicios(pdf_path)
+                        mapeo[nombre_extraido] = {
+                            "pdf_path": pdf_path,
+                            "nombre": mejor_match,
+                            "correo": correo,
+                            "servicio": servicio
+                        }
+                    else:
+                        mapeo[nombre_extraido] = {
+                            "pdf_path": pdf_path,
+                            "nombre": mejor_match,
+                            "correo": correo
+                        }
+    
+    return mapeo
+
 def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
     df.columns = df.columns.str.strip()
@@ -228,43 +259,25 @@ def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
 
     nombres_excel = df['Docente'].astype(str).tolist()
 
-    resultados = []
+    # Crear mapeo fuzzy una sola vez
+    mapeo_correos = crear_mapeo_correos(lista_pdfs, nombres_excel, df, "docente")
 
+    resultados = []
     for pdf_path in lista_pdfs:
         nombre_docente = extraer_nombre(pdf_path)
         if not nombre_docente:
             print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
             continue
 
-        # Emparejamiento difuso con precisión mínima de 80
-        mejor_match, score = process.extractOne(nombre_docente, nombres_excel)
-        if score < 80:
-            print(f"⚠ Coincidencia baja para '{nombre_docente}' (score={score}), omitido.")
-            continue
-
-        # Obtener correo del docente en Excel
-        fila_docente = df[df['Docente'] == mejor_match]
-        if fila_docente.empty:
-            print(f"⚠ No se encontró correo para {mejor_match}.")
-            continue
-
-        correo_docente = fila_docente['Correo Institucional'].values[0]
-
-        # Extraer servicio
-        servicio = extraer_servicios(pdf_path)
-        if not servicio:
-            print(f"⚠ No se encontró servicio para {mejor_match}.")
-            continue
-
-        # Guardar datos en lista para envío posterior
-        resultados.append({
-            "pdf_path": pdf_path,
-            "nombre": mejor_match,
-            "correo": correo_docente,
-            "servicio": servicio
-        })
-
-        print(f"{mejor_match} - {correo_docente} - {servicio}")
+        if nombre_docente in mapeo_correos:
+            datos = mapeo_correos[nombre_docente]
+            if datos["servicio"]:
+                resultados.append(datos)
+                print(f"{datos['nombre']} - {datos['correo']} - {datos['servicio']}")
+            else:
+                print(f"⚠ No se encontró servicio para {datos['nombre']}.")
+        else:
+            print(f"⚠ Coincidencia baja para '{nombre_docente}', omitido.")
 
     return resultados
 
@@ -278,35 +291,20 @@ def procesar_correos_administrativos(ruta_excel, hoja, lista_pdfs):
 
     nombres_excel = df['Docente'].astype(str).tolist()
 
-    resultados = []
+    mapeo_correos = crear_mapeo_correos(lista_pdfs, nombres_excel, df, "administrativo")
 
+    resultados = []
     for pdf_path in lista_pdfs:
         nombre_administrativo = extraer_nombre(pdf_path)
         if not nombre_administrativo:
             print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
             continue
 
-        # Emparejamiento difuso con precisión mínima de 80
-        mejor_match, score = process.extractOne(nombre_administrativo, nombres_excel)
-        if score < 80:
-            print(f"⚠ Coincidencia baja para '{nombre_administrativo}' (score={score}), omitido.")
-            continue
-
-        # Obtener correo del administrativo en Excel
-        fila_administrativo = df[df['Docente'] == mejor_match]
-        if fila_administrativo.empty:
-            print(f"⚠ No se encontró correo para {mejor_match}.")
-            continue
-
-        correo_administrativo = fila_administrativo['Correo Institucional'].values[0]
-
-        # Guardar datos en lista para envío posterior
-        resultados.append({
-            "pdf_path": pdf_path,
-            "nombre": mejor_match,
-            "correo": correo_administrativo
-        })
-
-        print(f"{mejor_match} - {correo_administrativo}")
+        if nombre_administrativo in mapeo_correos:
+            datos = mapeo_correos[nombre_administrativo]
+            resultados.append(datos)
+            print(f"{datos['nombre']} - {datos['correo']}")
+        else:
+            print(f"⚠ Coincidencia baja para '{nombre_administrativo}', omitido.")
 
     return resultados
