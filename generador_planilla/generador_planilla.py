@@ -1,19 +1,16 @@
-import openpyxl
 import pandas as pd
 import os
 import datetime
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment, Font, Border, Side
 from .functions import *
+from .excel_styles import *
 
 def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_carga, primera_planilla: str = None):
-
     año_actual = datetime.datetime.now().year
     
     try:
-        # Limpiar cache al inicio para evitar datos obsoletos
         limpiar_cache_excel()
+        limpiar_cache_procesamiento()
         
         datos = cargar_archivo(data_path)
         datos_docentes = pd.read_excel(excel_docentes, sheet_name="list")
@@ -31,30 +28,22 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
 
         if numero_carga == 2 and primera_planilla and os.path.exists(primera_planilla):
             try:
-                df_raw = pd.read_excel(primera_planilla, sheet_name="Primera carga académica", header=None)
-
-                fila_header = None
-                for idx, fila in df_raw.iterrows():
-                    if "Docente" in fila.values and "Curso" in fila.values:
-                        fila_header = idx
-                        break
-
-                if fila_header is None:
-                    raise ValueError("Columna 'Docente' no encontrada en la planilla anterior.")
-
-                planilla_anterior_df = pd.read_excel(primera_planilla, sheet_name="Primera carga académica", header=fila_header)
+                planilla_anterior_df = leer_planilla_anterior_con_cache(primera_planilla)
+                if planilla_anterior_df.empty:
+                    raise ValueError("Error al leer la planilla anterior")
+                    
                 datos = limpiar_docentes(datos, 'docente')
 
                 combinacion_anterior = set(zip(planilla_anterior_df['Docente'], planilla_anterior_df['Curso']))
-                datos = datos[~datos.apply(lambda row: (row['docente'], row['Curso']) in combinacion_anterior, axis=1)]
+                datos = filtrar_combinaciones_optimizado(datos, combinacion_anterior)
 
             except Exception as e:
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
 
-        agrupar = agrupar_y_calcular(datos, datos_docentes, 'detalles_curso')
+        agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
         agrupar = agregar_clasificacion(agrupar, excel_exa_clasif, normalizar_texto)
 
-        TABLA = construir_tabla(agrupar)
+        TABLA = construir_tabla_con_cache(agrupar)
 
         estado_planilla = "Primera planilla" if numero_carga == 1 else "Segunda planilla"
         if numero_carga == 1:
@@ -78,10 +67,10 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 clasif_df.to_excel(writer, sheet_name="Examen de clasificación", index=False)
             
             # Construir hoja Planilla_Generador usando datos ya procesados
-            agrupar_gen = agrupar_y_calcular(datos_csv_original_procesados, datos_docentes, 'Curso')
+            agrupar_gen = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
             agrupar_gen = agregar_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto)
 
-            TABLA_GENERADOR = construir_tabla(agrupar_gen)
+            TABLA_GENERADOR = construir_tabla_con_cache(agrupar_gen)
             TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
                 'Cantidad Cursos': 'Cantidad_cursos',
                 'Examen Clasif.': 'Examen_clasif',
@@ -106,9 +95,11 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 df_carga_consol = crear_df_carga(datos_csv_original_procesados, 'Consolidado')
                 df_carga_consol.to_excel(writer, sheet_name="Carga académica consolidada", index=False)
 
-                agrupar_consol = agrupar_y_calcular(datos_csv_original_procesados, datos_docentes, 'Curso')
+                # Optimización: Reutilizar cálculos ya realizados en lugar de duplicar
+                # Esta operación es idéntica a agrupar_gen, el cache la detectará automáticamente
+                agrupar_consol = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
                 agrupar_consol = agregar_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto)
-                TABLA_CONSOLIDADA = construir_tabla(agrupar_consol)
+                TABLA_CONSOLIDADA = construir_tabla_con_cache(agrupar_consol)
                 TABLA_CONSOLIDADA.to_excel(writer, sheet_name="Planilla consolidada", index=False)
         
         wb = load_workbook(ruta_salida)
@@ -156,3 +147,6 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
 
     except Exception as e:
         return f"❌ Error: {e}"
+    finally:
+        limpiar_cache_planilla()
+        limpiar_cache_procesamiento()

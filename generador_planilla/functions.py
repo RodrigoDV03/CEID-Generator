@@ -1,11 +1,7 @@
 import pandas as pd
 import os
 from fuzzywuzzy import process, fuzz
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
 import unicodedata
-
-# FUNCIONES PARA GENERACIÓN DE PLANILLA
 
 # Cache simple para archivos Excel
 _excel_cache = {}
@@ -106,12 +102,24 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     # Aplicar mapeo usando el diccionario
     agrupado['Docente'] = agrupado['docente'].map(mapeo_docentes)
     
-    agrupado = agrupado.merge(
-        datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Estado']], on='Docente', how='left'
-    )
+    agrupado = agrupado.merge(datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Estado']], on='Docente', how='left')
     agrupado['Curso Dictado'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 28
     agrupado['Diseño de Examenes'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 4
     return agrupado
+
+def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso):
+    # Generar key único basado en los datos de entrada
+    key_datos = generar_key_datos(df, col_curso)
+    
+    # Verificar si ya está en cache
+    if key_datos in _cache_agrupacion:
+        return _cache_agrupacion[key_datos].copy()
+    
+    # Si no está en cache, calcular y guardar
+    resultado = agrupar_y_calcular(df, datos_docentes, col_curso)
+    _cache_agrupacion[key_datos] = resultado.copy()
+    
+    return resultado
 
 
 def agregar_clasificacion(df, ruta_clasificacion, normalizar_texto):
@@ -149,11 +157,30 @@ def construir_tabla(df):
         'Total Pago S/.': 0,
         'Estado': df['Estado']
     })
-    tabla['Total Pago S/.'] = (
-        tabla['Curso Dictado'] + tabla['Extra Curso'] +
-        tabla['Diseño de Examenes'] + tabla['Examen Clasif.']
-    )
+    tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + tabla['Examen Clasif.'])
     return tabla
+
+def construir_tabla_con_cache(df):
+    try:
+        # Crear hash basado en las columnas relevantes para la tabla
+        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
+        
+        df_relevante = df[columnas_relevantes]
+        key_tabla = hash(df_relevante.to_string())
+        
+        # Verificar cache
+        if key_tabla in _cache_tablas_construidas:
+            return _cache_tablas_construidas[key_tabla].copy()
+        
+        # Si no está en cache, construir y guardar
+        tabla = construir_tabla(df)
+        _cache_tablas_construidas[key_tabla] = tabla.copy()
+        
+        return tabla
+        
+    except Exception as e:
+        # Fallback: usar función original si hay error en cache
+        return construir_tabla(df)
 
 def ajustar_nivel(row):
         nivel = row['nivel']
@@ -234,117 +261,79 @@ def normalizar_texto(texto):
     texto = unicodedata.normalize('NFKD', texto)
     return ''.join([c for c in texto if not unicodedata.combining(c)])
 
-# Cache para estilos de Excel para evitar recrearlos
-_excel_styles_cache = {}
+# Cache para evitar relecturas innecesarias de planilla anterior
+_cache_planilla_anterior = {}
 
-def get_excel_style(style_name):
-    if style_name not in _excel_styles_cache:
+# Cache para resultados de procesamiento (agrupar_y_calcular, construir_tabla)
+_cache_agrupacion = {}
+_cache_tablas_construidas = {}
+
+def obtener_header_planilla_con_cache(ruta_planilla):
+    try:
+        # Leer solo las primeras 10 filas para encontrar el header (más eficiente)
+        df_raw = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=None, nrows=10)
         
-        if style_name == "thin_border":
-            _excel_styles_cache[style_name] = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-        elif style_name == "header_fill":
-            _excel_styles_cache[style_name] = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-        elif style_name == "header_font":
-            _excel_styles_cache[style_name] = Font(bold=True, color="ffffff", size=12)
-        elif style_name == "title_font":
-            _excel_styles_cache[style_name] = Font(bold=True, color="ffffff", size=22)
-        elif style_name == "bold_font":
-            _excel_styles_cache[style_name] = Font(bold=True)
-        elif style_name == "center_alignment":
-            _excel_styles_cache[style_name] = Alignment(horizontal='center', vertical='center')
-        elif style_name == "title_alignment":
-            _excel_styles_cache[style_name] = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        elif style_name == "money_format":
-            _excel_styles_cache[style_name] = '"S/ "#,##0.00'
-            
-    return _excel_styles_cache[style_name]
+        for idx, fila in df_raw.iterrows():
+            if "Docente" in fila.values and "Curso" in fila.values:
+                return idx
+                
+        return None
+    except Exception as e:
+        print(f"Error al obtener header: {e}")
+        return None
 
-def aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla=False):
-    ws.insert_rows(1)
-    rango_titulo = f"A1:{get_column_letter(max_col)}1"
-    ws.merge_cells(rango_titulo)
-    ws["A1"].value = titulo_fusionado
-    ws["A1"].alignment = get_excel_style("title_alignment")
-    ws["A1"].fill = get_excel_style("header_fill")
-    ws["A1"].font = get_excel_style("title_font")
-
-    thin_border = get_excel_style("thin_border")
-    header_fill = get_excel_style("header_fill")
-    header_font = get_excel_style("header_font")
-    center_alignment = get_excel_style("center_alignment")
-    bold_font = get_excel_style("bold_font")
-    money_format = get_excel_style("money_format")
-
-    header_cells = [ws.cell(row=2, column=col) for col in range(1, max_col + 1)]
-    for celda in header_cells:
-        celda.alignment = center_alignment
-        celda.fill = header_fill
-        celda.font = header_font
-
-    max_row = ws.max_row
-    for row_cells in ws.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
-        for cell in row_cells:
-            cell.border = thin_border
-            cell.alignment = center_alignment
-
-    if es_planilla:
-        fila_total = max_row + 1
-        ws.merge_cells(f"A{fila_total}:G{fila_total}")
-        celda_total = ws[f"A{fila_total}"]
-        celda_total.alignment = center_alignment
-        celda_total.fill = header_fill
-
-        # Columnas a sumar - aplicar en lote
-        columnas_sumar = ['H', 'I', 'J', 'K', 'L', 'M']
-        
-        for col in columnas_sumar:
-            celda = ws[f"{col}{fila_total}"]
-            celda.value = f"=SUM({col}3:{col}{fila_total-1})"
-            celda.font = bold_font
-            celda.alignment = center_alignment
-            celda.border = thin_border
-
-        columnas_moneda = ['E', 'H', 'K', 'L', 'M']
-        
-        for col in columnas_moneda:
-            # Aplicar formato a todo el rango de una vez
-            for row_num in range(3, fila_total + 1):
-                ws[f"{col}{row_num}"].number_format = money_format
-
-    ajustar_anchos_columnas_optimizado(ws, max_col)
-
-def ajustar_anchos_columnas_optimizado(ws, max_col):
-    anchos_predefinidos = {
-        1: 5,   # N°
-        2: 30,  # Docente
-        3: 15,  # Sede
-        4: 8,   # Categoria (Letra)
-        5: 12,  # Categoria (Monto)
-        6: 15,  # N°. Ruc
-        7: 40,  # Curso
-        8: 12,  # Curso Dictado
-        9: 10,  # Extra Curso
-        10: 12, # Cantidad Cursos
-        11: 15, # Diseño de Examenes
-        12: 12, # Examen Clasif.
-        13: 15, # Total Pago S/.
-        14: 10  # Estado
-    }
+def leer_planilla_anterior_con_cache(ruta_planilla):
+    # Verificar si el archivo ya está en cache
+    if ruta_planilla in _cache_planilla_anterior:
+        return _cache_planilla_anterior[ruta_planilla]
     
-    for col in range(1, min(max_col + 1, len(anchos_predefinidos) + 1)):
-        column_letter = get_column_letter(col)
-        if col in anchos_predefinidos:
-            ws.column_dimensions[column_letter].width = anchos_predefinidos[col]
-        else:
-            # Ancho por defecto para columnas adicionales
-            ws.column_dimensions[column_letter].width = 12
+    try:
+        # Obtener la fila de header de manera optimizada
+        fila_header = obtener_header_planilla_con_cache(ruta_planilla)
+        if fila_header is None:
+            fila_header = 6  # Valor por defecto si no se encuentra
+            
+        # Solo leer si no está en cache
+        planilla_anterior = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=fila_header)
+        
+        # Guardar en cache para futuros accesos
+        _cache_planilla_anterior[ruta_planilla] = planilla_anterior
+        
+        return planilla_anterior
+    except Exception as e:
+        print(f"Error al leer planilla anterior: {e}")
+        return pd.DataFrame()
 
-def procesar_formato_multiple_hojas(wb, hojas_con_titulo, numero_carga_letra, month):
-    for hoja, titulo_fusionado in hojas_con_titulo:
-        if hoja in wb.sheetnames:
-            ws = wb[hoja]
-            max_col = ws.max_column
-            
-            es_planilla = (hoja == f"{numero_carga_letra} Planilla {month}" or hoja == "Planilla consolidada")
-            
-            aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla)
+def limpiar_cache_planilla():
+    global _cache_planilla_anterior
+    _cache_planilla_anterior = {}
+
+def limpiar_cache_procesamiento():
+    global _cache_agrupacion, _cache_tablas_construidas
+    _cache_agrupacion = {}
+    _cache_tablas_construidas = {}
+
+def generar_key_datos(df, col_curso):
+    try:
+        # Crear un hash basado en el contenido de datos relevantes
+        datos_relevantes = df[['docente', col_curso]].copy()
+        datos_str = datos_relevantes.to_string()
+        key = f"{col_curso}_{hash(datos_str)}"
+        return key
+    except:
+        # Fallback: usar shape y columnas como key menos preciso
+        return f"{col_curso}_{df.shape[0]}_{df.shape[1]}"
+
+def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
+    if not combinacion_anterior:
+        return datos
+    
+    # Convertir el set de combinaciones a DataFrame para hacer merge eficiente
+    combinaciones_df = pd.DataFrame(list(combinacion_anterior), columns=['docente', 'Curso'])
+
+    merged = datos.merge(combinaciones_df, on=['docente', 'Curso'], how='left', indicator=True)
+    
+    # Filtrar solo las que NO están en la planilla anterior
+    datos_filtrados = merged[merged['_merge'] == 'left_only'].drop('_merge', axis=1)
+    
+    return datos_filtrados
