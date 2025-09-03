@@ -110,7 +110,7 @@ def generar_cuerpo_correo_docente_html(mes, anio, servicio):
     <p>Atentamente,</p>
 
     <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Secretaria DGI-CEID-FLCH-UNMSM</p>
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
 
     <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
 
@@ -127,7 +127,7 @@ def generar_cuerpo_correo_administrativo_html(mes, anio):
     <p>Buen día:</p>
 
     <p>
-      Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+      Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios.
     </p>
 
     <p>
@@ -137,7 +137,7 @@ def generar_cuerpo_correo_administrativo_html(mes, anio):
     <p>Atentamente,</p>
 
     <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Secretaria DGI-CEID-FLCH-UNMSM</p>
+    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
 
     <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
 
