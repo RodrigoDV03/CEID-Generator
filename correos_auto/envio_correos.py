@@ -109,13 +109,13 @@ def generar_cuerpo_correo_docente_html(mes, anio, servicio):
 
     <p>Atentamente,</p>
 
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
+    <p style="font-size: 13px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
+    <p style="font-size: 10px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
 
-    <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
+    <span style="font-size:10px; font-weight: bold; font-style: sans-serif; color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
 
-    <p style="font-size:7.5pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
-    <p style="font-size:7pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
+    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
+    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
   </body>
 </html>
 """
@@ -136,13 +136,13 @@ def generar_cuerpo_correo_administrativo_html(mes, anio):
 
     <p>Atentamente,</p>
 
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-weight: bold; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
+    <p style="font-size: 13px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
+    <p style="font-size: 10px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
 
-    <span style="font-size:7.5pt; font-weight: bold;color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
+    <span style="font-size:10px; font-weight: bold; font-style: sans-serif; color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
 
-    <p style="font-size:7.5pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
-    <p style="font-size:7pt;color:rgb(68,68,68); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
+    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
+    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
   </body>
 </html>
 """
