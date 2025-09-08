@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from fases.functions import *
+from docx2pdf import convert
 
 def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, año, numero_armada, tipo_fase_inicial):
 
@@ -157,6 +158,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                                         if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
                                             run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
                     doc.save(ruta_salida_tdr)
+            ruta_salida_tdr_pdf = ruta_salida_tdr.replace('.docx', '.pdf')
+            convert(ruta_salida_tdr, ruta_salida_tdr_pdf)
 
         # -------- GENERAR COTIZACIÓN --------
 
