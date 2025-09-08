@@ -9,6 +9,22 @@ from email import encoders
 import os
 from fuzzywuzzy import process
 
+# Configuración de email
+# EMAIL_CONFIG = {
+#     "remitente": "personalcontratado28.flch@unmsm.edu.pe",
+#     "password": "vfrl usic kmfm fyah",
+#     "smtp_server": "smtp.gmail.com",
+#     "smtp_port": 465
+# }
+
+# Configuración alternativa (comentada)
+EMAIL_CONFIG = {
+    "remitente": "bolsistaceid01.flch@unmsm.edu.pe",
+    "password": "frsf imch edfs uwqy",
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 465
+}
+
 def extraer_nombre(pdf_path):
     reader = PdfReader(pdf_path)
     texto = ""
@@ -83,139 +99,105 @@ def extraer_servicios(pdf_path):
 
 
 
-def generar_cuerpo_correo_docente_html(mes, anio, servicio):
-    return f"""
-<html>
-  <body style="font-family: Verdana; font-size: 10pt;">
-    <p>Buen día:</p>
-
-    <p>
-      Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
-    </p>
-
-    <ul>
-      <li>
-        El concepto del recibo por honorarios es: <span style="font-weight: bold; color: #073763;"> Servicio de dictado de {servicio}, BAJO LA MODALIDAD HÍBRIDA.</span>
-      </li>
-
-      <li>
-        El pago se realizará a crédito, con un plazo de vencimiento de <span style="font-weight: bold; color: #073763;">40 días</span> desde la fecha de emisión del recibo en la plataforma SUNAT.
-      </li>
-    </ul>
-
-    <p>
-      Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
-    </p>
-
+def generar_firma_html() -> str:
+    return """
     <p>Atentamente,</p>
 
     <p style="font-size: 13px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-size: 10px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
+    <p style="font-size: 10px; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
 
     <span style="font-size:10px; font-weight: bold; font-style: sans-serif; color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
 
     <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
     <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
-  </body>
-</html>
 """
 
-def generar_cuerpo_correo_administrativo_html(mes, anio):
+def generar_cuerpo_correo_docente_html(mes: str, anio: str, servicio: str) -> str:
     return f"""
 <html>
-  <body style="font-family: Verdana; font-size: 10pt;">
-    <p>Buen día:</p>
+    <body style="font-family: Verdana; font-size: 10pt;">
+        <p>Buen día:</p>
 
-    <p>
-      Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios.
-    </p>
+        <p>
+            Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+        </p>
 
-    <p>
-      Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
-    </p>
+        <ul>
+            <li>
+                El concepto del recibo por honorarios es: <span style="font-weight: bold; color: #073763;"> Servicio de dictado de {servicio}, BAJO LA MODALIDAD HÍBRIDA.</span>
+            </li>
 
-    <p>Atentamente,</p>
+            <li>
+                El pago se realizará a crédito, con un plazo de vencimiento de <span style="font-weight: bold; color: #073763;">40 días</span> desde la fecha de emisión del recibo en la plataforma SUNAT.
+            </li>
+        </ul>
 
-    <p style="font-size: 13px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-size: 10px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
+            <p>
+            Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
+            </p>
 
-    <span style="font-size:10px; font-weight: bold; font-style: sans-serif; color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
-
-    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
-    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
-  </body>
+        {generar_firma_html()}
+    </body>
 </html>
 """
 
-def enviar_correo_docente(nombre, pdf_path, destinatario, mes, anio, servicio):
-    remitente = "personalcontratado28.flch@unmsm.edu.pe"
-    password = "vfrl usic kmfm fyah"
+def generar_cuerpo_correo_administrativo_html(mes: str, anio: str) -> str:
+    return f"""
+<html>
+    <body style="font-family: Verdana; font-size: 10pt;">
+        <p>Buen día:</p>
 
-    # remitente = "bolsistaceid01.flch@unmsm.edu.pe"
-    # password = "frsf imch edfs uwqy"
+        <p>
+        Adjunto su orden de servicio correspondiente al mes de {mes} {anio}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios.
+        </p>
 
+        <p>
+        Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
+        </p>
+
+        {generar_firma_html()}
+    </body>
+</html>
+"""
+
+def adjuntar_pdf(msg: MIMEMultipart, pdf_path: str) -> None:
+    with open(pdf_path, 'rb') as adjunto:
+        parte = MIMEBase('application', 'octet-stream')
+        parte.set_payload(adjunto.read())
+        encoders.encode_base64(parte)
+        parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(pdf_path)}')
+        msg.attach(parte)
+
+def enviar_correo(destinatario: str, asunto: str, cuerpo_html: str, pdf_path: str, nombre: str) -> None:
+    # Crear mensaje
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_CONFIG["remitente"]
+    msg['To'] = destinatario
+    msg['Subject'] = asunto
+    msg.attach(MIMEText(cuerpo_html, 'html'))
+
+    # Adjuntar PDF
+    adjuntar_pdf(msg, pdf_path)
+
+    # Enviar
+    with smtplib.SMTP_SSL(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"]) as servidor:
+        servidor.login(EMAIL_CONFIG["remitente"], EMAIL_CONFIG["password"])
+        servidor.sendmail(EMAIL_CONFIG["remitente"], [destinatario], msg.as_string())
+
+    print(f"Correo enviado a {nombre}.")
+
+def enviar_correo_docente(nombre: str, pdf_path: str, destinatario: str, mes: str, anio: str, servicio: str) -> None:
     nombre_formato = nombre.split(",")[0].strip()
-
     asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio} - {nombre_formato}"
-
     cuerpo_html = generar_cuerpo_correo_docente_html(mes, anio, servicio)
+    
+    enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
 
-    # Crear mensaje
-    msg = MIMEMultipart()
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    msg['Subject'] = asunto
-    msg.attach(MIMEText(cuerpo_html, 'html'))
-
-    # Adjuntar PDF
-    with open(pdf_path, 'rb') as adjunto:
-        parte = MIMEBase('application', 'octet-stream')
-        parte.set_payload(adjunto.read())
-        encoders.encode_base64(parte)
-        parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(pdf_path)}')
-        msg.attach(parte)
-
-    # Enviar
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as servidor:
-        servidor.login(remitente, password)
-        servidor.sendmail(remitente, [destinatario], msg.as_string())
-
-    print(f"Correo enviado a {nombre}.")
-
-def enviar_correo_administrativo(nombre, pdf_path, destinatario, mes, anio):
-    remitente = "personalcontratado28.flch@unmsm.edu.pe"
-    password = "vfrl usic kmfm fyah"
-
-    # remitente = "bolsistaceid01.flch@unmsm.edu.pe"
-    # password = "frsf imch edfs uwqy"
-
-    # nombre_formato = nombre.split(",")[0].strip()
-
+def enviar_correo_administrativo(nombre: str, pdf_path: str, destinatario: str, mes: str, anio: str) -> None:
     asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
-
     cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, anio)
-
-    # Crear mensaje
-    msg = MIMEMultipart()
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    msg['Subject'] = asunto
-    msg.attach(MIMEText(cuerpo_html, 'html'))
-
-    # Adjuntar PDF
-    with open(pdf_path, 'rb') as adjunto:
-        parte = MIMEBase('application', 'octet-stream')
-        parte.set_payload(adjunto.read())
-        encoders.encode_base64(parte)
-        parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(pdf_path)}')
-        msg.attach(parte)
-
-    # Enviar
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as servidor:
-        servidor.login(remitente, password)
-        servidor.sendmail(remitente, [destinatario], msg.as_string())
-
-    print(f"Correo enviado a {nombre}.")
+    
+    enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
 
 def crear_mapeo_correos(lista_pdfs, nombres_excel, df, tipo_correo="docente"):
     mapeo = {}

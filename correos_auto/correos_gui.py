@@ -106,8 +106,7 @@ def iniciar_interfaz_correos(callback_volver=None):
     # --- CONSOLA EMBEBIDA ---
     consola_frame = ctk.CTkFrame(root, fg_color=CONSOLE_BG, corner_radius=12)
     consola_frame.pack(padx=40, pady=(10, 20), fill="both", expand=True)
-    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word",
-                                  fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
+    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word", fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
     consola_text.pack(padx=10, pady=10, fill="both", expand=True)
     consola_text.configure(state="disabled")
 
