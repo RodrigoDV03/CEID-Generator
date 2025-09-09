@@ -10,20 +10,20 @@ import os
 from fuzzywuzzy import process
 
 # Configuración de email
-# EMAIL_CONFIG = {
-#     "remitente": "personalcontratado28.flch@unmsm.edu.pe",
-#     "password": "vfrl usic kmfm fyah",
-#     "smtp_server": "smtp.gmail.com",
-#     "smtp_port": 465
-# }
-
-# Configuración alternativa (comentada)
 EMAIL_CONFIG = {
-    "remitente": "bolsistaceid01.flch@unmsm.edu.pe",
-    "password": "frsf imch edfs uwqy",
+    "remitente": "personalcontratado28.flch@unmsm.edu.pe",
+    "password": "vfrl usic kmfm fyah",
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 465
 }
+
+# Configuración alternativa (comentada)
+# EMAIL_CONFIG = {
+#     "remitente": "bolsistaceid01.flch@unmsm.edu.pe",
+#     "password": "frsf imch edfs uwqy",
+#     "smtp_server": "smtp.gmail.com",
+#     "smtp_port": 465
+# }
 
 def extraer_nombre(pdf_path):
     reader = PdfReader(pdf_path)
