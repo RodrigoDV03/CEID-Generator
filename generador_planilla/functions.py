@@ -37,8 +37,25 @@ def limpiar_docentes(df, col):
     df[col] = df[col].astype(str).str.strip()
     return df
 
+def procesar_ediciones_idioma(datos):
+    datos_procesados = datos.copy()
+    
+    # Identificar filas donde la columna idioma empieza con "Edición"
+    mask_edicion = datos_procesados['idioma'].astype(str).str.startswith('Edición', na=False)
+    
+    # Para las filas que empiecen con "Edición", agregar "Inglés" al final si no lo tienen
+    for idx in datos_procesados[mask_edicion].index:
+        idioma_actual = str(datos_procesados.loc[idx, 'idioma']).strip()
+        if not idioma_actual.endswith('Inglés'):
+            datos_procesados.loc[idx, 'idioma'] = idioma_actual + ' Inglés'
+    
+    return datos_procesados
+
 def aplicar_transformaciones_base(datos):
     datos_transformados = datos.copy()
+    
+    # NUEVO: Procesar celdas de "Edición" para agregar "Inglés"
+    datos_transformados = procesar_ediciones_idioma(datos_transformados)
 
     mask_general = datos_transformados['nivel'] == 'General'
     mask_ingles = datos_transformados['idioma'] == 'Inglés'
@@ -75,7 +92,10 @@ def aplicar_transformaciones_base(datos):
     # Aplicar modalidad (mantener apply por ahora ya que la lógica es compleja)
     datos_transformados['modalidad'] = datos_transformados.apply(ajustar_modalidad, axis=1)
     
-    # Construir curso de forma vectorizada
+    # NUEVO: Procesar cursos intensivos (duplicar filas y agregar "Intensivo" al nivel)
+    datos_transformados = procesar_cursos_intensivos(datos_transformados)
+    
+    # Construir curso de forma vectorizada (se ejecuta después del procesamiento intensivo)
     datos_transformados['Curso'] = (
         datos_transformados['idioma'].astype(str) + ' ' + 
         datos_transformados['nivel'].astype(str) + ' ' + 
@@ -127,12 +147,50 @@ def agregar_clasificacion(df, ruta_clasificacion, normalizar_texto):
         try:
             # Usar cache para evitar lecturas múltiples
             clasif_df = cargar_excel_con_cache(ruta_clasificacion, sheet_name=0, header=1)
+            # Verificar que existe la columna Docente
+            if 'Docente' not in clasif_df.columns:
+                print("⚠️ No se encontró columna 'Docente' en el archivo de clasificación")
+                # Buscar columnas similares
+                posibles_docentes = [col for col in clasif_df.columns if 'docente' in str(col).lower()]
+                if posibles_docentes:
+                    print(f"Posibles columnas de docente: {posibles_docentes}")
+                    clasif_df = clasif_df.rename(columns={posibles_docentes[0]: 'Docente'})
+                else:
+                    df['Examen Clasif.'] = 0
+                    return df
+            
+            # Buscar la columna de Monto de manera más específica
+            columna_monto = None
+            
+            # Prioridad 1: Buscar exactamente 'Monto'
+            if 'Monto' in clasif_df.columns:
+                columna_monto = 'Monto'
+                print(f"Usando columna exacta: {columna_monto}")
+            else:
+                # Prioridad 2: Buscar variaciones de 'Monto'
+                for col in clasif_df.columns:
+                    if str(col).lower().strip() == 'monto':
+                        columna_monto = col
+                        print(f"Usando columna (variación): {columna_monto}")
+                        break
+            
+            if columna_monto is None:
+                print("⚠️ No se encontró columna de monto en el archivo de clasificación")
+                df['Examen Clasif.'] = 0
+                return df
+            
+            # Procesar los datos
             clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
             clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
             df['docente_norm'] = df['Docente'].apply(normalizar_texto)
-            df = df.merge(clasif_df[['docente_norm', 'Monto']], on='docente_norm', how='left')
-            df['Examen Clasif.'] = df['Monto'].fillna(0)
-            df.drop(columns=['docente_norm', 'Monto'], inplace=True)
+            
+            # Hacer el merge con la columna correcta
+            merge_result = df.merge(clasif_df[['docente_norm', columna_monto]], on='docente_norm', how='left')
+            
+            df = merge_result
+            df['Examen Clasif.'] = df[columna_monto].fillna(0)
+            df.drop(columns=['docente_norm', columna_monto], inplace=True)
+            
         except Exception as e:
             print(f"⚠️ Error al leer archivo de clasificación: {e}")
             df['Examen Clasif.'] = 0
@@ -210,6 +268,55 @@ def ajustar_modalidad(row):
         modalidad = 'INTENSIVO VIRTUAL'
 
     return modalidad
+
+def procesar_cursos_intensivos(datos):
+    datos_procesados = datos.copy()
+    
+    # Identificar filas con modalidad INTENSIVO VIRTUAL
+    mask_intensivo = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
+    
+    if not mask_intensivo.any():
+        return datos_procesados
+    
+    filas_intensivas = datos_procesados[mask_intensivo].copy()
+    filas_adicionales = []
+    
+    # Procesar cada fila intensiva
+    for idx, row in filas_intensivas.iterrows():
+        # Modificar la fila original: agregar "Intensivo" al nivel
+        nivel_original = str(row['nivel']).strip()
+        if not nivel_original.startswith('Intensivo'):
+            datos_procesados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
+        
+        # Crear fila adicional con ciclo +1
+        fila_adicional = row.copy()
+        try:
+            ciclo_actual = int(str(row['ciclo']).strip())
+            fila_adicional['ciclo'] = str(ciclo_actual + 1)
+        except (ValueError, TypeError):
+            # Si no se puede convertir el ciclo, mantener el original + 1 como string
+            fila_adicional['ciclo'] = str(row['ciclo']) + '+1'
+        
+        # Agregar "Intensivo" al nivel de la fila adicional
+        if not nivel_original.startswith('Intensivo'):
+            fila_adicional['nivel'] = f'Intensivo {nivel_original}'
+        
+        filas_adicionales.append(fila_adicional)
+    
+    # Agregar las filas adicionales al DataFrame
+    if filas_adicionales:
+        filas_adicionales_df = pd.DataFrame(filas_adicionales)
+        datos_procesados = pd.concat([datos_procesados, filas_adicionales_df], ignore_index=True)
+    
+    # Reconstruir la columna Curso para todas las filas afectadas
+    mask_todas_intensivas = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
+    datos_procesados.loc[mask_todas_intensivas, 'Curso'] = (
+        datos_procesados.loc[mask_todas_intensivas, 'idioma'].astype(str) + ' ' + 
+        datos_procesados.loc[mask_todas_intensivas, 'nivel'].astype(str) + ' ' + 
+        datos_procesados.loc[mask_todas_intensivas, 'ciclo'].astype(str)
+    )
+    
+    return datos_procesados
 
 def crear_df_carga(datos, estado_planilla):
     datos = datos.copy()
