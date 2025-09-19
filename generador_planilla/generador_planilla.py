@@ -138,7 +138,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
             ]
         wb = ordenar_hojas_excel(wb, hojas_ordenadas)        
         wb.save(ruta_salida)
-        return f"✅ {nombre_salida} generado correctamente."
+        return f"{nombre_salida} generado correctamente."
 
     except Exception as e:
         return f"❌ Error: {e}"

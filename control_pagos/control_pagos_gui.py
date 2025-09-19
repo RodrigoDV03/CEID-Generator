@@ -3,9 +3,10 @@ import os
 import pandas as pd
 import sys
 import threading
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from .control_pagos import actualizar_control_pagos
 from utils.gui_constants import *
+from utils import custom_modals as messagebox
 
 def iniciar_interfaz_control_pagos(callback_volver=None):
     ctk.set_appearance_mode("light")

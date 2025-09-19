@@ -1,8 +1,9 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 import os
 from .generador_planilla import generar_planilla
 from utils.gui_constants import *
+from utils import custom_modals as messagebox
 
 def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""

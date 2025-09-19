@@ -2,6 +2,7 @@ import pandas as pd
 from PyPDF2 import PdfReader
 import re
 import smtplib
+import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -24,6 +25,8 @@ EMAIL_CONFIG = {
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 465
 }
+
+año_actual = datetime.datetime.now().year
 
 def extraer_nombre(pdf_path):
     reader = PdfReader(pdf_path)
@@ -186,16 +189,16 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo_html: str, pdf_path: st
 
     print(f"Correo enviado a {nombre}.")
 
-def enviar_correo_docente(nombre: str, pdf_path: str, destinatario: str, mes: str, anio: str, servicio: str) -> None:
+def enviar_correo_docente(nombre: str, pdf_path: str, destinatario: str, mes: str, servicio: str) -> None:
     nombre_formato = nombre.split(",")[0].strip()
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio} - {nombre_formato}"
-    cuerpo_html = generar_cuerpo_correo_docente_html(mes, anio, servicio)
+    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual} - {nombre_formato}"
+    cuerpo_html = generar_cuerpo_correo_docente_html(mes, año_actual, servicio)
     
     enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
 
-def enviar_correo_administrativo(nombre: str, pdf_path: str, destinatario: str, mes: str, anio: str) -> None:
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {anio}"
-    cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, anio)
+def enviar_correo_administrativo(nombre: str, pdf_path: str, destinatario: str, mes: str) -> None:
+    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual}"
+    cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, año_actual)
     
     enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
 

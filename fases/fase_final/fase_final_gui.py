@@ -3,10 +3,11 @@ import threading
 import customtkinter as ctk
 import pandas as pd
 import os
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from datetime import datetime
 from .generador_fase_final import procesar_planilla_fase_final
 from utils.gui_constants import *
+from utils import custom_modals as messagebox
 
 def iniciar_interfaz_fase_final(callback_volver=None):
     ctk.set_appearance_mode("light")

@@ -3,10 +3,11 @@ import os
 import pandas as pd
 import sys
 import threading
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from datetime import datetime
 from .envio_correos import procesar_correos_administrativos, procesar_correos_docente, enviar_correo_administrativo, enviar_correo_docente
 from utils.gui_constants import *
+from utils import custom_modals as messagebox
 
 def iniciar_interfaz_correos(callback_volver=None):
     ctk.set_appearance_mode("light")
@@ -21,7 +22,6 @@ def iniciar_interfaz_correos(callback_volver=None):
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
-    año_var = ctk.StringVar(value=str(datetime.now().year))
     tipo_var = ctk.StringVar(value="Docente")
 
     ruta_excel = None
@@ -74,9 +74,6 @@ def iniciar_interfaz_correos(callback_volver=None):
     # --- FECHA ---
     etiqueta(card, "Mes:")
     crear_option_menu(card, mes_var, meses)
-
-    etiqueta(card, "Año:")
-    crear_option_menu(card, año_var, años)
 
     # --- BOTÓN GENERAR DATA ---
     def generar_data():
@@ -145,7 +142,6 @@ def iniciar_interfaz_correos(callback_volver=None):
                             pdf_path=item['pdf_path'],
                             destinatario=item['correo'],
                             mes=mes_var.get(),
-                            anio=año_var.get(),
                             servicio=item['servicio']
                         )
                     else:
@@ -153,8 +149,7 @@ def iniciar_interfaz_correos(callback_volver=None):
                             nombre=item['nombre'],
                             pdf_path=item['pdf_path'],
                             destinatario=item['correo'],
-                            mes=mes_var.get(),
-                            anio=año_var.get(),
+                            mes=mes_var.get()
                         )
 
                 messagebox.showinfo("Éxito", "Todos los correos fueron enviados correctamente.")

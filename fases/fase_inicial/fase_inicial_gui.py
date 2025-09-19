@@ -1,9 +1,10 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from datetime import datetime
 import os, sys, threading
 import pandas as pd
 from utils.gui_constants import *
+from utils import custom_modals as messagebox
 from .generador_fase_inicial import procesar_planilla_fase_inicial
 
 def iniciar_interfaz_fase_inicial(callback_volver=None):
@@ -53,12 +54,9 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     boton_excel, label_excel = crear_boton_archivo(card, "📂 No seleccionado", seleccionar_archivo)
 
-    # Mes y Año
+    # Mes
     etiqueta(card, "Mes:")
     crear_option_menu(card, mes_var, meses)
-
-    # etiqueta(card, "Año:")
-    # crear_option_menu(card, año_var, años)
 
     # Número de armada
     etiqueta(card, "Número de armada:")
@@ -95,7 +93,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     # Consola
     consola_frame = ctk.CTkFrame(root, fg_color=CONSOLE_BG, corner_radius=12)
     consola_frame.pack(padx=40, pady=(10, 20), fill="both", expand=False)
-    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word", fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
+    consola_text = ctk.CTkTextbox(consola_frame, height=200, wrap="word", fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
     consola_text.pack(padx=10, pady=10, fill="both", expand=True)
     consola_text.configure(state="disabled")
 
