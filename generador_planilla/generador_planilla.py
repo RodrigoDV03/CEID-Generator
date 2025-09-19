@@ -41,9 +41,9 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
 
         agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
-        agrupar = agregar_clasificacion(agrupar, excel_exa_clasif, normalizar_texto)
+        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto)
 
-        TABLA = construir_tabla_con_cache(agrupar)
+        TABLA = construir_tabla_planilla_con_cache(agrupar)
 
         estado_planilla = "Primera planilla" if numero_carga == 1 else "Segunda planilla"
         if numero_carga == 1:
@@ -68,15 +68,15 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
             
             # Construir hoja Planilla_Generador usando datos ya procesados
             agrupar_gen = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-            agrupar_gen = agregar_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto)
+            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto)
 
-            TABLA_GENERADOR = construir_tabla_con_cache(agrupar_gen)
+            TABLA_GENERADOR = construir_tabla_planilla_con_cache(agrupar_gen)
             TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
-                'Cantidad Cursos': 'Cantidad_cursos',
-                'Examen Clasif.': 'Examen_clasif',
                 'Categoria (Letra)': 'Categoria_letra',
                 'Categoria (Monto)': 'Categoria_monto',
-                'Total Pago S/.': 'Subtotal_pago',
+                'Diseño de Examenes': 'Disenio_examenes',
+                'Examen Clasif.': 'Examen_clasif',
+                'Total Pago S/.': 'Total_pago',
                 'Estado': 'Estado_docente',
                 'Idioma': 'Docente_idioma',
                 'N°. Ruc': 'N_Ruc',
@@ -88,28 +88,23 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
             }).to_excel(writer, sheet_name="Planilla_Generador", index=False)
 
 
-            df_carga = crear_df_carga(datos, estado_planilla)
+            df_carga = construir_tabla_carga_academica(datos, estado_planilla)
             df_carga.to_excel(writer, sheet_name=nombre_hoja_carga, index=False)
 
             if numero_carga == 2:
-                df_carga_consol = crear_df_carga(datos_csv_original_procesados, 'Consolidado')
+                df_carga_consol = construir_tabla_carga_academica(datos_csv_original_procesados, 'Consolidado')
                 df_carga_consol.to_excel(writer, sheet_name="Carga académica consolidada", index=False)
 
                 # Optimización: Reutilizar cálculos ya realizados en lugar de duplicar
                 # Esta operación es idéntica a agrupar_gen, el cache la detectará automáticamente
                 agrupar_consol = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-                agrupar_consol = agregar_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto)
-                TABLA_CONSOLIDADA = construir_tabla_con_cache(agrupar_consol)
+                agrupar_consol = agregar_examen_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto)
+                TABLA_CONSOLIDADA = construir_tabla_planilla_con_cache(agrupar_consol)
                 TABLA_CONSOLIDADA.to_excel(writer, sheet_name="Planilla consolidada", index=False)
         
         wb = load_workbook(ruta_salida)
-        titulo_fusionado = (
-            "CENTRO DE IDIOMAS - FLCH - UNMSM\n"
-            f"{numero_carga_letra.upper()} CARGA ACADÉMICA - PERIODO {month.upper()} {año_actual}\n"
-            "MODALIDAD: VIRTUAL Y PRESENCIAL"
-        )
 
-        hojas_con_titulo = [
+        titulo_hojas = [
             ("Examen de clasificación", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
@@ -127,7 +122,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
         ]
 
         # Procesar formato de todas las hojas de manera optimizada
-        procesar_formato_multiple_hojas(wb, hojas_con_titulo, numero_carga_letra, month)
+        procesar_formato_multiple_hojas(wb, titulo_hojas, numero_carga_letra, month)
                         
 
         hojas_ordenadas = [

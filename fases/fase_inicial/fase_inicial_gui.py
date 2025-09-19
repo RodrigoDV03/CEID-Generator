@@ -17,7 +17,6 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
-    año_var = ctk.StringVar(value=str(datetime.now().year))
     numero_armada = ctk.StringVar()
     tipo_fase_inicial = ctk.StringVar(value="planilla docente")
 
@@ -58,8 +57,8 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
     etiqueta(card, "Mes:")
     crear_option_menu(card, mes_var, meses)
 
-    etiqueta(card, "Año:")
-    crear_option_menu(card, año_var, años)
+    # etiqueta(card, "Año:")
+    # crear_option_menu(card, año_var, años)
 
     # Número de armada
     etiqueta(card, "Número de armada:")
@@ -84,7 +83,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
             return
         def tarea():
             try:
-                procesar_planilla_fase_inicial(planilla_path, hoja_var.get(), carpeta_destino, mes_var.get(), año_var.get(), numero_armada.get(), tipo_fase_inicial.get())
+                procesar_planilla_fase_inicial(planilla_path, hoja_var.get(), carpeta_destino, mes_var.get(), numero_armada.get(), tipo_fase_inicial.get())
                 messagebox.showinfo("Éxito", f"Documentos de fase inicial generados correctamente.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")

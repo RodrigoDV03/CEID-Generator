@@ -8,9 +8,7 @@ BUTTON_BG_COLOR = "#f38b1a"
 BUTTON_HOVER_BG_COLOR = "#e8aa69"
 
 CONSOLE_BG = "#2c2f33"
-
 WHITE_COLOR = "#ffffff"
-GRAY_COLOR = "#a0a8b8"
 
 FONT_TITLE = ("Segoe UI", 26, "bold")
 FONT_SECTION = ("Segoe UI", 16, "bold")
@@ -39,19 +37,19 @@ def crear_boton_archivo(frame, texto_etiqueta, comando):
     contenedor = ctk.CTkFrame(frame, fg_color="transparent")
     contenedor.pack(fill="x", padx=20, pady=(0, 10))
 
-    etiqueta = ctk.CTkLabel(contenedor, text=texto_etiqueta, text_color=GRAY_COLOR)
+    etiqueta = ctk.CTkLabel(contenedor, text=texto_etiqueta, text_color=WHITE_COLOR)
     etiqueta.pack(side="left", padx=(0, 10))
     
-    boton = ctk.CTkButton(contenedor, text="Seleccionar archivo", command=comando, width=160,
-                          fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR)
+    boton = ctk.CTkButton(contenedor, text="Seleccionar archivo", command=comando, width=160, fg_color=BUTTON_BG_COLOR,
+                            hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON)
     boton.pack(side="right", padx=10)
     
     return boton, etiqueta
 
 def boton_generador(master, texto, comando):
     boton = ctk.CTkButton(master=master, text=texto, command=comando, state="normal", height=45,
-                          fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR,
-                          text_color=WHITE_COLOR, font=FONT_BUTTON)
+                            fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR,
+                            text_color=WHITE_COLOR, font=FONT_BUTTON)
     boton.pack(pady=(15, 20))
     return boton
 
@@ -61,9 +59,8 @@ def boton_volver(master, callback_volver=None):
             master.destroy()
         if callback_volver:
             callback_volver()
-    return ctk.CTkButton(master, text="⬅ Volver al menú", command=volver,
-                         fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR,
-                         text_color=WHITE_COLOR, font=FONT_BUTTON).pack(pady=(0, 10))
+    return ctk.CTkButton(master, text="⬅ Volver al menú", command=volver, fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR,
+                            text_color=WHITE_COLOR, font=FONT_BUTTON).pack(pady=(0, 10))
 
 def footer(master):
     return ctk.CTkLabel(master, text="CEID Generator - FLCH - UNMSM", font=FONT_FOOTER, text_color=WHITE_COLOR).pack(pady=(0, 10))

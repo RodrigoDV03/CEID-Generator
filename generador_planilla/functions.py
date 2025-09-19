@@ -3,23 +3,7 @@ import os
 from fuzzywuzzy import process, fuzz
 import unicodedata
 
-# Cache simple para archivos Excel
-_excel_cache = {}
-
-def limpiar_cache_excel():
-    global _excel_cache
-    _excel_cache.clear()
-
-def cargar_excel_con_cache(ruta, sheet_name=0, header='infer'):
-    cache_key = f"{ruta}_{sheet_name}_{header}"
-    
-    if cache_key not in _excel_cache:
-        if header == 'infer':
-            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name)
-        else:
-            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name, header=header)
-    
-    return _excel_cache[cache_key].copy()  # Retorna una copia para evitar modificaciones accidentales
+# ----------------------- CARGAR ARCHIVO -----------------------
 
 def cargar_archivo(ruta):
     extension = os.path.splitext(ruta)[-1].lower()
@@ -36,6 +20,21 @@ def cargar_archivo(ruta):
 def limpiar_docentes(df, col):
     df[col] = df[col].astype(str).str.strip()
     return df
+
+# ---------------- TRANSFORMACIONES DE DATOS ----------------
+
+def traducir_dias(dias_raw: str) -> str:
+    dias_dict = {'MONDAY': 'Lun', 'TUESDAY': 'Mar', 'WEDNESDAY': 'Mié', 'THURSDAY': 'Jue', 'FRIDAY': 'Vie', 'SATURDAY': 'Sáb', 'SUNDAY': 'Dom'}
+    dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
+    return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
+
+def normalizar_texto(texto):
+    if pd.isna(texto):
+        return ''
+    texto = str(texto).lower().strip()
+    texto = unicodedata.normalize('NFKD', texto)
+    return ''.join([c for c in texto if not unicodedata.combining(c)])
+
 
 def procesar_ediciones_idioma(datos):
     datos_procesados = datos.copy()
@@ -101,8 +100,82 @@ def aplicar_transformaciones_base(datos):
         datos_transformados['nivel'].astype(str) + ' ' + 
         datos_transformados['ciclo'].astype(str)
     )
-    
     return datos_transformados
+    
+def ajustar_nivel(row):
+    nivel = row['nivel']
+    idioma = row['idioma']
+    ciclo = row['ciclo']
+    if nivel == 'General':
+        if idioma == 'Inglés':
+            return 'Posgrado Intermedio'
+        elif idioma == 'Portugués':
+            try:
+                ciclo_num = int(str(ciclo).strip())
+            except Exception:
+                ciclo_num = None
+            if ciclo_num is not None:
+                if 1 <= ciclo_num <= 4:
+                    return 'Posgrado Básico'
+                elif 5 <= ciclo_num <= 8:
+                    return 'Posgrado Intermedio'
+    return nivel
+
+def ajustar_modalidad(row):
+    dias = row['dias']
+    hora_fin = row['horafin']
+    modalidad = row['modalidad']
+
+    if (hora_fin == '22:30:00'or hora_fin == '15:00:00') and (dias == '{MONDAY,TUESDAY,WEDNESDAY,THURSDAY}' or dias == '{SATURDAY,SUNDAY}'):
+        modalidad = 'INTENSIVO VIRTUAL'
+
+    return modalidad
+
+def procesar_cursos_intensivos(datos):
+    datos_procesados = datos.copy()
+    
+    # Identificar filas con modalidad INTENSIVO VIRTUAL
+    mask_intensivo = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
+    
+    if not mask_intensivo.any():
+        return datos_procesados
+    
+    filas_intensivas = datos_procesados[mask_intensivo].copy()
+    filas_adicionales = []
+    
+    # Procesar cada fila intensiva
+    for idx, row in filas_intensivas.iterrows():
+        nivel_original = str(row['nivel']).strip()
+        if not nivel_original.startswith('Intensivo'):
+            datos_procesados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
+        
+        fila_adicional = row.copy()
+        try:
+            ciclo_actual = int(str(row['ciclo']).strip())
+            fila_adicional['ciclo'] = str(ciclo_actual + 1)
+        except (ValueError, TypeError):
+            fila_adicional['ciclo'] = str(row['ciclo']) + '+1'
+        
+        # Agregar "Intensivo" al nivel de la fila adicional
+        if not nivel_original.startswith('Intensivo'):
+            fila_adicional['nivel'] = f'Intensivo {nivel_original}'
+        
+        filas_adicionales.append(fila_adicional)
+    
+    # Agregar las filas adicionales al DataFrame
+    if filas_adicionales:
+        filas_adicionales_df = pd.DataFrame(filas_adicionales)
+        datos_procesados = pd.concat([datos_procesados, filas_adicionales_df], ignore_index=True)
+    
+    # Reconstruir la columna Curso para todas las filas afectadas
+    mask_todas_intensivas = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
+    datos_procesados.loc[mask_todas_intensivas, 'Curso'] = (
+        datos_procesados.loc[mask_todas_intensivas, 'idioma'].astype(str) + ' ' + 
+        datos_procesados.loc[mask_todas_intensivas, 'nivel'].astype(str) + ' ' + 
+        datos_procesados.loc[mask_todas_intensivas, 'ciclo'].astype(str)
+    )
+    
+    return datos_procesados
 
 def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=85):
     mapeo = {}
@@ -111,6 +184,8 @@ def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=85):
             resultado = process.extractOne(nombre, nombres_base, scorer=fuzz.token_sort_ratio)
             mapeo[nombre] = resultado[0] if resultado[1] >= umbral else None
     return mapeo
+
+# ------------- CÁLCULO DE MONTOS -------------
 
 def agrupar_y_calcular(df, datos_docentes, col_curso):
     agrupado = (df.groupby('docente').agg(curso=(col_curso, lambda x: ' / '.join(x)), cantidad_cursos=(col_curso, 'count')).reset_index())
@@ -127,22 +202,8 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     agrupado['Diseño de Examenes'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 4
     return agrupado
 
-def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso):
-    # Generar key único basado en los datos de entrada
-    key_datos = generar_key_datos(df, col_curso)
-    
-    # Verificar si ya está en cache
-    if key_datos in _cache_agrupacion:
-        return _cache_agrupacion[key_datos].copy()
-    
-    # Si no está en cache, calcular y guardar
-    resultado = agrupar_y_calcular(df, datos_docentes, col_curso)
-    _cache_agrupacion[key_datos] = resultado.copy()
-    
-    return resultado
 
-
-def agregar_clasificacion(df, ruta_clasificacion, normalizar_texto):
+def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
     if os.path.exists(ruta_clasificacion):
         try:
             # Usar cache para evitar lecturas múltiples
@@ -165,13 +226,11 @@ def agregar_clasificacion(df, ruta_clasificacion, normalizar_texto):
             # Prioridad 1: Buscar exactamente 'Monto'
             if 'Monto' in clasif_df.columns:
                 columna_monto = 'Monto'
-                print(f"Usando columna exacta: {columna_monto}")
             else:
                 # Prioridad 2: Buscar variaciones de 'Monto'
                 for col in clasif_df.columns:
                     if str(col).lower().strip() == 'monto':
                         columna_monto = col
-                        print(f"Usando columna (variación): {columna_monto}")
                         break
             
             if columna_monto is None:
@@ -198,7 +257,9 @@ def agregar_clasificacion(df, ruta_clasificacion, normalizar_texto):
         df['Examen Clasif.'] = 0
     return df
 
-def construir_tabla(df):
+# --------------------------- CONSTRUCCIÓN DE TABLAS ---------------------------
+
+def construir_tabla_planilla(df):
     tabla = pd.DataFrame({
         'N°': range(1, len(df) + 1),
         'Docente': df['Docente'],
@@ -218,107 +279,7 @@ def construir_tabla(df):
     tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + tabla['Examen Clasif.'])
     return tabla
 
-def construir_tabla_con_cache(df):
-    try:
-        # Crear hash basado en las columnas relevantes para la tabla
-        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
-        
-        df_relevante = df[columnas_relevantes]
-        key_tabla = hash(df_relevante.to_string())
-        
-        # Verificar cache
-        if key_tabla in _cache_tablas_construidas:
-            return _cache_tablas_construidas[key_tabla].copy()
-        
-        # Si no está en cache, construir y guardar
-        tabla = construir_tabla(df)
-        _cache_tablas_construidas[key_tabla] = tabla.copy()
-        
-        return tabla
-        
-    except Exception as e:
-        # Fallback: usar función original si hay error en cache
-        return construir_tabla(df)
-
-def ajustar_nivel(row):
-        nivel = row['nivel']
-        idioma = row['idioma']
-        ciclo = row['ciclo']
-        if nivel == 'General':
-            if idioma == 'Inglés':
-                return 'Posgrado Intermedio'
-            elif idioma == 'Portugués':
-                try:
-                    ciclo_num = int(str(ciclo).strip())
-                except Exception:
-                    ciclo_num = None
-                if ciclo_num is not None:
-                    if 1 <= ciclo_num <= 4:
-                        return 'Posgrado Básico'
-                    elif 5 <= ciclo_num <= 8:
-                        return 'Posgrado Intermedio'
-        return nivel
-
-def ajustar_modalidad(row):
-    dias = row['dias']
-    hora_fin = row['horafin']
-    modalidad = row['modalidad']
-
-    if (hora_fin == '22:30:00'or hora_fin == '15:00:00') and (dias == '{MONDAY,TUESDAY,WEDNESDAY,THURSDAY}' or dias == '{SATURDAY,SUNDAY}'):
-        modalidad = 'INTENSIVO VIRTUAL'
-
-    return modalidad
-
-def procesar_cursos_intensivos(datos):
-    datos_procesados = datos.copy()
-    
-    # Identificar filas con modalidad INTENSIVO VIRTUAL
-    mask_intensivo = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
-    
-    if not mask_intensivo.any():
-        return datos_procesados
-    
-    filas_intensivas = datos_procesados[mask_intensivo].copy()
-    filas_adicionales = []
-    
-    # Procesar cada fila intensiva
-    for idx, row in filas_intensivas.iterrows():
-        # Modificar la fila original: agregar "Intensivo" al nivel
-        nivel_original = str(row['nivel']).strip()
-        if not nivel_original.startswith('Intensivo'):
-            datos_procesados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
-        
-        # Crear fila adicional con ciclo +1
-        fila_adicional = row.copy()
-        try:
-            ciclo_actual = int(str(row['ciclo']).strip())
-            fila_adicional['ciclo'] = str(ciclo_actual + 1)
-        except (ValueError, TypeError):
-            # Si no se puede convertir el ciclo, mantener el original + 1 como string
-            fila_adicional['ciclo'] = str(row['ciclo']) + '+1'
-        
-        # Agregar "Intensivo" al nivel de la fila adicional
-        if not nivel_original.startswith('Intensivo'):
-            fila_adicional['nivel'] = f'Intensivo {nivel_original}'
-        
-        filas_adicionales.append(fila_adicional)
-    
-    # Agregar las filas adicionales al DataFrame
-    if filas_adicionales:
-        filas_adicionales_df = pd.DataFrame(filas_adicionales)
-        datos_procesados = pd.concat([datos_procesados, filas_adicionales_df], ignore_index=True)
-    
-    # Reconstruir la columna Curso para todas las filas afectadas
-    mask_todas_intensivas = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
-    datos_procesados.loc[mask_todas_intensivas, 'Curso'] = (
-        datos_procesados.loc[mask_todas_intensivas, 'idioma'].astype(str) + ' ' + 
-        datos_procesados.loc[mask_todas_intensivas, 'nivel'].astype(str) + ' ' + 
-        datos_procesados.loc[mask_todas_intensivas, 'ciclo'].astype(str)
-    )
-    
-    return datos_procesados
-
-def crear_df_carga(datos, estado_planilla):
+def construir_tabla_carga_academica(datos, estado_planilla):
     datos = datos.copy()
 
     if 'nivel' not in datos.columns:
@@ -345,49 +306,73 @@ def crear_df_carga(datos, estado_planilla):
     df.insert(0, 'N°', range(1, len(df) + 1))
     return df
 
-def ordenar_hojas_excel(wb, hojas_ordenadas):
-    hojas_existentes = wb.sheetnames
-    nuevas_hojas = [hoja for hoja in hojas_ordenadas if hoja in hojas_existentes]
-    for idx, hoja in enumerate(nuevas_hojas):
-        wb._sheets.insert(idx, wb[hoja])
-    wb._sheets = wb._sheets[:len(nuevas_hojas)] + [s for s in wb._sheets if s.title not in nuevas_hojas]
-    return wb
+def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
+    if not combinacion_anterior:
+        return datos
+    
+    # Convertir el set de combinaciones a DataFrame para hacer merge eficiente
+    combinaciones_df = pd.DataFrame(list(combinacion_anterior), columns=['docente', 'Curso'])
 
-def traducir_dias(dias_raw: str) -> str:
-    dias_dict = {
-        'MONDAY': 'Lun', 'TUESDAY': 'Mar', 'WEDNESDAY': 'Mié',
-        'THURSDAY': 'Jue', 'FRIDAY': 'Vie', 'SATURDAY': 'Sáb', 'SUNDAY': 'Dom'
-    }
-    dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
-    return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
+    merged = datos.merge(combinaciones_df, on=['docente', 'Curso'], how='left', indicator=True)
+    
+    # Filtrar solo las que NO están en la planilla anterior
+    datos_filtrados = merged[merged['_merge'] == 'left_only'].drop('_merge', axis=1)
+    
+    return datos_filtrados
 
-def normalizar_texto(texto):
-    if pd.isna(texto):
-        return ''
-    texto = str(texto).lower().strip()
-    texto = unicodedata.normalize('NFKD', texto)
-    return ''.join([c for c in texto if not unicodedata.combining(c)])
+
+# ================================= FUNCIONES CON USO DE MEMORIA CACHE ===================================================
+
+# Cache simple para archivos Excel
+_excel_cache = {}
 
 # Cache para evitar relecturas innecesarias de planilla anterior
 _cache_planilla_anterior = {}
-
-# Cache para resultados de procesamiento (agrupar_y_calcular, construir_tabla)
 _cache_agrupacion = {}
 _cache_tablas_construidas = {}
 
-def obtener_header_planilla_con_cache(ruta_planilla):
+def generar_key_datos(df, col_curso):
     try:
-        # Leer solo las primeras 10 filas para encontrar el header (más eficiente)
-        df_raw = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=None, nrows=10)
-        
-        for idx, fila in df_raw.iterrows():
-            if "Docente" in fila.values and "Curso" in fila.values:
-                return idx
-                
-        return None
-    except Exception as e:
-        print(f"Error al obtener header: {e}")
-        return None
+        # Crear un hash basado en el contenido de datos relevantes
+        datos_relevantes = df[['docente', col_curso]].copy()
+        datos_str = datos_relevantes.to_string()
+        key = f"{col_curso}_{hash(datos_str)}"
+        return key
+    except:
+        # Fallback: usar shape y columnas como key menos preciso
+        return f"{col_curso}_{df.shape[0]}_{df.shape[1]}"
+    
+
+def limpiar_cache_excel():
+    global _excel_cache
+    _excel_cache.clear()
+
+# ----------------------- CARGAR ARCHIVO CON CACHE -----------------------
+
+def cargar_excel_con_cache(ruta, sheet_name=0, header='infer'):
+    cache_key = f"{ruta}_{sheet_name}_{header}"
+    
+    if cache_key not in _excel_cache:
+        if header == 'infer':
+            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name)
+        else:
+            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name, header=header)
+    
+    return _excel_cache[cache_key].copy()  # Retorna una copia para evitar modificaciones accidentales
+
+def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso):
+    # Generar key único basado en los datos de entrada
+    key_datos = generar_key_datos(df, col_curso)
+    
+    # Verificar si ya está en cache
+    if key_datos in _cache_agrupacion:
+        return _cache_agrupacion[key_datos].copy()
+    
+    # Si no está en cache, calcular y guardar
+    resultado = agrupar_y_calcular(df, datos_docentes, col_curso)
+    _cache_agrupacion[key_datos] = resultado.copy()
+    
+    return resultado
 
 def leer_planilla_anterior_con_cache(ruta_planilla):
     # Verificar si el archivo ya está en cache
@@ -420,27 +405,38 @@ def limpiar_cache_procesamiento():
     _cache_agrupacion = {}
     _cache_tablas_construidas = {}
 
-def generar_key_datos(df, col_curso):
+def obtener_header_planilla_con_cache(ruta_planilla):
     try:
-        # Crear un hash basado en el contenido de datos relevantes
-        datos_relevantes = df[['docente', col_curso]].copy()
-        datos_str = datos_relevantes.to_string()
-        key = f"{col_curso}_{hash(datos_str)}"
-        return key
-    except:
-        # Fallback: usar shape y columnas como key menos preciso
-        return f"{col_curso}_{df.shape[0]}_{df.shape[1]}"
-
-def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
-    if not combinacion_anterior:
-        return datos
+        # Leer solo las primeras 10 filas para encontrar el header (más eficiente)
+        df_raw = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=None, nrows=10)
+        
+        for idx, fila in df_raw.iterrows():
+            if "Docente" in fila.values and "Curso" in fila.values:
+                return idx
+                
+        return None
+    except Exception as e:
+        print(f"Error al obtener header: {e}")
+        return None
     
-    # Convertir el set de combinaciones a DataFrame para hacer merge eficiente
-    combinaciones_df = pd.DataFrame(list(combinacion_anterior), columns=['docente', 'Curso'])
-
-    merged = datos.merge(combinaciones_df, on=['docente', 'Curso'], how='left', indicator=True)
-    
-    # Filtrar solo las que NO están en la planilla anterior
-    datos_filtrados = merged[merged['_merge'] == 'left_only'].drop('_merge', axis=1)
-    
-    return datos_filtrados
+def construir_tabla_planilla_con_cache(df):
+    try:
+        # Crear hash basado en las columnas relevantes para la tabla
+        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
+        
+        df_relevante = df[columnas_relevantes]
+        key_tabla = hash(df_relevante.to_string())
+        
+        # Verificar cache
+        if key_tabla in _cache_tablas_construidas:
+            return _cache_tablas_construidas[key_tabla].copy()
+        
+        # Si no está en cache, construir y guardar
+        tabla = construir_tabla_planilla(df)
+        _cache_tablas_construidas[key_tabla] = tabla.copy()
+        
+        return tabla
+        
+    except Exception as e:
+        # Fallback: usar función original si hay error en cache
+        return construir_tabla_planilla(df)

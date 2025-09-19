@@ -20,7 +20,6 @@ def iniciar_interfaz_fase_final(callback_volver=None):
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
-    año_var = ctk.StringVar(value=str(datetime.now().year))
     numero_armada = ctk.StringVar()
     tipo_fase_final = ctk.StringVar(value="planilla docente (con contrato)")
 
@@ -60,11 +59,11 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     # ARCHIVO DOCENTE CONTRATO (SOLO SI DOCENTE)
     frame_docente = ctk.CTkFrame(card, fg_color="transparent")
     
-    etiqueta(frame_docente, "Seleccionar excel de docentes de contrato:")
+    etiqueta(frame_docente, "Seleccionar excel de docentes con contrato de locación:")
 
     def seleccionar_docente():
         nonlocal excel_control_pagos
-        excel_control_pagos = filedialog.askopenfilename(title="Seleccionar excel de docentes de contrato", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        excel_control_pagos = filedialog.askopenfilename(title="Seleccionar excel de docentes con contrato de locación", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if excel_control_pagos:
             try:
                 pd.ExcelFile(excel_control_pagos)
@@ -86,9 +85,6 @@ def iniciar_interfaz_fase_final(callback_volver=None):
     # MES Y AÑO
     etiqueta(card, "Mes:")
     crear_option_menu(card, mes_var, meses)
-
-    etiqueta(card, "Año:")
-    crear_option_menu(card, año_var, años)
 
     # Número de armada
     etiqueta(card, "Número de armada:")
@@ -124,7 +120,6 @@ def iniciar_interfaz_fase_final(callback_volver=None):
                     hoja_var.get(),
                     carpeta_destino,
                     mes_var.get(),
-                    año_var.get(),
                     numero_armada.get(),
                     tipo_fase_final.get()
                 )

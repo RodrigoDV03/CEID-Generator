@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import datetime
 from fases.functions import *
 
 def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, tipo_fase_final):
@@ -9,6 +10,12 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
 
     if not os.path.exists(ruta_conformidad):
         raise FileNotFoundError(f"No se encontró la plantilla: {ruta_conformidad}")
+    
+    categoria_valor = getattr(fila, "Categoria_monto", 1)
+    if pd.isna(categoria_valor):
+        categoria_valor = 1
+    else:
+        categoria_valor = float(categoria_valor)
 
     ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
     descripcion_raw = str(getattr(fila, "Curso", ""))
@@ -16,16 +23,10 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
         descripcion = str(getattr(fila, "Curso", "N/A"))
     else:
         descripcion = redactar_cursos(descripcion_raw)
-    cant_cursos = int(getattr(fila, "Cantidad_cursos", 0))
-    disenio_cant_horas = cant_cursos * 4
+    disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
+    disenio_cant_horas = disenio_examenes / categoria_valor
     horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
     clasif_valor = int(getattr(fila, "Examen_clasif", 0))
-
-    categoria_valor = getattr(fila, "Categoria_monto", 1)
-    if pd.isna(categoria_valor):
-        categoria_valor = 1
-    else:
-        categoria_valor = float(categoria_valor)
 
     clasif_cant_horas = clasif_valor / categoria_valor
     if clasif_cant_horas == 1:
@@ -43,7 +44,7 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
             descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
 
     monto_categoria_letras = monto_a_letras(categoria_valor)
-    monto_total = getattr(fila, "Subtotal_pago", 0)
+    monto_total = getattr(fila, "Total_pago", 0)
     monto_total_letras = monto_a_letras(monto_total)
     nro_contrato_val = getattr(fila, "Nro_Contrato", "")
     
@@ -130,7 +131,8 @@ def generar_control_avance(fila_control, doc_control, ruta_destino):
     return ruta_destino
 
 
-def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpeta_salida, mes, año, numero_armada, tipo_fase_final):
+def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpeta_salida, mes, numero_armada, tipo_fase_final):
+    año_actual = datetime.datetime.now().year
     df = pd.read_excel(planilla_path, sheet_name=hoja)
     df.columns = df.columns.str.strip()
 
@@ -157,7 +159,7 @@ def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpe
 
             carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", docente)
             os.makedirs(carpeta_final, exist_ok=True)
-            nombre_archivo_conformidad = f"CONFORMIDAD - {docente} - {mes} {año}.docx"
+            nombre_archivo_conformidad = f"CONFORMIDAD - {docente} - {mes} {año_actual}.docx"
             ruta_destino_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
             generador_conformidad(fila, ruta_conformidad, ruta_destino_conformidad, numero_armada, tipo_fase_final)
 
@@ -184,7 +186,7 @@ def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpe
                 carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", docente)
                 os.makedirs(carpeta_final, exist_ok=True)
 
-                nombre_archivo_control = f"CONTROL DE AVANCE - {docente} - {mes} {año}.docx"
+                nombre_archivo_control = f"CONTROL DE AVANCE - {docente} - {mes} {año_actual}.docx"
                 ruta_destino_control = os.path.join(carpeta_final, nombre_archivo_control)
 
                 generar_control_avance(fila_control, doc_control, ruta_destino_control)
