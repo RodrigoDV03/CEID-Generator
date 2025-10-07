@@ -106,8 +106,8 @@ def ajustar_anchos_columnas_optimizado(ws, max_col):
             # Ancho por defecto para columnas adicionales
             ws.column_dimensions[column_letter].width = 12
 
-def procesar_formato_multiple_hojas(wb, hojas_con_titulo, numero_carga_letra, month):
-    for hoja, titulo_fusionado in hojas_con_titulo:
+def procesar_formato_multiple_hojas(wb, titulo_hojas, numero_carga_letra, month):
+    for hoja, titulo_fusionado in titulo_hojas:
         if hoja in wb.sheetnames:
             ws = wb[hoja]
             max_col = ws.max_column
@@ -115,3 +115,11 @@ def procesar_formato_multiple_hojas(wb, hojas_con_titulo, numero_carga_letra, mo
             es_planilla = (hoja == f"{numero_carga_letra} Planilla {month}" or hoja == "Planilla consolidada")
             
             aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla)
+
+def ordenar_hojas_excel(wb, hojas_ordenadas):
+    hojas_existentes = wb.sheetnames
+    nuevas_hojas = [hoja for hoja in hojas_ordenadas if hoja in hojas_existentes]
+    for idx, hoja in enumerate(nuevas_hojas):
+        wb._sheets.insert(idx, wb[hoja])
+    wb._sheets = wb._sheets[:len(nuevas_hojas)] + [s for s in wb._sheets if s.title not in nuevas_hojas]
+    return wb

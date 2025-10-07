@@ -5,7 +5,6 @@ import re
 from docx import Document
 from decimal import Decimal, ROUND_HALF_UP
 from num2words import num2words
-from docx.shared import Inches
 
 def limpiar_nombre_archivo(nombre):
     return re.sub(r'[\\/*?:"<>|]', "", nombre)

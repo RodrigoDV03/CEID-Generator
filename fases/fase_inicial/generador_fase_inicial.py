@@ -1,9 +1,11 @@
 import os
 import pandas as pd
+import datetime
 from fases.functions import *
 from docx2pdf import convert
 
-def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, año, numero_armada, tipo_fase_inicial):
+def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, numero_armada, tipo_fase_inicial):
+    año_actual = datetime.datetime.now().year
 
     datos = pd.read_excel(planilla_path, sheet_name=hoja_seleccionada)
     datos.columns = datos.columns.str.strip()
@@ -22,6 +24,11 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         carpeta_docente = os.path.join(carpeta_principal, nombre_docente)
         os.makedirs(carpeta_docente, exist_ok=True)
 
+        categoria_valor = getattr(fila, "Categoria_monto", 1)
+        if pd.isna(categoria_valor):
+            categoria_valor = 1
+        else:
+            categoria_valor = float(categoria_valor)
         ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
         if tipo_fase_inicial == "administrativo":
             descripcion = str(getattr(fila, "Curso", ""))
@@ -33,8 +40,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         else:
             descripcion_raw = str(getattr(fila, "Curso", ""))
             descripcion = redactar_cursos(descripcion_raw)
-        cant_cursos = int(getattr(fila, "Cantidad_cursos", 0))
-        disenio_cant_horas = cant_cursos * 4
+        disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
+        disenio_cant_horas = disenio_examenes / categoria_valor
         horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
         clasif_valor = int(getattr(fila, "Examen_clasif", 0))
         direccion = str(getattr(fila, "Domicilio_docente", '')).strip()
@@ -44,11 +51,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         if len(dni_docente) < 8:
             dni_docente = dni_docente.zfill(8)
 
-        categoria_valor = getattr(fila, "Categoria_monto", 1)
-        if pd.isna(categoria_valor):
-            categoria_valor = 1
-        else:
-            categoria_valor = float(categoria_valor)
+
 
         clasif_cant_horas = clasif_valor / categoria_valor
         if clasif_cant_horas == 1:
@@ -65,7 +68,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
 
         monto_categoria_letras = monto_a_letras(categoria_valor)
-        monto_total = getattr(fila, "Subtotal_pago", 0)
+        monto_total = getattr(fila, "Total_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
         tipo_contrato = getattr(fila, "Estado_docente", "N/A")
         nro_contrato_val = getattr(fila, "Nro_Contrato", "N/A")
@@ -96,7 +99,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
             "numero_armada": numero_armada,
             "modalidad_servicio": modalidad_servicio
         }
-        ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año}.docx")
+        ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año_actual}.docx")
         generar_documento(ruta_oficio, reemplazos_oficio, ruta_salida_oficio)
         if tipo_fase_inicial == "administrativo":
             if os.path.exists(ruta_salida_oficio):
@@ -141,7 +144,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                     "modalidad_servicio": modalidad_servicio
                 }
 
-            ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente} - {mes} {año}.docx")
+            ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente} - {mes} {año_actual}.docx")
             generar_documento(ruta_tdr, reemplazos_tdr, ruta_salida_tdr)
             if tipo_fase_inicial == "administrativo":
                 if os.path.exists(ruta_salida_tdr):
@@ -193,7 +196,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "modalidad_servicio": modalidad_servicio
             }
 
-            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año}.docx")
+            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año_actual}.docx")
             generar_documento(ruta_cotizacion, reemplazos, ruta_salida_cot, ruta_firma)
             if tipo_fase_inicial == "administrativo":
                 if os.path.exists(ruta_salida_cot):
