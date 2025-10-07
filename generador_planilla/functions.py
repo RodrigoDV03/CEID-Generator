@@ -8,15 +8,92 @@ import unicodedata
 def cargar_archivo(ruta):
     extension = os.path.splitext(ruta)[-1].lower()
     if extension == ".csv":
+        # Intentar lectura normal primero
         try:
-            return pd.read_csv(ruta, sep=',')
+            df = pd.read_csv(ruta)
+            # Si tiene solo una columna, probablemente está mal formateado
+            if len(df.columns) == 1:
+                return parsear_csv_comillas_dobles(ruta)
+            return df
         except Exception:
-            return pd.read_csv(ruta)
+            return parsear_csv_comillas_dobles(ruta)
     elif extension in [".xls", ".xlsx"]:
         return pd.read_excel(ruta)
     else:
         raise ValueError(f"Formato no soportado: {extension}")
+
+def parsear_csv_comillas_dobles(ruta):
+    """Parsea CSV con formato de comillas dobles anidadas"""
     
+    with open(ruta, 'r', encoding='utf-8') as f:
+        lineas = f.readlines()
+    
+    datos_parseados = []
+    
+    for linea in lineas:
+        linea = linea.strip()
+        if not linea:
+            continue
+            
+        # Remover comillas externas si existen
+        if linea.startswith('"') and linea.endswith('"'):
+            linea = linea[1:-1]
+        
+        # Dividir la línea considerando el formato especial
+        campos = []
+        campo_actual = ""
+        dentro_comillas = False
+        dentro_llaves = 0
+        i = 0
+        
+        while i < len(linea):
+            char = linea[i]
+            
+            # Manejar comillas dobles ""
+            if i < len(linea) - 1 and linea[i:i+2] == '""':
+                if not dentro_comillas:
+                    dentro_comillas = True
+                    i += 2
+                    continue
+                else:
+                    dentro_comillas = False
+                    i += 2
+                    continue
+            
+            # Manejar llaves para días
+            elif char == '{':
+                dentro_llaves += 1
+                campo_actual += char
+            elif char == '}':
+                dentro_llaves -= 1
+                campo_actual += char
+            
+            # Manejar comas separadoras
+            elif char == ',' and not dentro_comillas and dentro_llaves == 0:
+                campos.append(campo_actual.strip())
+                campo_actual = ""
+            else:
+                campo_actual += char
+            
+            i += 1
+        
+        # Agregar el último campo
+        if campo_actual:
+            campos.append(campo_actual.strip())
+        
+        # Limitar a 13 columnas
+        if len(campos) > 13:
+            campos = campos[:13]
+            
+        datos_parseados.append(campos)
+    
+    if datos_parseados:
+        headers = datos_parseados[0]
+        filas = datos_parseados[1:]
+        return pd.DataFrame(filas, columns=headers)
+    
+    return pd.DataFrame()
+
 def limpiar_docentes(df, col):
     df[col] = df[col].astype(str).str.strip()
     return df
