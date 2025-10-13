@@ -93,9 +93,3 @@ def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
         doc.save(ruta_salida)
         return True
     return False
-
-def formato_soles(valor):
-    try:
-        return f"S/ {float(valor):,.2f}"
-    except Exception:
-        return f"S/ {valor}"
