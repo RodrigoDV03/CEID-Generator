@@ -10,10 +10,12 @@ from email import encoders
 import os
 from fuzzywuzzy import process
 
+año_actual = datetime.datetime.now().year
+
 # Configuración de email
 EMAIL_CONFIG = {
     "remitente": "personalcontratado28.flch@unmsm.edu.pe",
-    "password": "vfrl usic kmfm fyah",
+    "password": "nbbr xttu qxqn tzej",
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 465
 }
