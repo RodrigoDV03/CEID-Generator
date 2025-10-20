@@ -1,1 +1,4 @@
 .venv
+config.json
+config_local.json
+*.log

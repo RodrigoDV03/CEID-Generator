@@ -283,8 +283,8 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
 def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
     if os.path.exists(ruta_clasificacion):
         try:
-            # Usar cache para evitar lecturas múltiples
-            clasif_df = cargar_excel_con_cache(ruta_clasificacion, sheet_name=0, header=1)
+            # Leer archivo de clasificación
+            clasif_df = pd.read_excel(ruta_clasificacion, sheet_name=0, header=1)
             # Verificar que existe la columna Docente
             if 'Docente' not in clasif_df.columns:
                 print("⚠️ No se encontró columna 'Docente' en el archivo de clasificación")
@@ -398,122 +398,7 @@ def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
     return datos_filtrados
 
 
-# ================================= FUNCIONES CON USO DE MEMORIA CACHE ===================================================
-
-# Cache simple para archivos Excel
-_excel_cache = {}
-
-# Cache para evitar relecturas innecesarias de planilla anterior
-_cache_planilla_anterior = {}
-_cache_agrupacion = {}
-_cache_tablas_construidas = {}
-
-def generar_key_datos(df, col_curso):
-    try:
-        # Crear un hash basado en el contenido de datos relevantes
-        datos_relevantes = df[['docente', col_curso]].copy()
-        datos_str = datos_relevantes.to_string()
-        key = f"{col_curso}_{hash(datos_str)}"
-        return key
-    except:
-        # Fallback: usar shape y columnas como key menos preciso
-        return f"{col_curso}_{df.shape[0]}_{df.shape[1]}"
-    
-
-def limpiar_cache_excel():
-    global _excel_cache
-    _excel_cache.clear()
-
-# ----------------------- CARGAR ARCHIVO CON CACHE -----------------------
-
-def cargar_excel_con_cache(ruta, sheet_name=0, header='infer'):
-    cache_key = f"{ruta}_{sheet_name}_{header}"
-    
-    if cache_key not in _excel_cache:
-        if header == 'infer':
-            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name)
-        else:
-            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name, header=header)
-    
-    return _excel_cache[cache_key].copy()  # Retorna una copia para evitar modificaciones accidentales
-
-def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso):
-    # Generar key único basado en los datos de entrada
-    key_datos = generar_key_datos(df, col_curso)
-    
-    # Verificar si ya está en cache
-    if key_datos in _cache_agrupacion:
-        return _cache_agrupacion[key_datos].copy()
-    
-    # Si no está en cache, calcular y guardar
-    resultado = agrupar_y_calcular(df, datos_docentes, col_curso)
-    _cache_agrupacion[key_datos] = resultado.copy()
-    
-    return resultado
-
-def leer_planilla_anterior_con_cache(ruta_planilla):
-    # Verificar si el archivo ya está en cache
-    if ruta_planilla in _cache_planilla_anterior:
-        return _cache_planilla_anterior[ruta_planilla]
-    
-    try:
-        # Obtener la fila de header de manera optimizada
-        fila_header = obtener_header_planilla_con_cache(ruta_planilla)
-        if fila_header is None:
-            fila_header = 6  # Valor por defecto si no se encuentra
-            
-        # Solo leer si no está en cache
-        planilla_anterior = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=fila_header)
-        
-        # Guardar en cache para futuros accesos
-        _cache_planilla_anterior[ruta_planilla] = planilla_anterior
-        
-        return planilla_anterior
-    except Exception as e:
-        print(f"Error al leer planilla anterior: {e}")
-        return pd.DataFrame()
-
-def limpiar_cache_planilla():
-    global _cache_planilla_anterior
-    _cache_planilla_anterior = {}
-
-def limpiar_cache_procesamiento():
-    global _cache_agrupacion, _cache_tablas_construidas
-    _cache_agrupacion = {}
-    _cache_tablas_construidas = {}
-
-def obtener_header_planilla_con_cache(ruta_planilla):
-    try:
-        # Leer solo las primeras 10 filas para encontrar el header (más eficiente)
-        df_raw = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=None, nrows=10)
-        
-        for idx, fila in df_raw.iterrows():
-            if "Docente" in fila.values and "Curso" in fila.values:
-                return idx
-                
-        return None
-    except Exception as e:
-        print(f"Error al obtener header: {e}")
-        return None
-    
-def construir_tabla_planilla_con_cache(df):
-    try:
-        # Crear hash basado en las columnas relevantes para la tabla
-        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
-        
-        df_relevante = df[columnas_relevantes]
-        key_tabla = hash(df_relevante.to_string())
-        
-        # Verificar cache
-        if key_tabla in _cache_tablas_construidas:
-            return _cache_tablas_construidas[key_tabla].copy()
-        
-        # Si no está en cache, construir y guardar
-        tabla = construir_tabla_planilla(df)
-        _cache_tablas_construidas[key_tabla] = tabla.copy()
-        
-        return tabla
-        
-    except Exception as e:
-        # Fallback: usar función original si hay error en cache
-        return construir_tabla_planilla(df)
+# ===============================================================================================================
+# NOTA: Las funciones de cache manual han sido eliminadas y reemplazadas por el patrón Repository.
+# El cache ahora se maneja centralizadamente a través de repositories/cache_repository.py
+# ===============================================================================================================

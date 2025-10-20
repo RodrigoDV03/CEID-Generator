@@ -1,0 +1,37 @@
+{
+    "email": {
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 465,
+        "remitente": "TU_EMAIL@unmsm.edu.pe",
+        "password": "TU_PASSWORD_AQUI",
+        "alternative": {
+            "remitente": "EMAIL_ALTERNATIVO@unmsm.edu.pe",
+            "password": "PASSWORD_ALTERNATIVO"
+        }
+    },
+    "gui": {
+        "colors": {
+            "section_color": "#1d5fb6",
+            "bg_color": "#114b98",
+            "button_bg_color": "#f38b1a",
+            "button_hover_bg_color": "#e8aa69",
+            "console_bg": "#2c2f33",
+            "white_color": "#ffffff"
+        },
+        "fonts": {
+            "title": ["Segoe UI", 26, "bold"],
+            "section": ["Segoe UI", 16, "bold"],
+            "button": ["Segoe UI", 14, "bold"],
+            "footer": ["Segoe UI", 12]
+        }
+    },
+    "paths": {
+        "templates": "./Modelos_documentos/",
+        "signatures_docentes": "firmas_docentes/",
+        "signatures_admin": "firmas_admin/"
+    },
+    "app": {
+        "name": "CEID Generator - FLCH - UNMSM",
+        "organization": "Centro de Idiomas - FLCH - UNMSM"
+    }
+}

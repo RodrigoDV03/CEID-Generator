@@ -1,19 +1,24 @@
 from datetime import datetime
 import customtkinter as ctk
+from .config_manager import get_gui_colors, get_gui_fonts
 
-SECTION_COLOR = "#1d5fb6"
-BG_COLOR = "#114b98"
+# Cargar configuración desde archivo externo
+_colors = get_gui_colors()
+_fonts = get_gui_fonts()
 
-BUTTON_BG_COLOR = "#f38b1a"
-BUTTON_HOVER_BG_COLOR = "#e8aa69"
+# Colores (con fallback a valores originales)
+SECTION_COLOR = _colors.get("section_color", "#1d5fb6")
+BG_COLOR = _colors.get("bg_color", "#114b98")
+BUTTON_BG_COLOR = _colors.get("button_bg_color", "#f38b1a")
+BUTTON_HOVER_BG_COLOR = _colors.get("button_hover_bg_color", "#e8aa69")
+CONSOLE_BG = _colors.get("console_bg", "#2c2f33")
+WHITE_COLOR = _colors.get("white_color", "#ffffff")
 
-CONSOLE_BG = "#2c2f33"
-WHITE_COLOR = "#ffffff"
-
-FONT_TITLE = ("Segoe UI", 26, "bold")
-FONT_SECTION = ("Segoe UI", 16, "bold")
-FONT_BUTTON = ("Segoe UI", 14, "bold")
-FONT_FOOTER = ("Segoe UI", 12)
+# Fuentes (con fallback a valores originales)
+FONT_TITLE = tuple(_fonts.get("title", ["Segoe UI", 26, "bold"]))
+FONT_SECTION = tuple(_fonts.get("section", ["Segoe UI", 16, "bold"]))
+FONT_BUTTON = tuple(_fonts.get("button", ["Segoe UI", 14, "bold"]))
+FONT_FOOTER = tuple(_fonts.get("footer", ["Segoe UI", 12]))
 
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 

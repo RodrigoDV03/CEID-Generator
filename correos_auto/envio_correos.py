@@ -1,4 +1,3 @@
-import pandas as pd
 from PyPDF2 import PdfReader
 import re
 import smtplib
@@ -9,96 +8,116 @@ from email.mime.base import MIMEBase
 from email import encoders
 import os
 from fuzzywuzzy import process
+from utils.config_manager import get_email_config
+from repositories import excel_repo
 
-año_actual = datetime.datetime.now().year
+# Configuración global
+CURRENT_YEAR = datetime.datetime.now().year
+SIMILARITY_THRESHOLD = 80  # Umbral de similitud para fuzzy matching
 
-# Configuración de email
-EMAIL_CONFIG = {
-    "remitente": "personalcontratado28.flch@unmsm.edu.pe",
-    "password": "nbbr xttu qxqn tzej",
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 465
-}
+def get_email_settings():
+    email_config = get_email_config()
+    return {
+        "remitente": email_config.get("remitente", "personalcontratado28.flch@unmsm.edu.pe"),
+        "password": email_config.get("password", "nbbr xttu qxqn tzej"),
+        "smtp_server": email_config.get("smtp_server", "smtp.gmail.com"),
+        "smtp_port": email_config.get("smtp_port", 465)
+    }
 
-# Configuración alternativa (comentada)
-# EMAIL_CONFIG = {
-#     "remitente": "bolsistaceid01.flch@unmsm.edu.pe",
-#     "password": "frsf imch edfs uwqy",
-#     "smtp_server": "smtp.gmail.com",
-#     "smtp_port": 465
-# }
+# Configuración de email singleton
+EMAIL_CONFIG = get_email_settings()
 
 def extraer_nombre(pdf_path):
-    reader = PdfReader(pdf_path)
-    texto = ""
+    try:
+        reader = PdfReader(pdf_path)
+        texto = ""
 
-    # Concatenar el texto de todas las páginas
-    for pagina in reader.pages:
-        texto += pagina.extract_text() + "\n"
+        # Concatenar texto de todas las páginas
+        for pagina in reader.pages:
+            texto += pagina.extract_text() + "\n"
 
-    # Buscar patrón específico: Concepto:UNMSM seguido de números y nombre
-    # Patrón mejorado que busca "Concepto:" seguido opcionalmente de "UNMSM", números y nombre
-    match = re.search(r"Concepto:\s*UNMSM\s*\n?\s*\d+\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)", texto, re.IGNORECASE)
-    if match:
-        nombre_raw = match.group(1)
-        # Limpiar espacios múltiples
-        return re.sub(r"\s+", " ", nombre_raw).strip()
+        # Patrones de búsqueda ordenados por precisión
+        patrones = [
+            # Patrón específico: Concepto:UNMSM seguido de números y nombre
+            r"Concepto:\s*UNMSM\s*\n?\s*\d+\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)",
+            # Patrón alternativo: números seguidos directamente de nombre
+            r"\d{8,}\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)",
+            # Patrón genérico como fallback
+            r"\b([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)\b"
+        ]
 
-    # Patrón alternativo: buscar números seguidos directamente de nombre (sin "Concepto:")
-    match = re.search(r"\d{8,}\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)", texto)
-    if match:
-        nombre_raw = match.group(1)
-        # Limpiar espacios múltiples
-        return re.sub(r"\s+", " ", nombre_raw).strip()
+        for patron in patrones:
+            match = re.search(patron, texto, re.IGNORECASE)
+            if match:
+                nombre_raw = match.group(1)
+                # Limpiar espacios múltiples y normalizar
+                return re.sub(r"\s+", " ", nombre_raw).strip().upper()
 
-    # Patrón original como fallback
-    match = re.search(r"\b([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)\b", texto)
-    if match:
-        nombre_raw = match.group(1)
-        # Limpiar espacios múltiples
-        return re.sub(r"\s+", " ", nombre_raw).strip()
-
-    return None
+        return None
+    
+    except Exception as e:
+        print(f"⚠️ Error extrayendo nombre de {pdf_path}: {e}")
+        return None
 
 def extraer_servicios(pdf_path):
+    try:
+        reader = PdfReader(pdf_path)
+        texto = ""
 
-    reader = PdfReader(pdf_path)
-    texto = ""
+        # Concatenar texto de todas las páginas
+        for pagina in reader.pages:
+            texto += pagina.extract_text() + "\n"
 
-    # Concatenar el texto de todas las páginas
-    for pagina in reader.pages:
-        texto += pagina.extract_text() + "\n"
+        lineas = texto.splitlines()
 
-    lineas = texto.splitlines()
+        # Buscar tabla de servicios
+        idx_inicio = _find_services_table_start(lineas)
+        if idx_inicio is None:
+            return None
 
-    # Buscar índice de inicio de la tabla
-    idx_inicio = None
+        # Extraer servicios de enseñanza
+        servicios = _extract_teaching_services(lineas[idx_inicio:])
+        
+        if not servicios:
+            return None
+
+        # Formatear lista de servicios
+        return _format_services_list(servicios)
+    
+    except Exception as e:
+        print(f"⚠️ Error extrayendo servicios de {pdf_path}: {e}")
+        return None
+
+
+def _find_services_table_start(lineas):
+    """Busca el inicio de la tabla de servicios en las líneas del PDF."""
     for i, linea in enumerate(lineas):
         if "Código Unid. Med." in linea and "Descripción" in linea:
-            idx_inicio = i
-            break
+            return i
+    return None
 
-    if idx_inicio is None:
-        return None
 
-    # Patrón mejorado: permite "28 horas" o "28horas"
+def _extract_teaching_services(lineas):
+    """Extrae servicios de enseñanza que coincidan con el patrón de horas."""
     patron = re.compile(r"^\d{1,2}\s*horas\s+de\s+.*", re.IGNORECASE)
-
-    horas = []
-    for linea in lineas[idx_inicio:]:
-        if patron.match(linea.strip()):
-            horas.append(re.sub(r"\s+", " ", linea.strip()))  # limpiar espacios extra
-        elif horas:  # si ya empezó y cortó
+    servicios = []
+    
+    for linea in lineas:
+        linea_clean = linea.strip()
+        if patron.match(linea_clean):
+            servicios.append(re.sub(r"\s+", " ", linea_clean))
+        elif servicios:  # Si ya empezó a encontrar servicios y se corta la secuencia
             break
+    
+    return servicios
 
-    if not horas:
-        return None
 
-    # Formatear con comas y "y"
-    if len(horas) > 1:
-        return ", ".join(horas[:-1]) + " y " + horas[-1]
+def _format_services_list(servicios):
+    """Formatea una lista de servicios con comas y 'y' al final."""
+    if len(servicios) > 1:
+        return ", ".join(servicios[:-1]) + " y " + servicios[-1]
     else:
-        return horas[0]
+        return servicios[0]
 
 
 
@@ -190,15 +209,17 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo_html: str, pdf_path: st
     print(f"Correo enviado a {nombre}.")
 
 def enviar_correo_docente(nombre: str, pdf_path: str, destinatario: str, mes: str, servicio: str) -> None:
+    """Envía correo con orden de servicio a docente."""
     nombre_formato = nombre.split(",")[0].strip()
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual} - {nombre_formato}"
-    cuerpo_html = generar_cuerpo_correo_docente_html(mes, año_actual, servicio)
+    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {CURRENT_YEAR} - {nombre_formato}"
+    cuerpo_html = generar_cuerpo_correo_docente_html(mes, CURRENT_YEAR, servicio)
     
     enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
 
 def enviar_correo_administrativo(nombre: str, pdf_path: str, destinatario: str, mes: str) -> None:
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual}"
-    cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, año_actual)
+    """Envía correo con orden de servicio a personal administrativo."""
+    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {CURRENT_YEAR}"
+    cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, CURRENT_YEAR)
     
     enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
 
@@ -212,84 +233,111 @@ def crear_mapeo_correos(lista_pdfs, nombres_excel, df, tipo_correo="docente"):
             
         if nombre_extraido not in mapeo:  # Evitar recálculos
             resultado = process.extractOne(nombre_extraido, nombres_excel)
-            if resultado and resultado[1] >= 80:
+            if resultado and resultado[1] >= SIMILARITY_THRESHOLD:
                 mejor_match = resultado[0]
                 fila = df[df['Docente'] == mejor_match]
+                
                 if not fila.empty:
                     correo = fila['Correo Institucional'].values[0]
+                    
+                    datos_base = {
+                        "pdf_path": pdf_path,
+                        "nombre": mejor_match,
+                        "correo": correo
+                    }
+                    
                     if tipo_correo == "docente":
+                        # Para docentes, extraer también los servicios
                         servicio = extraer_servicios(pdf_path)
-                        mapeo[nombre_extraido] = {
-                            "pdf_path": pdf_path,
-                            "nombre": mejor_match,
-                            "correo": correo,
-                            "servicio": servicio
-                        }
-                    else:
-                        mapeo[nombre_extraido] = {
-                            "pdf_path": pdf_path,
-                            "nombre": mejor_match,
-                            "correo": correo
-                        }
+                        datos_base["servicio"] = servicio
+                    
+                    mapeo[nombre_extraido] = datos_base
     
     return mapeo
 
 def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
-    df = pd.read_excel(ruta_excel, sheet_name=hoja)
+    print("📊 Cargando datos de docentes...")
+    
+    # Usar repositorio para leer Excel
+    if not excel_repo.exists(ruta_excel):
+        raise FileNotFoundError(f"No se encontró el archivo Excel: {ruta_excel}")
+    
+    df = excel_repo.read_sheet(ruta_excel, sheet_name=hoja)
     df.columns = df.columns.str.strip()
 
-    # Asegurar que la columna 'Docente' exista
-    if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
-        raise ValueError("El Excel debe contener columnas 'Docente' y 'Correo Institucional'.")
+    # Validar columnas requeridas
+    required_columns = ['Docente', 'Correo Institucional']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Columnas faltantes en Excel: {missing_columns}")
 
+    print(f"✅ Datos cargados: {len(df)} docentes encontrados")
+    
     nombres_excel = df['Docente'].astype(str).tolist()
 
-    # Crear mapeo fuzzy una sola vez
+    # Crear mapeo fuzzy optimizado
+    print("🔄 Creando mapeo de correos...")
     mapeo_correos = crear_mapeo_correos(lista_pdfs, nombres_excel, df, "docente")
 
+    print("📧 Procesando PDFs para envío...")
     resultados = []
     for pdf_path in lista_pdfs:
         nombre_docente = extraer_nombre(pdf_path)
         if not nombre_docente:
-            print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
+            print(f"⚠️ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
             continue
 
         if nombre_docente in mapeo_correos:
             datos = mapeo_correos[nombre_docente]
             if datos["servicio"]:
                 resultados.append(datos)
-                print(f"{datos['nombre']} - {datos['correo']} - {datos['servicio']}")
+                print(f"✅ {datos['nombre']} - {datos['correo']} - {datos['servicio']}")
             else:
-                print(f"⚠ No se encontró servicio para {datos['nombre']}.")
+                print(f"⚠️ No se encontró servicio para {datos['nombre']}.")
         else:
-            print(f"⚠ Coincidencia baja para '{nombre_docente}', omitido.")
+            print(f"⚠️ Coincidencia baja para '{nombre_docente}', omitido.")
 
+    print(f"📋 Procesamiento completado: {len(resultados)} correos listos para enviar")
     return resultados
 
+
 def procesar_correos_administrativos(ruta_excel, hoja, lista_pdfs):
-    df = pd.read_excel(ruta_excel, sheet_name=hoja)
+    print("📊 Cargando datos de personal administrativo...")
+    
+    # Usar repositorio para leer Excel
+    if not excel_repo.exists(ruta_excel):
+        raise FileNotFoundError(f"No se encontró el archivo Excel: {ruta_excel}")
+    
+    df = excel_repo.read_sheet(ruta_excel, sheet_name=hoja)
     df.columns = df.columns.str.strip()
 
-    # Asegurar que la columna 'Docente' exista
-    if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
-        raise ValueError("El Excel debe contener columnas 'Docente' y 'Correo Institucional'.")
+    # Validar columnas requeridas
+    required_columns = ['Docente', 'Correo Institucional']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Columnas faltantes en Excel: {missing_columns}")
 
+    print(f"✅ Datos cargados: {len(df)} personas encontradas")
+    
     nombres_excel = df['Docente'].astype(str).tolist()
 
+    print("🔄 Creando mapeo de correos...")
     mapeo_correos = crear_mapeo_correos(lista_pdfs, nombres_excel, df, "administrativo")
 
+    print("📧 Procesando PDFs para envío...")
     resultados = []
     for pdf_path in lista_pdfs:
         nombre_administrativo = extraer_nombre(pdf_path)
         if not nombre_administrativo:
-            print(f"⚠ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
+            print(f"⚠️ No se encontró nombre en {os.path.basename(pdf_path)}, omitido.")
             continue
 
         if nombre_administrativo in mapeo_correos:
             datos = mapeo_correos[nombre_administrativo]
             resultados.append(datos)
-            print(f"{datos['nombre']} - {datos['correo']}")
+            print(f"✅ {datos['nombre']} - {datos['correo']}")
         else:
-            print(f"⚠ Coincidencia baja para '{nombre_administrativo}', omitido.")
+            print(f"⚠️ Coincidencia baja para '{nombre_administrativo}', omitido.")
 
+    print(f"📋 Procesamiento completado: {len(resultados)} correos listos para enviar")
     return resultados
