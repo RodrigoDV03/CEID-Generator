@@ -55,18 +55,24 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
 
     if tipo_fase_final == "administrativo":
         modalidad_servicio = "presencial"
+        nombre_director = "Dr. Guillaume Yannick Serge Oisel"
+        cargo_director = "Director de la Dirección de Gestión Institucional"
     else:
         modalidad_servicio = "híbrida"
+        nombre_director = "Mg. Yolanda Ruth Julca Estrada"
+        cargo_director = "Directora de la Dirección Académica"
 
     reemplazos_conformidad = {
-        "nombre": str(nombre_docente),
+        "nombre_docente": str(nombre_docente),
         "ruc": str(ruc),
         "descripcion_cursos": str(descripcion_final),
         "monto_subtotal": f"S/. {monto_total:,.2f} ({str(monto_total_letras)})",
         "monto_hora": f"S/. {categoria_valor:,.2f} ({str(monto_categoria_letras)})",
         "Nro_Contrato": str(nro_contrato),
         "numero_armada": str(numero_armada),
-        "modalidad_servicio": str(modalidad_servicio)
+        "modalidad_servicio": str(modalidad_servicio),
+        "nombre_director": str(nombre_director),
+        "cargo_director": str(cargo_director)
     }
 
     carpeta_final = os.path.dirname(ruta_destino)
@@ -89,7 +95,7 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
             doc.save(ruta_destino)
     return ruta_destino
 
-def generar_control_avance(fila_control, doc_control, ruta_destino):
+def generar_control_avance(fila_control, doc_control, ruta_destino, tipo_fase_final):
 
     nombre_docente = str(getattr(fila_control, "APELLIDOS Y NOMBRES", ""))
     idioma_docente = str(getattr(fila_control, "Especialidad", ""))
@@ -110,6 +116,13 @@ def generar_control_avance(fila_control, doc_control, ruta_destino):
     saldo_primera = monto_total - primera_armada
     saldo_segunda = saldo_primera - segunda_armada
 
+    if tipo_fase_final == "administrativo":
+        nombre_director = "Dr. Guillaume Yannick Serge Oisel"
+        cargo_director = "Director de la Dirección de Gestión Institucional"
+    else:
+        nombre_director = "Mg. Yolanda Ruth Julca Estrada"
+        cargo_director = "Directora de la Dirección Académica"
+
     # === Reemplazar en documento ===
 
     reemplazos_armada = {
@@ -123,6 +136,8 @@ def generar_control_avance(fila_control, doc_control, ruta_destino):
         "Saldo_Restante": f"S/. {saldo_restante:,.2f}",
         "Saldo_Primera": f"S/. {saldo_primera:,.2f}",
         "Saldo_Segunda": f"S/. {saldo_segunda:,.2f}",
+        "nombre_director": str(nombre_director),
+        "cargo_director": str(cargo_director)
     }
 
     carpeta_final = os.path.dirname(ruta_destino)
@@ -189,7 +204,7 @@ def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpe
                 nombre_archivo_control = f"CONTROL DE AVANCE - {docente} - {mes} {año_actual}.docx"
                 ruta_destino_control = os.path.join(carpeta_final, nombre_archivo_control)
 
-                generar_control_avance(fila_control, doc_control, ruta_destino_control)
+                generar_control_avance(fila_control, doc_control, ruta_destino_control, tipo_fase_final)
 
                 print(f"{docente} - Control de pagos generado correctamente.")
 
