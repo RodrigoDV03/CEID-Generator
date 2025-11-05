@@ -30,7 +30,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         raise ValueError("Número de armada inválido. Use 'Primera', 'Segunda' o 'Tercera'.")
     col_armada_name = columnas_armada[numero_armada]
 
-    # Matching Docente y Subtotal_Pago
+    # Matching Docente y Total_Pago
     nombres_planilla = df_planilla["Docente"].dropna().tolist()
 
     def crear_mapeo_montos(df_planilla, nombres_planilla):
@@ -65,7 +65,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
                 if match:
                     nombre_match, score = match
                     if score >= 85:
-                        fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Subtotal_pago"]
+                        fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Total_pago"]
                         if not fila.empty:
                             mapeo_montos[docente_control] = float(fila.values[0])
                         else:
