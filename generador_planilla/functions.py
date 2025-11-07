@@ -227,15 +227,48 @@ def procesar_cursos_intensivos(datos):
             datos_procesados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
         
         fila_adicional = row.copy()
+        idioma = str(row['idioma']).strip()
+        
         try:
             ciclo_actual = int(str(row['ciclo']).strip())
-            fila_adicional['ciclo'] = str(ciclo_actual + 1)
+            
+            # Lógica específica para Portugués
+            if idioma == 'Portugués':
+                nivel_sin_intensivo = nivel_original.replace('Intensivo ', '').strip()
+                
+                if 'Básico' in nivel_sin_intensivo or 'Basico' in nivel_sin_intensivo:
+                    if ciclo_actual == 5:
+                        # Cambiar a Intermedio 1
+                        fila_adicional['nivel'] = 'Intensivo Intermedio'
+                        fila_adicional['ciclo'] = '1'
+                    else:
+                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
+                elif 'Intermedio' in nivel_sin_intensivo:
+                    if ciclo_actual == 4:
+                        # Cambiar a Avanzado 1
+                        fila_adicional['nivel'] = 'Intensivo Avanzado'
+                        fila_adicional['ciclo'] = '1'
+                    else:
+                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
+                elif 'Avanzado' in nivel_sin_intensivo:
+                    if ciclo_actual < 3:
+                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
+                    else:
+                        # Para Avanzado 3, mantener el mismo ciclo (o manejar según reglas de negocio)
+                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
+                else:
+                    # Para otros niveles de portugués, incrementar normalmente
+                    fila_adicional['ciclo'] = str(ciclo_actual + 1)
+            else:
+                # Para otros idiomas, incrementar ciclo normalmente
+                fila_adicional['ciclo'] = str(ciclo_actual + 1)
+                
         except (ValueError, TypeError):
             fila_adicional['ciclo'] = str(row['ciclo']) + '+1'
         
-        # Agregar "Intensivo" al nivel de la fila adicional
-        if not nivel_original.startswith('Intensivo'):
-            fila_adicional['nivel'] = f'Intensivo {nivel_original}'
+        # Agregar "Intensivo" al nivel de la fila adicional si no lo tiene
+        if not str(fila_adicional['nivel']).startswith('Intensivo'):
+            fila_adicional['nivel'] = f'Intensivo {fila_adicional["nivel"]}'
         
         filas_adicionales.append(fila_adicional)
     
