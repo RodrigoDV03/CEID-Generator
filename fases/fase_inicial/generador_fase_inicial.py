@@ -79,12 +79,8 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
 
         if tipo_fase_inicial == "administrativo":
             modalidad_servicio = "presencial"
-            nombre_director = "Dr. Guillaume Yannick Serge Oisel"
-            cargo_director = "Director de la Dirección de Gestión Institucional"
         else:
             modalidad_servicio = "híbrida"
-            nombre_director = "Mg. Yolanda Ruth Julca Estrada"
-            cargo_director = "Directora de la Dirección Académica"
 
         # -------- GENERAR OFICIO --------
         if tipo_contrato == "CONTRATO":
@@ -101,9 +97,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
             "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
             "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
             "numero_armada": numero_armada,
-            "modalidad_servicio": modalidad_servicio,
-            "nombre_director": nombre_director,
-            "cargo_director": cargo_director
+            "modalidad_servicio": modalidad_servicio
         }
         ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año_actual}.docx")
         generar_documento(ruta_oficio, reemplazos_oficio, ruta_salida_oficio)

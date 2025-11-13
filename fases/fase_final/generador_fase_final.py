@@ -55,12 +55,8 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
 
     if tipo_fase_final == "administrativo":
         modalidad_servicio = "presencial"
-        nombre_director = "Dr. Guillaume Yannick Serge Oisel"
-        cargo_director = "Director de la Dirección de Gestión Institucional"
     else:
         modalidad_servicio = "híbrida"
-        nombre_director = "Mg. Yolanda Ruth Julca Estrada"
-        cargo_director = "Directora de la Dirección Académica"
 
     reemplazos_conformidad = {
         "nombre_docente": str(nombre_docente),
@@ -70,9 +66,7 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
         "monto_hora": f"S/. {categoria_valor:,.2f} ({str(monto_categoria_letras)})",
         "Nro_Contrato": str(nro_contrato),
         "numero_armada": str(numero_armada),
-        "modalidad_servicio": str(modalidad_servicio),
-        "nombre_director": str(nombre_director),
-        "cargo_director": str(cargo_director)
+        "modalidad_servicio": str(modalidad_servicio)
     }
 
     carpeta_final = os.path.dirname(ruta_destino)
@@ -116,13 +110,6 @@ def generar_control_avance(fila_control, doc_control, ruta_destino, tipo_fase_fi
     saldo_primera = monto_total - primera_armada
     saldo_segunda = saldo_primera - segunda_armada
 
-    if tipo_fase_final == "administrativo":
-        nombre_director = "Dr. Guillaume Yannick Serge Oisel"
-        cargo_director = "Director de la Dirección de Gestión Institucional"
-    else:
-        nombre_director = "Mg. Yolanda Ruth Julca Estrada"
-        cargo_director = "Directora de la Dirección Académica"
-
     # === Reemplazar en documento ===
 
     reemplazos_armada = {
@@ -135,9 +122,7 @@ def generar_control_avance(fila_control, doc_control, ruta_destino, tipo_fase_fi
         "Total_Tercera": f"S/. {total_tercera:,.2f}",
         "Saldo_Restante": f"S/. {saldo_restante:,.2f}",
         "Saldo_Primera": f"S/. {saldo_primera:,.2f}",
-        "Saldo_Segunda": f"S/. {saldo_segunda:,.2f}",
-        "nombre_director": str(nombre_director),
-        "cargo_director": str(cargo_director)
+        "Saldo_Segunda": f"S/. {saldo_segunda:,.2f}"
     }
 
     carpeta_final = os.path.dirname(ruta_destino)
