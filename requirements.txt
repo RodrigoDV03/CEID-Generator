@@ -1,5 +1,5 @@
 altgraph==0.17.4
-auto-py-to-exe==2.47.0
+auto-py-to-exe==2.48.1
 bottle==0.13.4
 bottle-websocket==0.2.9
 certifi==2025.8.3
@@ -22,16 +22,16 @@ idna==3.10
 importlib_resources==6.5.2
 lxml==6.0.1
 num2words==0.5.14
-numpy==2.0.2
+numpy==2.3.2
 openpyxl==3.1.5
 packaging==25.0
-pandas==2.2.3
+pandas==2.3.2
 pdfminer.six==20250506
 pefile==2023.2.7
 pillow==11.3.0
 pycparser==2.22
-pyinstaller==6.15.0
-pyinstaller-hooks-contrib==2025.8
+pyinstaller==6.17.0
+pyinstaller-hooks-contrib==2025.10
 pyparsing==3.2.3
 PyPDF2==3.0.1
 pypdfium2==4.30.0
