@@ -126,7 +126,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "descripcion": descripcion_final,
                 "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
                 "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
-                "modalidad_servicio": modalidad_servicio
+                "modalidad_servicio": modalidad_servicio,
             }
 
             if tipo_fase_inicial == "administrativo":
@@ -166,7 +166,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
 
         # -------- GENERAR COTIZACIÓN --------
 
-        if tipo_fase_inicial == "administrativo" or (tipo_fase_inicial == "planilla docente" and tipo_contrato == "TERCERO"):
+        if tipo_fase_inicial == "administrativo" or (tipo_fase_inicial != "administrativo" and tipo_contrato == "TERCERO"):
             ruta_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
 
             if tipo_fase_inicial != "administrativo":
@@ -193,7 +193,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "categoria_monto": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
                 "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
                 "dni_cot": f"DNI: {dni_docente}",
-                "modalidad_servicio": modalidad_servicio
+                "modalidad_servicio": modalidad_servicio,
             }
 
             ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año_actual}.docx")

@@ -59,7 +59,7 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
         modalidad_servicio = "híbrida"
 
     reemplazos_conformidad = {
-        "nombre": str(nombre_docente),
+        "nombre_docente": str(nombre_docente),
         "ruc": str(ruc),
         "descripcion_cursos": str(descripcion_final),
         "monto_subtotal": f"S/. {monto_total:,.2f} ({str(monto_total_letras)})",
@@ -89,7 +89,7 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
             doc.save(ruta_destino)
     return ruta_destino
 
-def generar_control_avance(fila_control, doc_control, ruta_destino):
+def generar_control_avance(fila_control, doc_control, ruta_destino, tipo_fase_final):
 
     nombre_docente = str(getattr(fila_control, "APELLIDOS Y NOMBRES", ""))
     idioma_docente = str(getattr(fila_control, "Especialidad", ""))
@@ -122,7 +122,7 @@ def generar_control_avance(fila_control, doc_control, ruta_destino):
         "Total_Tercera": f"S/. {total_tercera:,.2f}",
         "Saldo_Restante": f"S/. {saldo_restante:,.2f}",
         "Saldo_Primera": f"S/. {saldo_primera:,.2f}",
-        "Saldo_Segunda": f"S/. {saldo_segunda:,.2f}",
+        "Saldo_Segunda": f"S/. {saldo_segunda:,.2f}"
     }
 
     carpeta_final = os.path.dirname(ruta_destino)
@@ -189,7 +189,7 @@ def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpe
                 nombre_archivo_control = f"CONTROL DE AVANCE - {docente} - {mes} {año_actual}.docx"
                 ruta_destino_control = os.path.join(carpeta_final, nombre_archivo_control)
 
-                generar_control_avance(fila_control, doc_control, ruta_destino_control)
+                generar_control_avance(fila_control, doc_control, ruta_destino_control, tipo_fase_final)
 
                 print(f"{docente} - Control de pagos generado correctamente.")
 
