@@ -1,32 +1,128 @@
 import pandas as pd
 from PyPDF2 import PdfReader
 import re
-import smtplib
 import datetime
+import os
+import sys
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import os
 from fuzzywuzzy import process
+
+# Gmail API imports
+import pickle
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 año_actual = datetime.datetime.now().year
 
-# Configuración de email
-EMAIL_CONFIG = {
-    "remitente": "personalcontratado28.flch@unmsm.edu.pe",
-    "password": "nbbr xttu qxqn tzej",
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 465
+PALABRAS_PROHIBIDAS = {
+    "SERVICIO", "SERVICIOSERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS",
+    "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "COORDINACION", "ATENCION",
+    "DIGITACION", "CLASIFICACION", "DESCRIPCION", "EVALUACION", "SOLICITUDES",
+    "RECEPCION", "ARCHIVO", "VISITAS", "DE", "LA", "Y", "EN", "MES", "DIA", "AÑO",
+    "ADJUDICACION", "PROCESO", "SIN", "ADQUISICION", "ORDEN"
 }
 
-# Configuración alternativa (comentada)
-# EMAIL_CONFIG = {
-#     "remitente": "bolsistaceid01.flch@unmsm.edu.pe",
-#     "password": "frsf imch edfs uwqy",
-#     "smtp_server": "smtp.gmail.com",
-#     "smtp_port": 465
-# }
+# Configuración de Gmail API
+def get_app_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+GMAIL_CONFIG = {
+    "scopes": [
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/gmail.settings.basic'
+    ],
+    "credentials_file": os.path.join(get_app_dir(), "credentials.json"),
+    "token_file": os.path.join(get_app_dir(), "token.pickle"),
+    "remitente": "personalcontratado28.flch@unmsm.edu.pe"
+}
+
+def autenticar_gmail():
+    creds = None
+    
+    # El archivo token.pickle almacena los tokens de acceso y actualización del usuario.
+    if os.path.exists(GMAIL_CONFIG["token_file"]):
+        with open(GMAIL_CONFIG["token_file"], 'rb') as token:
+            creds = pickle.load(token)
+    
+    # Si no hay credenciales válidas disponibles, permite al usuario autenticarse.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            if not os.path.exists(GMAIL_CONFIG["credentials_file"]):
+                raise FileNotFoundError(
+                    f"No se encontró {GMAIL_CONFIG['credentials_file']}. "
+                    "Descarga las credenciales OAuth2 desde Google Cloud Console."
+                )
+            
+            flow = InstalledAppFlow.from_client_secrets_file(
+                GMAIL_CONFIG["credentials_file"], 
+                GMAIL_CONFIG["scopes"]
+            )
+            creds = flow.run_local_server(port=0)
+        
+        # Guardar las credenciales para la próxima ejecución
+        with open(GMAIL_CONFIG["token_file"], 'wb') as token:
+            pickle.dump(creds, token)
+    
+    return build('gmail', 'v1', credentials=creds)
+
+def obtener_firma_gmail(service):
+    try:
+        # Intentar obtener la configuración de envío
+        send_as = service.users().settings().sendAs().list(userId='me').execute()
+        
+        for alias in send_as.get('sendAs', []):
+            if alias.get('isPrimary'):
+                signature = alias.get('signature', '')
+                if signature:
+                    return signature
+        return ""
+        
+    except Exception as e:
+        print(f"⚠️ No se pudo obtener la firma de Gmail: {e}")
+        return ""
+
+def _es_nombre_valido(nombre, min_len=3):
+    """Valida que un nombre tenga el formato y contenido correcto"""
+    if not nombre:
+        return False
+    partes = nombre.split(',')
+    if len(partes) < 2:
+        return False
+    apellidos = partes[0].strip()
+    nombres = partes[1].strip()
+    apellidos_letras = len([c for c in apellidos if c.isalpha()])
+    nombres_letras = len([c for c in nombres if c.isalpha()])
+    return apellidos_letras >= min_len and nombres_letras >= min_len
+
+def _limpiar_nombre(nombre_raw):
+    """Limpia y normaliza un nombre extraído"""
+    return re.sub(r"\s+", " ", nombre_raw).strip()
+
+def _convertir_a_formato_coma(nombre_sin_coma):
+    """Convierte formato 'APELLIDO1 APELLIDO2 NOMBRE1 NOMBRE2' a 'APELLIDO1 APELLIDO2, NOMBRE1 NOMBRE2'"""
+    primera_palabra = nombre_sin_coma.split()[0] if nombre_sin_coma.split() else ""
+    
+    if primera_palabra in PALABRAS_PROHIBIDAS:
+        return None
+        
+    palabras = nombre_sin_coma.split()
+    if len(palabras) >= 3:
+        apellidos = " ".join(palabras[:2])
+        nombres = " ".join(palabras[2:])
+        return f"{apellidos}, {nombres}"
+    return None
 
 def extraer_nombre(pdf_path, debug=False):
     reader = PdfReader(pdf_path)
@@ -36,126 +132,58 @@ def extraer_nombre(pdf_path, debug=False):
     for pagina in reader.pages:
         texto += pagina.extract_text() + "\n"
 
-    if debug:
-        print(f"\n=== DEBUG: {os.path.basename(pdf_path)} ===")
-        print(f"Texto extraído (primeros 500 caracteres):\n{texto[:500]}\n")
-
-    # Función auxiliar para validar que el nombre tenga sentido
-    def es_nombre_valido(nombre, min_len=3):
-        if not nombre:
-            return False
-        partes = nombre.split(',')
-        if len(partes) < 2:
-            return False
-        apellidos = partes[0].strip()
-        nombres = partes[1].strip()
-        # Contar solo letras (ignorar espacios)
-        apellidos_letras = len([c for c in apellidos if c.isalpha()])
-        nombres_letras = len([c for c in nombres if c.isalpha()])
-        return apellidos_letras >= min_len and nombres_letras >= min_len
-
     candidatos = []
 
     # Patrón 1: Concepto:UNMSM seguido de números y nombre CON COMA
     match = re.search(r"Concepto:\s*UNMSM\s*\n?\s*\d+\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)", texto, re.IGNORECASE)
     if match:
-        nombre_raw = match.group(1)
-        nombre_limpio = re.sub(r"\s+", " ", nombre_raw).strip()
-        if es_nombre_valido(nombre_limpio):
+        nombre_limpio = _limpiar_nombre(match.group(1))
+        if _es_nombre_valido(nombre_limpio):
             candidatos.append(("Patrón 1 (Concepto:UNMSM con coma)", nombre_limpio))
 
-    # Patrón 1b: Concepto:UNMSM seguido de números y nombre SIN COMA (formato: APELLIDOS NOMBRES)
-    # Busca al menos 4 palabras en mayúsculas después del número
+    # Patrón 1b: Concepto:UNMSM seguido de números y nombre SIN COMA
     match = re.search(r"Concepto:\s*UNMSM\s*\n?\s*(\d{8,})\s*([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+){2,})", texto, re.IGNORECASE)
     if match:
-        nombre_sin_coma = match.group(2).strip()
-        # Filtrar palabras clave que no son nombres
-        palabras_prohibidas = ["SERVICIO", "SERVICIOSERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS", 
-                               "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "COORDINACION", "ATENCION",
-                               "DIGITACION", "CLASIFICACION", "DESCRIPCION", "EVALUACION", "SOLICITUDES",
-                               "RECEPCION", "ARCHIVO", "VISITAS", "DE", "LA", "Y", "EN"]
-        
-        primera_palabra = nombre_sin_coma.split()[0] if nombre_sin_coma.split() else ""
-        
-        # Validar que no comience con palabras prohibidas
-        if primera_palabra not in palabras_prohibidas:
-            # Convertir formato "APELLIDO1 APELLIDO2 NOMBRE1 NOMBRE2" a "APELLIDO1 APELLIDO2, NOMBRE1 NOMBRE2"
-            palabras = nombre_sin_coma.split()
-            if len(palabras) >= 3:
-                # Tomar las primeras 2 palabras como apellidos y el resto como nombres
-                apellidos = " ".join(palabras[:2])
-                nombres = " ".join(palabras[2:])
-                nombre_formateado = f"{apellidos}, {nombres}"
-                nombre_limpio = re.sub(r"\s+", " ", nombre_formateado).strip()
-                if es_nombre_valido(nombre_limpio, min_len=3):
-                    candidatos.append(("Patrón 1b (Concepto:UNMSM sin coma)", nombre_limpio))
+        nombre_formateado = _convertir_a_formato_coma(match.group(2).strip())
+        if nombre_formateado and _es_nombre_valido(nombre_formateado, min_len=3):
+            candidatos.append(("Patrón 1b (Concepto:UNMSM sin coma)", nombre_formateado))
 
     # Patrón 2: números seguidos directamente de nombre CON COMA
     match = re.search(r"\d{8,}\s*([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)", texto)
     if match:
-        nombre_raw = match.group(1)
-        nombre_limpio = re.sub(r"\s+", " ", nombre_raw).strip()
-        if es_nombre_valido(nombre_limpio):
+        nombre_limpio = _limpiar_nombre(match.group(1))
+        if _es_nombre_valido(nombre_limpio):
             candidatos.append(("Patrón 2 (números con coma)", nombre_limpio))
 
     # Patrón 2b: números largos seguidos de nombre SIN COMA
     match = re.search(r"\d{8,}\s*([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+){2,})", texto)
     if match:
-        nombre_sin_coma = match.group(1).strip()
-        # Filtrar palabras clave
-        palabras_prohibidas = ["SERVICIO", "SERVICIOSERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS", 
-                               "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "COORDINACION", "ATENCION",
-                               "DIGITACION", "CLASIFICACION", "DESCRIPCION", "EVALUACION", "SOLICITUDES",
-                               "RECEPCION", "ARCHIVO", "VISITAS", "DE", "LA", "Y", "EN", "MES", "DIA", "AÑO"]
-        
-        primera_palabra = nombre_sin_coma.split()[0] if nombre_sin_coma.split() else ""
-        
-        if primera_palabra not in palabras_prohibidas:
-            palabras = nombre_sin_coma.split()
-            if len(palabras) >= 3:
-                apellidos = " ".join(palabras[:2])
-                nombres = " ".join(palabras[2:])
-                nombre_formateado = f"{apellidos}, {nombres}"
-                nombre_limpio = re.sub(r"\s+", " ", nombre_formateado).strip()
-                if es_nombre_valido(nombre_limpio, min_len=3):
-                    candidatos.append(("Patrón 2b (números sin coma)", nombre_limpio))
+        nombre_formateado = _convertir_a_formato_coma(match.group(1).strip())
+        if nombre_formateado and _es_nombre_valido(nombre_formateado, min_len=3):
+            candidatos.append(("Patrón 2b (números sin coma)", nombre_formateado))
 
     # Patrón 2c: Buscar específicamente después de RUC (11 dígitos) seguido del nombre
     match = re.search(r"\bRUC:.*?(\d{11})\s*([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+){2,})", texto, re.IGNORECASE | re.DOTALL)
     if match:
         nombre_sin_coma = match.group(2).strip()
-        palabras_prohibidas = ["SERVICIO", "SERVICIOSERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS", 
-                               "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "COORDINACION", "ATENCION",
-                               "DIGITACION", "CLASIFICACION", "DESCRIPCION", "EVALUACION", "SOLICITUDES",
-                               "RECEPCION", "ARCHIVO", "VISITAS", "DE", "LA", "Y", "EN"]
-        
-        primera_palabra = nombre_sin_coma.split()[0] if nombre_sin_coma.split() else ""
-        
-        if primera_palabra not in palabras_prohibidas:
-            palabras = nombre_sin_coma.split()
-            if len(palabras) >= 3 and len(palabras) <= 6:  # Nombres típicos tienen 3-6 palabras
-                apellidos = " ".join(palabras[:2])
-                nombres = " ".join(palabras[2:])
-                nombre_formateado = f"{apellidos}, {nombres}"
-                nombre_limpio = re.sub(r"\s+", " ", nombre_formateado).strip()
-                if es_nombre_valido(nombre_limpio, min_len=3):
-                    candidatos.append(("Patrón 2c (después de RUC)", nombre_limpio))
+        if len(nombre_sin_coma.split()) <= 6:  # Límite de palabras
+            nombre_formateado = _convertir_a_formato_coma(nombre_sin_coma)
+            if nombre_formateado and _es_nombre_valido(nombre_formateado, min_len=3):
+                candidatos.append(("Patrón 2c (después de RUC)", nombre_formateado))
 
     # Patrón 3: nombres con saltos de línea
     match = re.search(r"\b([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)*)\s*,\s*\n?\s*([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)*)\b", texto)
     if match:
-        apellidos = match.group(1).strip()
-        nombres = match.group(2).strip()
-        nombre_completo = f"{apellidos}, {nombres}"
-        nombre_limpio = re.sub(r"\s+", " ", nombre_completo)
-        if es_nombre_valido(nombre_limpio):
+        nombre_completo = f"{match.group(1).strip()}, {match.group(2).strip()}"
+        nombre_limpio = _limpiar_nombre(nombre_completo)
+        if _es_nombre_valido(nombre_limpio):
             candidatos.append(("Patrón 3 (con saltos)", nombre_limpio))
 
-    # Patrón 4: buscar todos los nombres con formato "APELLIDO(S), NOMBRE(S)" y elegir el más largo
+    # Patrón 4: buscar todos los nombres con formato "APELLIDO(S), NOMBRE(S)"
     matches = re.findall(r"\b([A-ZÁÉÍÓÚÑ ]+,\s*[A-ZÁÉÍÓÚÑ ]+)\b", texto)
     for match in matches:
-        nombre_limpio = re.sub(r"\s+", " ", match).strip()
-        if es_nombre_valido(nombre_limpio):
+        nombre_limpio = _limpiar_nombre(match)
+        if _es_nombre_valido(nombre_limpio):
             candidatos.append(("Patrón 4 (fallback)", nombre_limpio))
 
     if debug and candidatos:
@@ -163,30 +191,20 @@ def extraer_nombre(pdf_path, debug=False):
         for patron, nombre in candidatos:
             print(f"  - {patron}: {nombre}")
 
-    # Retornar el mejor candidato con prioridad por patrón y validación adicional
+    # Filtrar y seleccionar el mejor candidato
     if candidatos:
-        # Filtrar candidatos que contengan palabras prohibidas
-        palabras_prohibidas = ["SERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS", 
-                               "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "OPERADOR",
-                               "COORDINACION", "ATENCION", "ORDEN", "DE LA"]
-        
         candidatos_validos = []
         for patron, nombre in candidatos:
-            # Verificar que el nombre no contenga palabras prohibidas
             nombre_upper = nombre.upper()
-            tiene_prohibida = any(palabra in nombre_upper for palabra in palabras_prohibidas)
-            
-            # Verificar longitud razonable (nombres típicos tienen entre 15 y 60 caracteres)
+            tiene_prohibida = any(palabra in nombre_upper for palabra in PALABRAS_PROHIBIDAS)
             longitud_ok = 15 <= len(nombre) <= 60
             
             if not tiene_prohibida and longitud_ok:
                 candidatos_validos.append((patron, nombre))
         
-        # Si no quedan candidatos válidos después del filtro, usar todos
         if not candidatos_validos:
             candidatos_validos = candidatos
         
-        # Priorizar por tipo de patrón (los primeros son más confiables)
         prioridad = {
             "Patrón 1 (Concepto:UNMSM con coma)": 1,
             "Patrón 2 (números con coma)": 2,
@@ -197,7 +215,6 @@ def extraer_nombre(pdf_path, debug=False):
             "Patrón 4 (fallback)": 7
         }
         
-        # Ordenar por prioridad y luego por longitud
         mejor = min(candidatos_validos, key=lambda x: (prioridad.get(x[0], 99), -len(x[1])))
         
         if debug:
@@ -210,11 +227,9 @@ def extraer_nombre(pdf_path, debug=False):
     return None
 
 def extraer_servicios(pdf_path):
-
     reader = PdfReader(pdf_path)
     texto = ""
 
-    # Concatenar el texto de todas las páginas
     for pagina in reader.pages:
         texto += pagina.extract_text() + "\n"
 
@@ -230,41 +245,62 @@ def extraer_servicios(pdf_path):
     if idx_inicio is None:
         return None
 
-    # Patrón mejorado: permite "28 horas" o "28horas"
     patron = re.compile(r"^\d{1,2}\s*horas\s+de\s+.*", re.IGNORECASE)
 
     horas = []
     for linea in lineas[idx_inicio:]:
         if patron.match(linea.strip()):
-            horas.append(re.sub(r"\s+", " ", linea.strip()))  # limpiar espacios extra
-        elif horas:  # si ya empezó y cortó
+            horas.append(re.sub(r"\s+", " ", linea.strip()))
+        elif horas:
             break
 
     if not horas:
         return None
 
-    # Formatear con comas y "y"
     if len(horas) > 1:
         return ", ".join(horas[:-1]) + " y " + horas[-1]
     else:
         return horas[0]
 
+def crear_mensaje_gmail_con_firma(service, destinatario: str, asunto: str, cuerpo_html: str, pdf_path: str) -> dict:
+    try:
+        # Crear mensaje MIME básico (sin firma, Gmail la añadirá)
+        msg = MIMEMultipart()
+        msg['To'] = destinatario
+        msg['Subject'] = asunto
+        
+        # Añadir cuerpo HTML (SIN firma)
+        msg.attach(MIMEText(cuerpo_html, 'html'))
+        
+        # Adjuntar PDF
+        with open(pdf_path, 'rb') as adjunto:
+            parte = MIMEBase('application', 'octet-stream')
+            parte.set_payload(adjunto.read())
+            encoders.encode_base64(parte)
+            parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(pdf_path)}')
+            msg.attach(parte)
+        
+        # Codificar mensaje
+        raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        
+        # Crear draft primero (esto permite que Gmail añada la firma)
+        draft_body = {
+            'message': {
+                'raw': raw_message
+            }
+        }
+        
+        draft = service.users().drafts().create(userId='me', body=draft_body).execute()
+        
+        # Enviar el draft (Gmail añadirá la firma automáticamente)
+        result = service.users().drafts().send(userId='me', body={'id': draft['id']}).execute()
+        
+        return result
+        
+    except Exception as e:
+        raise Exception(f"Error creando mensaje con firma: {str(e)}")
 
-
-def generar_firma_html() -> str:
-    return """
-    <p>Atentamente,</p>
-
-    <p style="font-size: 13px; font-weight: bold; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">C.P.C. María Rivera Vidal</p>
-    <p style="font-size: 10px; font-style: sans-serif; color:rgb(82,82,82); margin:0cm 0cm 0.0001pt; line-height: normal">Responsable de la Coordinación de Procesos Administrativos </p>
-
-    <span style="font-size:10px; font-weight: bold; font-style: sans-serif; color:rgb(11,83,148); margin-bottom: 0cm; line-height: normal">Centro de Idiomas de la Universidad Nacional Mayor de San Marcos</span>
-
-    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Contacto: (01) 619 7000 Anexo 2848</p>
-    <p style="font-size:10px; font-style: sans-serif; color:rgb(51,51,51); margin-bottom: 0cm; line-height: normal">Av. Universitaria,  Calle Germán Amézaga N.° 375. Ciudad Universitaria, Lima.</p>
-"""
-
-def generar_cuerpo_correo_docente_html(mes: str, anio: str, servicio: str) -> str:
+def generar_cuerpo_correo_docente_html(mes: str, anio: str, servicio: str, firma_html: str = "") -> str:
     return f"""
 <html>
     <body style="font-family: Verdana; font-size: 10pt;">
@@ -284,16 +320,16 @@ def generar_cuerpo_correo_docente_html(mes: str, anio: str, servicio: str) -> st
             </li>
         </ul>
 
-            <p>
+        <p>
             Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
-            </p>
+        </p>
 
-        {generar_firma_html()}
+        {firma_html}
     </body>
 </html>
 """
 
-def generar_cuerpo_correo_administrativo_html(mes: str, anio: str) -> str:
+def generar_cuerpo_correo_administrativo_html(mes: str, anio: str, firma_html: str = "") -> str:
     return f"""
 <html>
     <body style="font-family: Verdana; font-size: 10pt;">
@@ -307,156 +343,155 @@ def generar_cuerpo_correo_administrativo_html(mes: str, anio: str) -> str:
         Una vez emitido, envíe el recibo en <span style="font-weight: bold; color: #073763;">formato PDF</span> como respuesta a este mismo correo, sin generar un nuevo hilo.
         </p>
 
-        {generar_firma_html()}
+        {firma_html}
     </body>
 </html>
 """
 
-def adjuntar_pdf(msg: MIMEMultipart, pdf_path: str) -> None:
-    with open(pdf_path, 'rb') as adjunto:
-        parte = MIMEBase('application', 'octet-stream')
-        parte.set_payload(adjunto.read())
-        encoders.encode_base64(parte)
-        parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(pdf_path)}')
-        msg.attach(parte)
+def enviar_correo_gmail(service, destinatario: str, asunto: str, cuerpo_html: str, pdf_path: str, nombre: str) -> None:
+    """Envía un correo con adjunto PDF usando la API de Gmail"""
+    try:
+        crear_mensaje_gmail_con_firma(service, destinatario, asunto, cuerpo_html, pdf_path)
+        print(f"Correo enviado a {nombre}")
+    except HttpError as error:
+        print(f"❌ Error enviando correo a {nombre}: {error}")
+    except Exception as error:
+        print(f"❌ Error inesperado enviando correo a {nombre}: {error}")
 
-def enviar_correo(destinatario: str, asunto: str, cuerpo_html: str, pdf_path: str, nombre: str) -> None:
-    # Crear mensaje
-    msg = MIMEMultipart()
-    msg['From'] = EMAIL_CONFIG["remitente"]
-    msg['To'] = destinatario
-    msg['Subject'] = asunto
-    msg.attach(MIMEText(cuerpo_html, 'html'))
-
-    # Adjuntar PDF
-    adjuntar_pdf(msg, pdf_path)
-
-    # Enviar
-    with smtplib.SMTP_SSL(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"]) as servidor:
-        servidor.login(EMAIL_CONFIG["remitente"], EMAIL_CONFIG["password"])
-        servidor.sendmail(EMAIL_CONFIG["remitente"], [destinatario], msg.as_string())
-
-    print(f"Correo enviado a {nombre}.")
-
-def enviar_correo_docente(nombre: str, pdf_path: str, destinatario: str, mes: str, servicio: str) -> None:
-    nombre_formato = nombre.split(",")[0].strip()
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual} - {nombre_formato}"
-    cuerpo_html = generar_cuerpo_correo_docente_html(mes, año_actual, servicio)
+def enviar_correo_personalizado(service, nombre: str, pdf_path: str, destinatario: str, mes: str, tipo: str, servicio: str = None) -> None:
+    """Función unificada para enviar correos a docentes o administrativos"""
+    firma_html = obtener_firma_gmail(service)
     
-    enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
-
-def enviar_correo_administrativo(nombre: str, pdf_path: str, destinatario: str, mes: str) -> None:
-    asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual}"
-    cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, año_actual)
+    if tipo == "docente":
+        if not servicio:
+            print(f"⚠ No se puede enviar correo a {nombre}: servicio no especificado")
+            return
+        nombre_formato = nombre.split(",")[0].strip()
+        asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual} - {nombre_formato}"
+        cuerpo_html = generar_cuerpo_correo_docente_html(mes, año_actual, servicio, firma_html)
+    elif tipo == "administrativo":
+        asunto = f"Envío de orden de servicio y solicitud de recibo por honorarios – {mes} {año_actual}"
+        cuerpo_html = generar_cuerpo_correo_administrativo_html(mes, año_actual, firma_html)
+    else:
+        print(f"❌ Tipo de correo no válido: {tipo}")
+        return
     
-    enviar_correo(destinatario, asunto, cuerpo_html, pdf_path, nombre)
+    enviar_correo_gmail(service, destinatario, asunto, cuerpo_html, pdf_path, nombre)
 
-def crear_mapeo_correos(lista_pdfs, nombres_excel, df, tipo_correo="docente"):
+def _crear_mapeo_correos(lista_pdfs, nombres_excel, df, incluir_servicio=True, debug=False):
+    """Crea mapeo entre PDFs y datos de correo. Función unificada para docentes y administrativos"""
     mapeo = {}
     
     for pdf_path in lista_pdfs:
-        nombre_extraido = extraer_nombre(pdf_path)
-        if not nombre_extraido:
+        nombre_extraido = extraer_nombre(pdf_path, debug=debug)
+        if not nombre_extraido or nombre_extraido in mapeo:
             continue
             
-        if nombre_extraido not in mapeo:  # Evitar recálculos
-            resultado = process.extractOne(nombre_extraido, nombres_excel)
-            if resultado and resultado[1] >= 80:
-                mejor_match = resultado[0]
-                fila = df[df['Docente'] == mejor_match]
-                if not fila.empty:
-                    correo = fila['Correo Institucional'].values[0]
-                    if tipo_correo == "docente":
-                        servicio = extraer_servicios(pdf_path)
-                        mapeo[nombre_extraido] = {
-                            "pdf_path": pdf_path,
-                            "nombre": mejor_match,
-                            "correo": correo,
-                            "servicio": servicio
-                        }
-                    else:
-                        mapeo[nombre_extraido] = {
-                            "pdf_path": pdf_path,
-                            "nombre": mejor_match,
-                            "correo": correo
-                        }
+        resultado = process.extractOne(nombre_extraido, nombres_excel)
+        if resultado and resultado[1] >= 80:
+            mejor_match = resultado[0]
+            fila = df[df['Docente'] == mejor_match]
+            if not fila.empty:
+                correo = fila['Correo Institucional'].values[0]
+                datos = {
+                    "pdf_path": pdf_path,
+                    "nombre": mejor_match,
+                    "correo": correo
+                }
+                
+                if incluir_servicio:
+                    datos["servicio"] = extraer_servicios(pdf_path)
+                    
+                mapeo[nombre_extraido] = datos
     
     return mapeo
 
-def procesar_correos_docente(ruta_excel, hoja, lista_pdfs):
+def _procesar_correos_base(ruta_excel, hoja, lista_pdfs, incluir_servicio=True, debug=False):
+    """Función base para procesar correos (unifica lógica para docentes y administrativos)"""
     df = pd.read_excel(ruta_excel, sheet_name=hoja)
     df.columns = df.columns.str.strip()
 
-    # Asegurar que la columna 'Docente' exista
     if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
         raise ValueError("El Excel debe contener columnas 'Docente' y 'Correo Institucional'.")
 
     nombres_excel = df['Docente'].astype(str).tolist()
-
-    # Crear mapeo fuzzy una sola vez
-    mapeo_correos = crear_mapeo_correos(lista_pdfs, nombres_excel, df, "docente")
+    mapeo_correos = _crear_mapeo_correos(lista_pdfs, nombres_excel, df, incluir_servicio, debug)
 
     resultados = []
     for pdf_path in lista_pdfs:
-        nombre_docente = extraer_nombre(pdf_path)
-        if not nombre_docente:
+        nombre_encontrado = extraer_nombre(pdf_path, debug=debug)
+        if not nombre_encontrado:
             print(f"⚠ No se encontró nombre válido en {os.path.basename(pdf_path)}, omitido.")
             continue
 
-        if nombre_docente in mapeo_correos:
-            datos = mapeo_correos[nombre_docente]
-            if datos["servicio"]:
+        if nombre_encontrado in mapeo_correos:
+            datos = mapeo_correos[nombre_encontrado]
+            if not incluir_servicio or datos.get("servicio"):
                 resultados.append(datos)
-                print(f"{datos['nombre']} - {datos['correo']} - {datos['servicio']}")
-            else:
+                servicio_info = f" - {datos['servicio']}" if incluir_servicio else ""
+                print(f"{datos['nombre']} - {datos['correo']}{servicio_info}")
+            elif incluir_servicio:
                 print(f"⚠ No se encontró servicio para {datos['nombre']}.")
         else:
-            print(f"⚠ Coincidencia baja para '{nombre_docente}' (archivo: {os.path.basename(pdf_path)}), omitido.")
+            print(f"⚠ Coincidencia baja para '{nombre_encontrado}' (archivo: {os.path.basename(pdf_path)}), omitido.")
 
     return resultados
 
-def procesar_correos_administrativos(ruta_excel, hoja, lista_pdfs, debug=False):
-    df = pd.read_excel(ruta_excel, sheet_name=hoja)
-    df.columns = df.columns.str.strip()
+def procesar_correos_docente_gmail(ruta_excel, hoja, lista_pdfs):
+    """Procesa correos para docentes"""
+    try:
+        service = autenticar_gmail()
+    except Exception as e:
+        print(f"❌ Error autenticando con Gmail API: {e}")
+        return []
+    
+    return _procesar_correos_base(ruta_excel, hoja, lista_pdfs, incluir_servicio=True)
 
-    # Asegurar que la columna 'Docente' exista
-    if 'Docente' not in df.columns or 'Correo Institucional' not in df.columns:
-        raise ValueError("El Excel debe contener columnas 'Docente' y 'Correo Institucional'.")
+def procesar_correos_administrativos_gmail(ruta_excel, hoja, lista_pdfs, debug=False):
+    """Procesa correos para personal administrativo"""
+    try:
+        service = autenticar_gmail()
+    except Exception as e:
+        print(f"❌ Error autenticando con Gmail API: {e}")
+        return []
+    
+    return _procesar_correos_base(ruta_excel, hoja, lista_pdfs, incluir_servicio=False, debug=debug)
 
-    nombres_excel = df['Docente'].astype(str).tolist()
+def enviar_lote_desde_gui(data_para_envio, mes, tipo):
+    """Función unificada para enviar lotes de correos desde la GUI"""
+    service = autenticar_gmail()
+    
+    tipo_texto = "docentes" if tipo == "docente" else "personal administrativo"
+    print(f"\nEnviando {len(data_para_envio)} correos a {tipo_texto}...")
+    
+    for datos in data_para_envio:
+        servicio = datos.get("servicio") if tipo == "docente" else None
+        enviar_correo_personalizado(
+            service, 
+            datos["nombre"], 
+            datos["pdf_path"], 
+            datos["correo"], 
+            mes, 
+            tipo,
+            servicio
+        )
 
-    # Crear mapeo con debug
-    mapeo_correos = {}
-    for pdf_path in lista_pdfs:
-        nombre_extraido = extraer_nombre(pdf_path, debug=debug)
-        if not nombre_extraido:
-            continue
-            
-        if nombre_extraido not in mapeo_correos:
-            resultado = process.extractOne(nombre_extraido, nombres_excel)
-            if resultado and resultado[1] >= 80:
-                mejor_match = resultado[0]
-                fila = df[df['Docente'] == mejor_match]
-                if not fila.empty:
-                    correo = fila['Correo Institucional'].values[0]
-                    mapeo_correos[nombre_extraido] = {
-                        "pdf_path": pdf_path,
-                        "nombre": mejor_match,
-                        "correo": correo
-                    }
+# Funciones de compatibilidad para mantener la API existente
+def enviar_lote_desde_gui_docentes(data_para_envio, mes):
+    """Wrapper para mantener compatibilidad con código existente"""
+    enviar_lote_desde_gui(data_para_envio, mes, "docente")
 
-    resultados = []
-    for pdf_path in lista_pdfs:
-        nombre_administrativo = extraer_nombre(pdf_path, debug=debug)
-        if not nombre_administrativo:
-            print(f"⚠ No se encontró nombre válido en {os.path.basename(pdf_path)}, omitido.")
-            continue
+def enviar_lote_desde_gui_administrativos(data_para_envio, mes):
+    """Wrapper para mantener compatibilidad con código existente"""
+    enviar_lote_desde_gui(data_para_envio, mes, "administrativo")
 
-        if nombre_administrativo in mapeo_correos:
-            datos = mapeo_correos[nombre_administrativo]
-            resultados.append(datos)
-            print(f"{datos['nombre']} - {datos['correo']}")
-        else:
-            print(f"⚠ Coincidencia baja para '{nombre_administrativo}' (archivo: {os.path.basename(pdf_path)}), omitido.")
+# Funciones de conveniencia para migración desde SMTP
+def enviar_lote_docentes_gmail(ruta_excel, hoja, lista_pdfs, mes):
+    """Función completa para procesar y enviar correos a docentes"""
+    resultados = procesar_correos_docente_gmail(ruta_excel, hoja, lista_pdfs)
+    enviar_lote_desde_gui_docentes(resultados, mes)
 
-    return resultados
+def enviar_lote_administrativos_gmail(ruta_excel, hoja, lista_pdfs, mes):
+    """Función completa para procesar y enviar correos a personal administrativo"""
+    resultados = procesar_correos_administrativos_gmail(ruta_excel, hoja, lista_pdfs)
+    enviar_lote_desde_gui_administrativos(resultados, mes)
