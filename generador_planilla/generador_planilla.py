@@ -41,7 +41,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
 
         agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
-        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto)
+        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto, datos_docentes)
 
         TABLA = construir_tabla_planilla_con_cache(agrupar)
 
@@ -68,7 +68,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
             
             # Construir hoja Planilla_Generador usando datos ya procesados
             agrupar_gen = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto)
+            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto, datos_docentes)
 
             TABLA_GENERADOR = construir_tabla_planilla_con_cache(agrupar_gen)
             TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
@@ -98,7 +98,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 # Optimización: Reutilizar cálculos ya realizados en lugar de duplicar
                 # Esta operación es idéntica a agrupar_gen, el cache la detectará automáticamente
                 agrupar_consol = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-                agrupar_consol = agregar_examen_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto)
+                agrupar_consol = agregar_examen_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto, datos_docentes)
                 TABLA_CONSOLIDADA = construir_tabla_planilla_con_cache(agrupar_consol)
                 TABLA_CONSOLIDADA.to_excel(writer, sheet_name="Planilla consolidada", index=False)
         

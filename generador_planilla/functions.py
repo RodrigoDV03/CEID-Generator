@@ -313,7 +313,7 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     return agrupado
 
 
-def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
+def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos_docentes=None):
     if os.path.exists(ruta_clasificacion):
         try:
             # Usar cache para evitar lecturas múltiples
@@ -351,10 +351,50 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
             # Procesar los datos
             clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
             clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
-            df['docente_norm'] = df['Docente'].apply(normalizar_texto)
             
-            # Hacer el merge con la columna correcta
+            # Si ya existe la columna docente_norm en df, la usamos; sino la creamos
+            if 'docente_norm' not in df.columns:
+                df['docente_norm'] = df['Docente'].apply(normalizar_texto)
+            
+            # Hacer el merge con la columna correcta (left para mantener todos los de df)
             merge_result = df.merge(clasif_df[['docente_norm', columna_monto]], on='docente_norm', how='left')
+            
+            # NUEVA FUNCIONALIDAD: Agregar docentes del examen de clasificación que NO están en df
+            docentes_clasif_no_en_df = clasif_df[~clasif_df['docente_norm'].isin(df['docente_norm'])]
+            
+            if not docentes_clasif_no_en_df.empty and datos_docentes is not None:
+                print(f"📋 Agregando {len(docentes_clasif_no_en_df)} docentes del examen de clasificación sin carga académica...")
+                
+                # Para cada docente del examen que no está en df, crear una fila nueva
+                filas_nuevas = []
+                for _, row_clasif in docentes_clasif_no_en_df.iterrows():
+                    # Buscar información del docente en datos_docentes
+                    docente_info = datos_docentes[datos_docentes['Docente'].apply(normalizar_texto) == row_clasif['docente_norm']]
+                    
+                    if not docente_info.empty:
+                        docente_info = docente_info.iloc[0]
+                        nueva_fila = {
+                            'Docente': docente_info['Docente'],
+                            'Sede': docente_info['Sede'],
+                            'Categoria (Letra)': docente_info['Categoria (Letra)'],
+                            'Categoria (Monto)': docente_info['Categoria (Monto)'],
+                            'N°. Ruc': docente_info['N°. Ruc'],
+                            'Estado': docente_info['Estado'],
+                            'curso': '',  # Sin carga académica
+                            'cantidad_cursos': 0,
+                            'Curso Dictado': 0,
+                            'Diseño de Examenes': 0,
+                            'docente_norm': row_clasif['docente_norm'],
+                            columna_monto: row_clasif[columna_monto]
+                        }
+                        filas_nuevas.append(nueva_fila)
+                    else:
+                        print(f"⚠️ Docente '{row_clasif['Docente']}' del examen de clasificación no encontrado en datos_docentes")
+                
+                # Agregar las nuevas filas al resultado
+                if filas_nuevas:
+                    filas_nuevas_df = pd.DataFrame(filas_nuevas)
+                    merge_result = pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
             
             df = merge_result
             df['Examen Clasif.'] = df[columna_monto].fillna(0)
@@ -370,6 +410,22 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
 # --------------------------- CONSTRUCCIÓN DE TABLAS ---------------------------
 
 def construir_tabla_planilla(df):
+    # Asegurar que los campos necesarios existen y tienen valores por defecto
+    df = df.copy()
+    campos_requeridos = {
+        'curso': '',
+        'Curso Dictado': 0,
+        'cantidad_cursos': 0,
+        'Diseño de Examenes': 0,
+        'Examen Clasif.': 0
+    }
+    
+    for campo, valor_default in campos_requeridos.items():
+        if campo not in df.columns:
+            df[campo] = valor_default
+        else:
+            df[campo] = df[campo].fillna(valor_default)
+    
     tabla = pd.DataFrame({
         'N°': range(1, len(df) + 1),
         'Docente': df['Docente'],
@@ -387,6 +443,12 @@ def construir_tabla_planilla(df):
         'Estado': df['Estado']
     })
     tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + tabla['Examen Clasif.'])
+    
+    # Ordenar alfabéticamente por nombre de docente
+    tabla = tabla.sort_values('Docente').reset_index(drop=True)
+    # Reajustar la numeración después del ordenamiento
+    tabla['N°'] = range(1, len(tabla) + 1)
+    
     return tabla
 
 def construir_tabla_carga_academica(datos, estado_planilla):
