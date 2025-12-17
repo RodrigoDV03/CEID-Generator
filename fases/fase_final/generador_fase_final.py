@@ -38,14 +38,16 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
     if tipo_fase_final == "administrativo":
         descripcion_final = descripcion
     else:
-        if clasif_valor == 0:
+        if disenio_cant_horas == 0:
+            descripcion_final = f"{descripcion}"   
+        elif clasif_valor == 0:
             descripcion_final = f"{descripcion} y {horas_disenio}"
         else:
             descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
-
+    
     monto_categoria_letras = monto_a_letras(categoria_valor)
     monto_total = getattr(fila, "Total_pago", 0)
-    monto_total_letras = monto_a_letras(monto_total)
+    monto_total_letras = monto_a_letras(monto_total) 
     nro_contrato_val = getattr(fila, "Nro_Contrato", "")
     
     try:

@@ -52,10 +52,34 @@ def redactar_cursos(cadena):
     cursos = [c.strip() for c in cadena.split("/") if c.strip()]
     if not cursos:
         return "N/A"
-    resultado = f"servicio de dictado de 28 horas de clases de {cursos[0]}"
-    for curso in cursos[1:]:
-        resultado += f", 28 horas de clases de {curso}"
-    return resultado
+    
+    elementos_descripcion = []
+    
+    for curso in cursos:
+        # Detectar si es el servicio de actualización de materiales
+        if "Servicio de actualización de materiales de enseñanza" in curso:
+            # Para el servicio de actualización, usar el texto tal como viene (sin agregar "28 horas de clases")
+            elementos_descripcion.append(curso.strip())
+        else:
+            # Para cursos académicos normales, agregar el formato tradicional
+            elementos_descripcion.append(f"28 horas de clases de {curso}")
+    
+    # Unir todos los elementos
+    if len(elementos_descripcion) == 1:
+        # Si solo hay un elemento y es el servicio de actualización, no agregar nada más
+        if "Servicio de actualización de materiales de enseñanza" in elementos_descripcion[0]:
+            return elementos_descripcion[0]
+        else:
+            return f"servicio de dictado de {elementos_descripcion[0]}"
+    elif len(elementos_descripcion) == 2:
+        # Si hay servicio de actualización como segundo elemento, usar coma
+        if "Servicio de actualización de materiales de enseñanza" in elementos_descripcion[1]:
+            return f"servicio de dictado de {elementos_descripcion[0]}, {elementos_descripcion[1].lower()}"
+        else:
+            return f"servicio de dictado de {elementos_descripcion[0]}, {elementos_descripcion[1]}"
+    else:
+        # Si hay más de 2 elementos, usar solo comas
+        return f"servicio de dictado de {', '.join(elementos_descripcion)}"
 
 def ruta_absoluta_relativa(path_relativo):
     if getattr(sys, 'frozen', False):
@@ -99,3 +123,14 @@ def formato_soles(valor):
         return f"S/ {float(valor):,.2f}"
     except Exception:
         return f"S/ {valor}"
+    
+def generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras):
+    if servicio_actualizacion > 0:
+        if monto_sin_actualizacion == 0:
+            return f""" S/. {servicio_actualizacion:,.2f} ({servicio_actualizacion_letras}) por servicio de actualización de materiales de enseñanza. Incluye el impuesto y la contribución de ley"""
+        else:
+            return f"""S/. {monto_sin_actualizacion:,.2f} ({monto_sin_actualizacion_letras}).
+S/. {servicio_actualizacion:,.2f} ({servicio_actualizacion_letras}) por servicio de actualización de materiales de enseñanza.
+Monto total: S/. {monto_total:,.2f} ({monto_total_letras}). Incluye el impuesto y la contribución de ley"""
+    else:
+        return f"S/. {monto_total:,.2f} ({monto_total_letras}). Incluye el impuesto y la contribución de ley"

@@ -44,6 +44,10 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         disenio_cant_horas = disenio_examenes / categoria_valor
         horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
         clasif_valor = int(getattr(fila, "Examen_clasif", 0))
+        
+        # NUEVO: Agregar servicio de actualización
+        servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
+        
         direccion = str(getattr(fila, "Domicilio_docente", '')).strip()
         correo = str(getattr(fila, "Correo_personal", ''))
         celular = limpiar_numero(getattr(fila, "Numero_celular", ""))
@@ -61,8 +65,10 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
 
         if tipo_fase_inicial == "administrativo":
             descripcion_final = f"{descripcion}"
-        else:   
-            if clasif_valor == 0:
+        else:
+            if disenio_cant_horas == 0:
+                descripcion_final = f"{descripcion}"   
+            elif clasif_valor == 0:
                 descripcion_final = f"{descripcion} y {horas_disenio}"
             else:
                 descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
@@ -70,6 +76,25 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         monto_categoria_letras = monto_a_letras(categoria_valor)
         monto_total = getattr(fila, "Total_pago", 0)
         monto_total_letras = monto_a_letras(monto_total)
+        
+        # NUEVO: Cálcular montos para el formato del monto referencial
+        monto_sin_actualizacion = monto_total - servicio_actualizacion
+        monto_sin_actualizacion_letras = monto_a_letras(monto_sin_actualizacion)
+        servicio_actualizacion_letras = monto_a_letras(servicio_actualizacion)
+
+        # NUEVO: Generar actividades_docentes
+        actividades_base = "• Dictar clases, preparar las clases, evaluar a los alumnos, diseñar exámenes, entregar notas y presentar informe de dictado de curso."
+        actividades_adicionales = ("• Revisar y actualizar los materiales de enseñanza conforme a los planes de estudio "
+                                        "vigentes.\n• Elaborar y mejorar materiales didácticos y recursos pedagógicos para clases presenciales y "
+                                        "virtuales.\n• Actualizar instrumentos de evaluación (exámenes y prácticas).")
+        
+        if servicio_actualizacion > 0 and monto_sin_actualizacion > 0:
+            actividades_docentes = f"{actividades_base}\n{actividades_adicionales}"
+        elif servicio_actualizacion > 0 and monto_sin_actualizacion == 0:
+            actividades_docentes = actividades_adicionales
+        else:
+            actividades_docentes = actividades_base
+        
         tipo_contrato = getattr(fila, "Estado_docente", "N/A")
         nro_contrato_val = getattr(fila, "Nro_Contrato", "N/A")
         try:
@@ -124,8 +149,9 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
 
             reemplazos_tdr = {
                 "descripcion": descripcion_final,
+                "actividades_docentes": actividades_docentes,
                 "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
+                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras),
                 "modalidad_servicio": modalidad_servicio,
             }
 
@@ -139,8 +165,9 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                     "experiencia_laboral": experiencia_laboral,
                     "requisitos_adicional": requisitos_adi,
                     "actividades_admin": actividades_admin,
+                    "actividades_docentes": actividades_docentes,
                     "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                    "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
+                    "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras),
                     "modalidad_servicio": modalidad_servicio
                 }
 
@@ -170,18 +197,37 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
             ruta_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
 
             if tipo_fase_inicial != "administrativo":
-                actividades_admin = """-	Dictar clases
-    -	Preparar las clases
-    -	Evaluar a los alumnos
-    -	Diseñar exámenes
-    -	Entregar acta de nota
-    -	Presentar informe de dictado de curso
-    """
+                if servicio_actualizacion > 0 and monto_sin_actualizacion > 0:
+                    actividades_admin = """-	Dictar clases.
+-	Preparar las clases.
+-	Evaluar a los alumnos.
+-	Diseñar exámenes.
+-	Entregar acta de nota.
+-	Presentar informe de dictado de curso.
+-   Revisar y actualizar los materiales de enseñanza conforme a los planes de estudio vigentes.
+-   Elaborar y mejorar materiales didácticos y recursos pedagógicos para clases presenciales y virtuales.
+-   Actualizar instrumentos de evaluación (exámenes y prácticas).
+"""
+                elif servicio_actualizacion > 0 and monto_sin_actualizacion == 0:
+                    actividades_admin = """-	Revisar y actualizar los materiales de enseñanza conforme a los planes de estudio vigentes.
+-	Elaborar y mejorar materiales didácticos y recursos pedagógicos para clases presenciales y virtuales.
+-	Actualizar instrumentos de evaluación (exámenes y prácticas).
+"""
+                else:
+                    actividades_admin = """-	Dictar clases.
+-	Preparar las clases.
+-	Evaluar a los alumnos.
+-	Diseñar exámenes.
+-	Entregar acta de nota.
+-	Presentar informe de dictado de curso.
+"""
                 ruta_firma = ruta_absoluta_relativa(f'firmas_docentes/{nombre_docente}.png')
             else:
                 ruta_firma = ruta_absoluta_relativa(f'firmas_admin/{nombre_docente}.png')
 
 
+            
+            
             reemplazos = {
                 "nombre_docente": docente,
                 "direccion_cot": f"Dirección: {direccion}",
@@ -191,7 +237,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "descripcion_servicio": descripcion_final,
                 "actividades_admin": actividades_admin,
                 "categoria_monto": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
+                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras) if servicio_actualizacion > 0 else f"S/. {monto_total:,.2f} ({monto_total_letras})",
                 "dni_cot": f"DNI: {dni_docente}",
                 "modalidad_servicio": modalidad_servicio,
             }

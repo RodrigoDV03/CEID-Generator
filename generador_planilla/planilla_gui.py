@@ -9,6 +9,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""
     archivo_docentes_path = ""
     archivo_clasif_path = ""
+    archivo_coordinacion_path = ""  # Nueva variable
     archivo_planilla_anterior_path = ""
 
     ctk.set_appearance_mode("light")
@@ -98,17 +99,27 @@ def iniciar_interfaz_planilla(callback_volver=None):
     def actualizar_cursos(path): nonlocal archivo_cursos_path; archivo_cursos_path = path
     def actualizar_docentes(path): nonlocal archivo_docentes_path; archivo_docentes_path = path
     def actualizar_clasif(path): nonlocal archivo_clasif_path; archivo_clasif_path = path
+    def actualizar_coordinacion(path): nonlocal archivo_coordinacion_path; archivo_coordinacion_path = path  # Nueva función
 
     crear_selector_archivo(card, "Adjunte el archivo de la data de cursos del mes", ("Archivos CSV", "*.csv"), actualizar_cursos)
     crear_selector_archivo(card, "Adjunte el archivo de la lista de docentes", ("Archivos Excel", "*.xlsx *.xls"), actualizar_docentes)
     crear_selector_archivo(card, "Adjunte el archivo de Examen de Clasificación", ("Archivos Excel", "*.xlsx *.xls"), actualizar_clasif)
+    crear_selector_archivo(card, "Adjunte el archivo de Coordinación (Actualización de Materiales)", ("Archivos Excel", "*.xlsx *.xls"), actualizar_coordinacion)  # Nueva línea
 
     # ---------------- BOTÓN DE PROCESAR ----------------
     def procesar():
         if not archivo_cursos_path or not archivo_docentes_path or not archivo_clasif_path:
-            messagebox.showerror("Faltan archivos", "⚠️ Debes seleccionar los tres archivos requeridos.")
+            messagebox.showerror("Faltan archivos", "⚠️ Debes seleccionar al menos: cursos, docentes y examen de clasificación.")
             return
-        resultado = generar_planilla(archivo_cursos_path, archivo_docentes_path, archivo_clasif_path, mes_var.get(), carga_var.get(), archivo_planilla_anterior_path if carga_var.get()==2 else None)
+        resultado = generar_planilla(
+            archivo_cursos_path, 
+            archivo_docentes_path, 
+            archivo_clasif_path, 
+            archivo_coordinacion_path,  # Nuevo parámetro
+            mes_var.get(), 
+            carga_var.get(), 
+            archivo_planilla_anterior_path if carga_var.get()==2 else None
+        )
         if resultado.startswith("Error"):
             messagebox.showerror("Error", resultado)
         else:

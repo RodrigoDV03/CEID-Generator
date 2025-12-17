@@ -62,7 +62,7 @@ def aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla=
         celda_total.fill = header_fill
 
         # Columnas a sumar - aplicar en lote
-        columnas_sumar = ['H', 'I', 'J', 'K', 'L', 'M']
+        columnas_sumar = ['H', 'I', 'J', 'K', 'L', 'M', 'N']
         
         for col in columnas_sumar:
             celda = ws[f"{col}{fila_total}"]
@@ -71,7 +71,7 @@ def aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla=
             celda.alignment = center_alignment
             celda.border = thin_border
 
-        columnas_moneda = ['E', 'H', 'K', 'L', 'M']
+        columnas_moneda = ['E', 'H', 'K', 'L', 'M', 'N']
         
         for col in columnas_moneda:
             # Aplicar formato a todo el rango de una vez
