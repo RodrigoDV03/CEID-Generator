@@ -21,11 +21,7 @@ from googleapiclient.errors import HttpError
 año_actual = datetime.datetime.now().year
 
 PALABRAS_PROHIBIDAS = {
-    "SERVICIO", "SERVICIOSERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS",
-    "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "COORDINACION", "ATENCION",
-    "DIGITACION", "CLASIFICACION", "DESCRIPCION", "EVALUACION", "SOLICITUDES",
-    "RECEPCION", "ARCHIVO", "VISITAS", "DE", "LA", "Y", "EN", "MES", "DIA", "AÑO",
-    "ADJUDICACION", "PROCESO", "SIN", "ADQUISICION", "ORDEN"
+    "SERVICIO", "SERVICIOSERVICIO", "CEID", "FACULTAD", "LETRAS", "CIENCIAS", "HUMANAS", "UNMSM", "BAJO", "MODALIDAD", "COORDINACION", "ATENCION", "DIGITACION", "CLASIFICACION", "DESCRIPCION", "EVALUACION", "SOLICITUDES", "RECEPCION", "ARCHIVO", "VISITAS", "DE", "LA", "Y", "EN", "MES", "DIA", "AÑO", "ADJUDICACION", "PROCESO", "SIN", "ADQUISICION", "ORDEN", "LIMA", "INDUSTRIAL", "INT", "URB", "URBANIZACION", "AVENIDA", "AV", "CALLE", "CAL", "JR", "JIRON", "MZ", "LOTE", "DISTRITO", "PROVINCIA", "DEPARTAMENTO", "CALLAO", "ANCON", "SAN", "JUAN", "MARTIN", "PARQUE", "ALAMEDA", "PSJ", "PASAJE"
 }
 
 # Configuración de Gmail API
@@ -226,41 +222,79 @@ def extraer_nombre(pdf_path, debug=False):
     
     return None
 
-def extraer_servicios(pdf_path):
+def extraer_servicios(pdf_path, debug=False):
     reader = PdfReader(pdf_path)
     texto = ""
-
+    
+    # Extraer todo el texto
     for pagina in reader.pages:
         texto += pagina.extract_text() + "\n"
-
+    
     lineas = texto.splitlines()
-
-    # Buscar índice de inicio de la tabla
+    
+    # Buscar la línea que contiene "Código Unid. Med. Descripción"
     idx_inicio = None
     for i, linea in enumerate(lineas):
         if "Código Unid. Med." in linea and "Descripción" in linea:
             idx_inicio = i
             break
-
+    
     if idx_inicio is None:
+        if debug:
+            print("⚠️ No se encontró la línea 'Código Unid. Med. Descripción'")
         return None
-
-    patron = re.compile(r"^\d{1,2}\s*horas\s+de\s+.*", re.IGNORECASE)
-
-    horas = []
-    for linea in lineas[idx_inicio:]:
-        if patron.match(linea.strip()):
-            horas.append(re.sub(r"\s+", " ", linea.strip()))
-        elif horas:
+    
+    # Patrones para identificar líneas de servicio
+    patron_horas = re.compile(r"^\d{1,2}\s+horas\s+de\s+.+", re.IGNORECASE)
+    patron_servicio = re.compile(r"^servicio\s+de\s+.+", re.IGNORECASE)
+    
+    # Palabras/frases que indican el fin de los servicios
+    palabras_fin = ["BAJO LA MODALIDAD", "OFICIO", "***"]
+    
+    servicios = []
+    capturando = False
+    
+    # Empezar a buscar desde la línea después de "Código Unid. Med. Descripción"
+    for i in range(idx_inicio + 1, len(lineas)):
+        linea = lineas[i].strip()
+        
+        # Si la línea está vacía, continuar
+        if not linea:
+            continue
+        
+        # Si encontramos una palabra de fin, detener
+        if any(palabra in linea for palabra in palabras_fin):
             break
-
-    if not horas:
+        
+        # Saltar líneas que son códigos o encabezados
+        if linea.startswith("071100") or "SERVICIO DE DICTADO DE CURSO" in linea.upper():
+            capturando = True
+            continue
+        
+        # Si estamos en la sección de captura, buscar líneas de servicio
+        if capturando:
+            if patron_horas.match(linea) or patron_servicio.match(linea):
+                servicios.append(linea)
+                if debug:
+                    print(f"✓ Capturado: {linea}")
+    
+    if debug:
+        print(f"\nTotal de servicios encontrados: {len(servicios)}")
+    
+    # Si no hay servicios, retornar None
+    if not servicios:
         return None
-
-    if len(horas) > 1:
-        return ", ".join(horas[:-1]) + " y " + horas[-1]
+    
+    # Formatear los servicios como texto con comas y "y" antes del último
+    if len(servicios) > 1:
+        servicios_formateados = ", ".join(servicios[:-1]) + " y " + servicios[-1]
     else:
-        return horas[0]
+        servicios_formateados = servicios[0]
+    
+    if debug:
+        print(f"\n📝 Texto formateado:\n{servicios_formateados}")
+    
+    return servicios_formateados
 
 def crear_mensaje_gmail_con_firma(service, destinatario: str, asunto: str, cuerpo_html: str, pdf_path: str) -> dict:
     try:
