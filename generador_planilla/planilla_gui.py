@@ -9,6 +9,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
     archivo_cursos_path = ""
     archivo_docentes_path = ""
     archivo_clasif_path = ""
+    archivo_coordinacion_path = ""  # Nueva variable
     archivo_planilla_anterior_path = ""
 
     ctk.set_appearance_mode("light")
@@ -21,6 +22,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     carga_var = ctk.IntVar(value=1)
+    monto_bono_var = ctk.DoubleVar(value=0)
 
     # --- Header ---
     titulo(root, "Generador de Planilla - CEID")
@@ -72,6 +74,31 @@ def iniciar_interfaz_planilla(callback_volver=None):
     carga_var.trace_add("write", actualizar_visibilidad_planilla_anterior)
     actualizar_visibilidad_planilla_anterior()
 
+    # ---------------- SECCIÓN: Monto Bono (solo para enero) ----------------
+    marco_bono = ctk.CTkFrame(card, fg_color="transparent")
+    
+    seccion_bono_titulo = ctk.CTkLabel(marco_bono, text="Monto del Bono", font=FONT_SECTION, text_color=WHITE_COLOR)
+    seccion_bono_titulo.pack(anchor="w", pady=(0, 5))
+    
+    marco_bono_input = ctk.CTkFrame(marco_bono, fg_color="transparent")
+    marco_bono_input.pack(fill="x")
+    
+    ctk.CTkLabel(marco_bono_input, text="Ingrese el monto del bono:", text_color=WHITE_COLOR).pack(side="left", padx=10)
+    
+    entry_bono = ctk.CTkEntry(marco_bono_input, textvariable=monto_bono_var, width=200, 
+                               placeholder_text="Ej: 500.00")
+    entry_bono.pack(side="left", padx=10)
+    
+    def actualizar_visibilidad_bono(*args):
+        if mes_var.get() == "Enero":
+            marco_bono.pack(fill="x", padx=30, pady=10)
+        else:
+            marco_bono.pack_forget()
+            monto_bono_var.set(0)
+    
+    mes_var.trace_add("write", actualizar_visibilidad_bono)
+    actualizar_visibilidad_bono()
+
     # ---------------- SECCIÓN: Archivos ----------------
     def crear_selector_archivo(master, texto_label, extensiones, actualizar_func):
         frame = ctk.CTkFrame(master, fg_color="transparent")
@@ -98,17 +125,40 @@ def iniciar_interfaz_planilla(callback_volver=None):
     def actualizar_cursos(path): nonlocal archivo_cursos_path; archivo_cursos_path = path
     def actualizar_docentes(path): nonlocal archivo_docentes_path; archivo_docentes_path = path
     def actualizar_clasif(path): nonlocal archivo_clasif_path; archivo_clasif_path = path
+    def actualizar_coordinacion(path): nonlocal archivo_coordinacion_path; archivo_coordinacion_path = path  # Nueva función
 
     crear_selector_archivo(card, "Adjunte el archivo de la data de cursos del mes", ("Archivos CSV", "*.csv"), actualizar_cursos)
     crear_selector_archivo(card, "Adjunte el archivo de la lista de docentes", ("Archivos Excel", "*.xlsx *.xls"), actualizar_docentes)
     crear_selector_archivo(card, "Adjunte el archivo de Examen de Clasificación", ("Archivos Excel", "*.xlsx *.xls"), actualizar_clasif)
+    crear_selector_archivo(card, "Adjunte el archivo de Coordinación (Actualización de Materiales)", ("Archivos Excel", "*.xlsx *.xls"), actualizar_coordinacion)  # Nueva línea
 
     # ---------------- BOTÓN DE PROCESAR ----------------
     def procesar():
         if not archivo_cursos_path or not archivo_docentes_path or not archivo_clasif_path:
-            messagebox.showerror("Faltan archivos", "⚠️ Debes seleccionar los tres archivos requeridos.")
+            messagebox.showerror("Faltan archivos", "⚠️ Debes seleccionar al menos: cursos, docentes y examen de clasificación.")
             return
-        resultado = generar_planilla(archivo_cursos_path, archivo_docentes_path, archivo_clasif_path, mes_var.get(), carga_var.get(), archivo_planilla_anterior_path if carga_var.get()==2 else None)
+        
+        # Validar monto del bono si es enero
+        if mes_var.get() == "Enero":
+            try:
+                monto = monto_bono_var.get()
+                if monto < 0:
+                    messagebox.showerror("Error", "⚠️ El monto del bono no puede ser negativo.")
+                    return
+            except:
+                messagebox.showerror("Error", "⚠️ El monto del bono debe ser un número válido.")
+                return
+        
+        resultado = generar_planilla(
+            archivo_cursos_path, 
+            archivo_docentes_path, 
+            archivo_clasif_path, 
+            archivo_coordinacion_path,  # Nuevo parámetro
+            mes_var.get(), 
+            carga_var.get(), 
+            archivo_planilla_anterior_path if carga_var.get()==2 else None,
+            monto_bono_var.get()  # Nuevo parámetro para el bono
+        )
         if resultado.startswith("Error"):
             messagebox.showerror("Error", resultado)
         else:

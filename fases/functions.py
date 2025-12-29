@@ -46,16 +46,44 @@ def monto_a_letras(monto):
     except Exception:
         return "N/A"
 
-def redactar_cursos(cadena):
+def redactar_cursos(cadena, tiene_bono=False):
     if not isinstance(cadena, str):
         return "N/A"
     cursos = [c.strip() for c in cadena.split("/") if c.strip()]
     if not cursos:
         return "N/A"
-    resultado = f"servicio de dictado de 28 horas de clases de {cursos[0]}"
-    for curso in cursos[1:]:
-        resultado += f", 28 horas de clases de {curso}"
-    return resultado
+    
+    elementos_descripcion = []
+    
+    for curso in cursos:
+        # Detectar si es el servicio de actualización de materiales
+        if "Servicio de actualización de materiales de enseñanza" in curso:
+            # Para el servicio de actualización, usar el texto tal como viene (sin agregar "28 horas de clases")
+            elementos_descripcion.append(curso.strip())
+        else:
+            # Para cursos académicos normales, agregar el formato tradicional
+            elementos_descripcion.append(f"28 horas de clases de {curso}")
+    
+    # Agregar el bono al final si existe
+    if tiene_bono:
+        elementos_descripcion.append("servicio de diseño y evaluación del examen anual")
+    
+    # Unir todos los elementos
+    if len(elementos_descripcion) == 1:
+        # Si solo hay un elemento y es el servicio de actualización o bono, no agregar nada más
+        if "Servicio de actualización de materiales de enseñanza" in elementos_descripcion[0] or "servicio de diseño y evaluación del examen anual" in elementos_descripcion[0]:
+            return elementos_descripcion[0]
+        else:
+            return f"servicio de dictado de {elementos_descripcion[0]}"
+    elif len(elementos_descripcion) == 2:
+        # Si hay servicio de actualización o bono como segundo elemento, usar coma
+        if "Servicio de actualización de materiales de enseñanza" in elementos_descripcion[1] or "servicio de diseño y evaluación del examen anual" in elementos_descripcion[1]:
+            return f"servicio de dictado de {elementos_descripcion[0]}, {elementos_descripcion[1].lower()}"
+        else:
+            return f"servicio de dictado de {elementos_descripcion[0]}, {elementos_descripcion[1]}"
+    else:
+        # Si hay más de 2 elementos, usar solo comas
+        return f"servicio de dictado de {', '.join(elementos_descripcion)}"
 
 def ruta_absoluta_relativa(path_relativo):
     if getattr(sys, 'frozen', False):
@@ -99,3 +127,31 @@ def formato_soles(valor):
         return f"S/ {float(valor):,.2f}"
     except Exception:
         return f"S/ {valor}"
+    
+def generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono, bono_letras, monto_total, monto_total_letras):
+    lineas = []
+    
+    # Agregar monto base si existe
+    if monto_sin_actualizacion > 0:
+        lineas.append(f"S/. {monto_sin_actualizacion:,.2f} ({monto_sin_actualizacion_letras}).")
+    
+    # Agregar servicio de actualización si existe
+    if servicio_actualizacion > 0:
+        lineas.append(f"S/. {servicio_actualizacion:,.2f} ({servicio_actualizacion_letras}) por servicio de actualización de materiales de enseñanza.")
+    
+    # Agregar bono si existe
+    if bono > 0:
+        lineas.append(f"S/. {bono:,.2f} ({bono_letras}) por servicio de diseño y evaluación del examen anual.")
+    
+    # Si hay más de un concepto, agregar el monto total
+    if len(lineas) > 1:
+        lineas.append(f"Monto total: S/. {monto_total:,.2f} ({monto_total_letras}). Incluye el impuesto y la contribución de ley")
+    else:
+        # Si solo hay un concepto, solo agregar la nota de impuestos
+        lineas.append(f"Incluye el impuesto y la contribución de ley")
+        lineas_texto = lineas[0]
+        if not lineas_texto.endswith("."):
+            lineas_texto += "."
+        return lineas_texto.replace(".", ". Incluye el impuesto y la contribución de ley", 1)
+    
+    return "\n".join(lineas)

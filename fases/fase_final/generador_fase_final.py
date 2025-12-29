@@ -19,10 +19,15 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
 
     ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
     descripcion_raw = str(getattr(fila, "Curso", ""))
+    
+    # Leer servicio de actualización y bono
+    servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
+    bono = float(getattr(fila, "Bono", 0))
+    
     if tipo_fase_final == "administrativo":
         descripcion = str(getattr(fila, "Curso", "N/A"))
     else:
-        descripcion = redactar_cursos(descripcion_raw)
+        descripcion = redactar_cursos(descripcion_raw, tiene_bono=(bono > 0))
     disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
     disenio_cant_horas = disenio_examenes / categoria_valor
     horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
@@ -38,14 +43,16 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
     if tipo_fase_final == "administrativo":
         descripcion_final = descripcion
     else:
-        if clasif_valor == 0:
+        if disenio_cant_horas == 0:
+            descripcion_final = f"{descripcion}"   
+        elif clasif_valor == 0:
             descripcion_final = f"{descripcion} y {horas_disenio}"
         else:
             descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
-
+    
     monto_categoria_letras = monto_a_letras(categoria_valor)
     monto_total = getattr(fila, "Total_pago", 0)
-    monto_total_letras = monto_a_letras(monto_total)
+    monto_total_letras = monto_a_letras(monto_total) 
     nro_contrato_val = getattr(fila, "Nro_Contrato", "")
     
     try:

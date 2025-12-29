@@ -313,7 +313,186 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     return agrupado
 
 
-def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
+def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos_docentes=None):
+    if not os.path.exists(ruta_coordinacion):
+        df['Servicio Actualización'] = 0
+        return df
+    
+    try:
+        # Leer el archivo Excel
+        coordinacion_df = cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
+        
+        # Detectar automáticamente las columnas importantes
+        columna_docente = None
+        columna_horas = None
+        
+        print(f"🔍 Columnas disponibles en archivo: {list(coordinacion_df.columns)}")
+        
+        # Buscar columna de docente de manera más flexible
+        for col in coordinacion_df.columns:
+            col_lower = str(col).lower().strip()
+            if any(patron in col_lower for patron in ['docente', 'profesor', 'teacher', 'instructor']):
+                columna_docente = col
+                print(f"✅ Columna de docente encontrada: '{col}'")
+                break
+        
+        if columna_docente is None:
+            print("⚠️ No se encontró columna de docente en archivo de coordinación")
+            print(f"Columnas disponibles: {list(coordinacion_df.columns)}")
+            df['Servicio Actualización'] = 0
+            return df
+        
+        # Buscar columna de horas de manera más flexible - PRIORIDAD A HORAS TOTALES
+        prioridad_horas = [
+            'horas totales', 'horas_totales', 'total', 'totales',  # Máxima prioridad
+            'hora total', 'total horas', 'total_horas',
+            'horas', 'hora', 'hour', 'tiempo', 'time',  # Prioridad media
+            'horas semanales', 'horas_semanales', 'semanal'  # Menor prioridad
+        ]
+        
+        for patron in prioridad_horas:
+            for col in coordinacion_df.columns:
+                col_lower = str(col).lower().strip()
+                if patron in col_lower:
+                    columna_horas = col
+                    print(f"✅ Columna de horas encontrada: '{col}'")
+                    break
+            if columna_horas:  # Si encontró una columna, salir del loop externo
+                break
+        
+        if columna_horas is None:
+            print("⚠️ No se encontró columna de horas en archivo de coordinación")
+            print(f"Columnas disponibles: {list(coordinacion_df.columns)}")
+            df['Servicio Actualización'] = 0
+            return df
+        
+        
+        # Limpiar y procesar datos - REMOVER NaN Y VALORES VACÍOS
+        coordinacion_df = coordinacion_df.dropna(subset=[columna_docente, columna_horas])
+        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.strip() != '']
+        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.lower() != 'nan']
+        
+        coordinacion_df[columna_docente] = coordinacion_df[columna_docente].astype(str).str.strip()
+        
+        # EXTRAER SOLO LOS NÚMEROS DE LA COLUMNA DE HORAS (ej: "32 horas" -> 32)
+        def extraer_numero_horas(texto):
+            import re
+            if pd.isna(texto):
+                return 0
+            # Buscar el primer número en el texto
+            numeros = re.findall(r'\d+', str(texto))
+            return int(numeros[0]) if numeros else 0
+        
+        coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
+        
+        # Agrupar por docente (sumar horas si aparece múltiples veces)
+        coordinacion_agrupado = coordinacion_df.groupby(columna_docente)[columna_horas].sum().reset_index()
+        coordinacion_agrupado.columns = ['Docente_Original', 'Horas_Total']
+        
+        # Aplicar normalización para matching
+        coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
+        
+        # Si datos_docentes está disponible, calcular montos por categoría
+        if datos_docentes is not None:
+            # Normalizar nombres en datos_docentes también
+            datos_docentes_temp = datos_docentes.copy()
+            datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
+            
+            # Hacer merge con datos_docentes para obtener categoría
+            coordinacion_con_categoria = coordinacion_agrupado.merge(
+                datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Monto)']],
+                on='docente_norm', how='left'
+            )
+            
+            # Calcular monto: Horas * Categoria (Monto) * 1 (tarifa base por hora de coordinación)
+            coordinacion_con_categoria['Monto_Coordinacion'] = (
+                coordinacion_con_categoria['Horas_Total'] * 
+                coordinacion_con_categoria['Categoria (Monto)'].fillna(0)
+            )
+            
+            # Usar el nombre corregido del merge
+            coordinacion_con_categoria['Docente_Correcto'] = coordinacion_con_categoria['Docente'].fillna(
+                coordinacion_con_categoria['Docente_Original']
+            )
+            
+        else:
+            # Si no hay datos_docentes, usar un monto fijo por hora
+            coordinacion_con_categoria = coordinacion_agrupado.copy()
+            coordinacion_con_categoria['Monto_Coordinacion'] = coordinacion_agrupado['Horas_Total'] * 50  # Monto fijo
+            coordinacion_con_categoria['Docente_Correcto'] = coordinacion_agrupado['Docente_Original']
+        
+        # Preparar datos para merge con df principal
+        coordinacion_final = coordinacion_con_categoria[['docente_norm', 'Monto_Coordinacion', 'Horas_Total', 'Docente_Correcto']].copy()
+        
+        # Si df no tiene docente_norm, crearlo
+        if 'docente_norm' not in df.columns:
+            df['docente_norm'] = df['Docente'].apply(normalizar_texto)
+        
+        # Hacer merge con df principal
+        merge_result = df.merge(coordinacion_final, on='docente_norm', how='left')
+        
+        # AGREGAR DOCENTES DE COORDINACIÓN QUE NO ESTÁN EN DF (similar a examen clasificación)
+        docentes_coord_no_en_df = coordinacion_final[~coordinacion_final['docente_norm'].isin(df['docente_norm'])]
+        
+        if not docentes_coord_no_en_df.empty and datos_docentes is not None:
+            
+            filas_nuevas = []
+            for _, row_coord in docentes_coord_no_en_df.iterrows():
+                # VALIDAR QUE EL DOCENTE NO SEA VACÍO O NaN
+                if pd.isna(row_coord['Docente_Correcto']) or str(row_coord['Docente_Correcto']).strip() == '' or str(row_coord['Docente_Correcto']).lower() == 'nan':
+                    continue
+                
+                # Buscar información del docente en datos_docentes
+                docente_info = datos_docentes[datos_docentes['Docente'].apply(normalizar_texto) == row_coord['docente_norm']]
+                
+                if not docente_info.empty:
+                    docente_info = docente_info.iloc[0]
+                    nueva_fila = {
+                        'Docente': docente_info['Docente'],
+                        'Sede': docente_info['Sede'],
+                        'Categoria (Letra)': docente_info['Categoria (Letra)'],
+                        'Categoria (Monto)': docente_info['Categoria (Monto)'],
+                        'N°. Ruc': docente_info['N°. Ruc'],
+                        'Estado': docente_info['Estado'],
+                        'curso': '',  # Sin carga académica
+                        'cantidad_cursos': 0,
+                        'Curso Dictado': 0,
+                        'Diseño de Examenes': 0,
+                        'Examen Clasif.': 0,
+                        'docente_norm': row_coord['docente_norm'],
+                        'Monto_Coordinacion': row_coord['Monto_Coordinacion'],
+                        'Horas_Total': row_coord['Horas_Total'],
+                        'Docente_Correcto': row_coord['Docente_Correcto']
+                    }
+                    filas_nuevas.append(nueva_fila)
+                else:
+                    pass
+            
+            # Agregar las nuevas filas al resultado
+            if filas_nuevas:
+                filas_nuevas_df = pd.DataFrame(filas_nuevas)
+                merge_result = pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
+        
+        # Finalizar el procesamiento
+        df = merge_result
+        df['Servicio Actualización'] = df['Monto_Coordinacion'].fillna(0)
+        
+        # Limpiar columnas temporales
+        columnas_a_eliminar = ['docente_norm', 'Monto_Coordinacion', 'Horas_Total', 'Docente_Correcto']
+        for col in columnas_a_eliminar:
+            if col in df.columns:
+                df.drop(columns=[col], inplace=True)
+        
+        print(f"✅ Servicio de coordinación procesado correctamente")
+        
+    except Exception as e:
+        print(f"⚠️ Error al procesar archivo de coordinación: {e}")
+        df['Servicio Actualización'] = 0
+    
+    return df
+
+
+def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos_docentes=None):
     if os.path.exists(ruta_clasificacion):
         try:
             # Usar cache para evitar lecturas múltiples
@@ -329,6 +508,11 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
                 else:
                     df['Examen Clasif.'] = 0
                     return df
+            
+            # LIMPIAR VALORES NaN/VACÍOS EN LA COLUMNA DOCENTE ANTES DE PROCESAR
+            clasif_df = clasif_df.dropna(subset=['Docente'])
+            clasif_df = clasif_df[clasif_df['Docente'].astype(str).str.strip() != '']
+            clasif_df = clasif_df[clasif_df['Docente'].astype(str).str.lower() != 'nan']
             
             # Buscar la columna de Monto de manera más específica
             columna_monto = None
@@ -351,10 +535,54 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
             # Procesar los datos
             clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
             clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
-            df['docente_norm'] = df['Docente'].apply(normalizar_texto)
             
-            # Hacer el merge con la columna correcta
+            # Si ya existe la columna docente_norm en df, la usamos; sino la creamos
+            if 'docente_norm' not in df.columns:
+                df['docente_norm'] = df['Docente'].apply(normalizar_texto)
+            
+            # Hacer el merge con la columna correcta (left para mantener todos los de df)
             merge_result = df.merge(clasif_df[['docente_norm', columna_monto]], on='docente_norm', how='left')
+            
+            # NUEVA FUNCIONALIDAD: Agregar docentes del examen de clasificación que NO están en df
+            docentes_clasif_no_en_df = clasif_df[~clasif_df['docente_norm'].isin(df['docente_norm'])]
+            
+            if not docentes_clasif_no_en_df.empty and datos_docentes is not None:
+                print(f"📋 Agregando {len(docentes_clasif_no_en_df)} docentes del examen de clasificación sin carga académica...")
+                
+                # Para cada docente del examen que no está en df, crear una fila nueva
+                filas_nuevas = []
+                for _, row_clasif in docentes_clasif_no_en_df.iterrows():
+                    # VALIDAR QUE EL DOCENTE NO SEA VACÍO O NaN
+                    if pd.isna(row_clasif['Docente']) or str(row_clasif['Docente']).strip() == '' or str(row_clasif['Docente']).lower() == 'nan':
+                        continue
+                    
+                    # Buscar información del docente en datos_docentes
+                    docente_info = datos_docentes[datos_docentes['Docente'].apply(normalizar_texto) == row_clasif['docente_norm']]
+                    
+                    if not docente_info.empty:
+                        docente_info = docente_info.iloc[0]
+                        nueva_fila = {
+                            'Docente': docente_info['Docente'],
+                            'Sede': docente_info['Sede'],
+                            'Categoria (Letra)': docente_info['Categoria (Letra)'],
+                            'Categoria (Monto)': docente_info['Categoria (Monto)'],
+                            'N°. Ruc': docente_info['N°. Ruc'],
+                            'Estado': docente_info['Estado'],
+                            'curso': '',  # Sin carga académica
+                            'cantidad_cursos': 0,
+                            'Curso Dictado': 0,
+                            'Diseño de Examenes': 0,
+                            'docente_norm': row_clasif['docente_norm'],
+                            columna_monto: row_clasif[columna_monto]
+                        }
+                        filas_nuevas.append(nueva_fila)
+                    else:
+                        pass
+                
+                # Agregar las nuevas filas al resultado
+                if filas_nuevas:
+                    filas_nuevas_df = pd.DataFrame(filas_nuevas)
+                    merge_result = pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
             
             df = merge_result
             df['Examen Clasif.'] = df[columna_monto].fillna(0)
@@ -369,8 +597,26 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto):
 
 # --------------------------- CONSTRUCCIÓN DE TABLAS ---------------------------
 
-def construir_tabla_planilla(df):
-    tabla = pd.DataFrame({
+def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
+    # Asegurar que los campos necesarios existen y tienen valores por defecto
+    df = df.copy()
+    campos_requeridos = {
+        'curso': '',
+        'Curso Dictado': 0,
+        'cantidad_cursos': 0,
+        'Diseño de Examenes': 0,
+        'Examen Clasif.': 0,
+        'Servicio Actualización': 0  # Nueva columna
+    }
+    
+    for campo, valor_default in campos_requeridos.items():
+        if campo not in df.columns:
+            df[campo] = valor_default
+        else:
+            df[campo] = df[campo].fillna(valor_default)
+    
+    # Construir diccionario base de columnas
+    columnas_tabla = {
         'N°': range(1, len(df) + 1),
         'Docente': df['Docente'],
         'Sede': df['Sede'],
@@ -378,16 +624,174 @@ def construir_tabla_planilla(df):
         'Categoria (Monto)': df['Categoria (Monto)'],
         'N°. Ruc': df['N°. Ruc'],
         'Curso': df['curso'],
-        'Curso Dictado': df['Curso Dictado'],
+        'Curso Dictado': df['Curso Dictado']
+    }
+    
+    # Agregar columna Bono solo si es enero
+    if es_enero:
+        columnas_tabla['Bono'] = monto_bono
+    
+    # Continuar con el resto de columnas
+    columnas_tabla.update({
         'Extra Curso': 0,
         'Cantidad Cursos': df['cantidad_cursos'],
         'Diseño de Examenes': df['Diseño de Examenes'],
         'Examen Clasif.': df['Examen Clasif.'],
+        'Servicio Actualización': df['Servicio Actualización'],
         'Total Pago S/.': 0,
         'Estado': df['Estado']
     })
-    tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + tabla['Examen Clasif.'])
+    
+    tabla = pd.DataFrame(columnas_tabla)
+    
+    # AGREGAR SERVICIO DE ACTUALIZACIÓN A LA COLUMNA CURSO CUANDO CORRESPONDA
+    def agregar_servicio_a_curso(row):
+        curso_actual = str(row['Curso']).strip()
+        servicio_actualizacion = row['Servicio Actualización']
+        
+        # Si tiene servicio de actualización (mayor a 0)
+        if servicio_actualizacion > 0:
+            texto_servicio = "Servicio de actualización de materiales de enseñanza"
+            
+            # Si ya tiene cursos académicos, agregar el servicio separado por ' / '
+            if curso_actual and curso_actual != '' and curso_actual != 'nan':
+                return f"{curso_actual} / {texto_servicio}"
+            else:
+                # Si no tiene carga académica, solo el servicio
+                return texto_servicio
+        
+        # Si no tiene servicio de actualización, mantener el curso original
+        return curso_actual
+    
+    tabla['Curso'] = tabla.apply(agregar_servicio_a_curso, axis=1)
+    
+    # Calcular total incluyendo Bono si existe
+    if es_enero:
+        tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Bono'] + tabla['Extra Curso'] + 
+                                    tabla['Diseño de Examenes'] + tabla['Examen Clasif.'] + 
+                                    tabla['Servicio Actualización'])
+    else:
+        tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + 
+                                    tabla['Examen Clasif.'] + tabla['Servicio Actualización'])
+    
+    # Ordenar alfabéticamente por nombre de docente
+    tabla = tabla.sort_values('Docente').reset_index(drop=True)
+    # Reajustar la numeración después del ordenamiento
+    tabla['N°'] = range(1, len(tabla) + 1)
+    
     return tabla
+
+def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_docentes):
+    if not os.path.exists(ruta_coordinacion):
+        return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+    
+    try:
+        # Leer el archivo Excel
+        coordinacion_df = cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
+        
+        # Detectar automáticamente las columnas importantes (misma lógica que en agregar_servicio_coordinacion)
+        columna_docente = None
+        columna_horas = None
+        
+        # Buscar columna de docente de manera más flexible
+        for col in coordinacion_df.columns:
+            col_lower = str(col).lower().strip()
+            if any(patron in col_lower for patron in ['docente', 'profesor', 'teacher', 'instructor']):
+                columna_docente = col
+                break
+        
+        if columna_docente is None:
+            print("⚠️ No se encontró columna de docente en archivo de coordinación")
+            return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+        
+        # Buscar columna de horas de manera más flexible - PRIORIDAD A HORAS TOTALES
+        prioridad_horas = [
+            'horas totales', 'horas_totales', 'total', 'totales',  # Máxima prioridad
+            'hora total', 'total horas', 'total_horas',
+            'horas', 'hora', 'hour', 'tiempo', 'time',  # Prioridad media
+            'horas semanales', 'horas_semanales', 'semanal'  # Menor prioridad
+        ]
+        
+        for patron in prioridad_horas:
+            for col in coordinacion_df.columns:
+                col_lower = str(col).lower().strip()
+                if patron in col_lower:
+                    columna_horas = col
+                    break
+            if columna_horas:  # Si encontró una columna, salir del loop externo
+                break
+        
+        if columna_horas is None:
+            print("⚠️ No se encontró columna de horas en archivo de coordinación")
+            return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+        
+        # Limpiar y procesar datos - REMOVER NaN Y VALORES VACÍOS
+        coordinacion_df = coordinacion_df.dropna(subset=[columna_docente, columna_horas])
+        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.strip() != '']
+        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.lower() != 'nan']
+        coordinacion_df[columna_docente] = coordinacion_df[columna_docente].astype(str).str.strip()
+        
+        # EXTRAER SOLO LOS NÚMEROS DE LA COLUMNA DE HORAS (ej: "32 horas" -> 32)
+        def extraer_numero_horas(texto):
+            import re
+            if pd.isna(texto):
+                return 0
+            # Buscar el primer número en el texto
+            numeros = re.findall(r'\d+', str(texto))
+            return int(numeros[0]) if numeros else 0
+        
+        coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
+        
+        # Agrupar por docente (sumar horas si aparece múltiples veces)
+        coordinacion_agrupado = coordinacion_df.groupby(columna_docente)[columna_horas].sum().reset_index()
+        coordinacion_agrupado.columns = ['Docente_Original', 'Horas_Total']
+        
+        # Aplicar normalización para matching
+        coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
+        
+        # Normalizar nombres en datos_docentes
+        datos_docentes_temp = datos_docentes.copy()
+        datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
+        
+        # Hacer merge con datos_docentes para obtener categoría
+        coordinacion_con_categoria = coordinacion_agrupado.merge(
+            datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Letra)', 'Categoria (Monto)']],
+            on='docente_norm', how='left'
+        )
+        
+        # Usar el nombre corregido del merge, fallback al original
+        coordinacion_con_categoria['Docente_Final'] = coordinacion_con_categoria['Docente'].fillna(
+            coordinacion_con_categoria['Docente_Original']
+        )
+        coordinacion_con_categoria['Categoria (Letra)'] = coordinacion_con_categoria['Categoria (Letra)'].fillna('N/A')
+        coordinacion_con_categoria['Categoria (Monto)'] = coordinacion_con_categoria['Categoria (Monto)'].fillna(0)
+        
+        # Calcular monto total
+        coordinacion_con_categoria['Monto_Total'] = (
+            coordinacion_con_categoria['Horas_Total'] * 
+            coordinacion_con_categoria['Categoria (Monto)']
+        )
+        
+        # Construir tabla final
+        tabla_coordinacion = pd.DataFrame({
+            'N°': range(1, len(coordinacion_con_categoria) + 1),
+            'Docente': coordinacion_con_categoria['Docente_Final'],
+            'Categoría (Letra)': coordinacion_con_categoria['Categoria (Letra)'],
+            'Categoría (Monto)': coordinacion_con_categoria['Categoria (Monto)'],
+            'Horas Totales': coordinacion_con_categoria['Horas_Total'],
+            'Monto Total': coordinacion_con_categoria['Monto_Total']
+        })
+        
+        # Ordenar alfabéticamente por docente
+        tabla_coordinacion = tabla_coordinacion.sort_values('Docente').reset_index(drop=True)
+        tabla_coordinacion['N°'] = range(1, len(tabla_coordinacion) + 1)
+        
+        print(f"✅ Tabla de coordinación creada con {len(tabla_coordinacion)} docentes")
+        return tabla_coordinacion
+        
+    except Exception as e:
+        print(f"⚠️ Error al crear tabla de coordinación: {e}")
+        return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
 
 def construir_tabla_carga_academica(datos, estado_planilla):
     datos = datos.copy()
@@ -529,24 +933,24 @@ def obtener_header_planilla_con_cache(ruta_planilla):
         print(f"Error al obtener header: {e}")
         return None
     
-def construir_tabla_planilla_con_cache(df):
+def construir_tabla_planilla_con_cache(df, es_enero=False, monto_bono=0):
     try:
-        # Crear hash basado en las columnas relevantes para la tabla
+        # Crear hash basado en las columnas relevantes para la tabla y parámetros adicionales
         columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
         
         df_relevante = df[columnas_relevantes]
-        key_tabla = hash(df_relevante.to_string())
+        key_tabla = hash(df_relevante.to_string() + str(es_enero) + str(monto_bono))
         
         # Verificar cache
         if key_tabla in _cache_tablas_construidas:
             return _cache_tablas_construidas[key_tabla].copy()
         
         # Si no está en cache, construir y guardar
-        tabla = construir_tabla_planilla(df)
+        tabla = construir_tabla_planilla(df, es_enero, monto_bono)
         _cache_tablas_construidas[key_tabla] = tabla.copy()
         
         return tabla
         
     except Exception as e:
         # Fallback: usar función original si hay error en cache
-        return construir_tabla_planilla(df)
+        return construir_tabla_planilla(df, es_enero, monto_bono)

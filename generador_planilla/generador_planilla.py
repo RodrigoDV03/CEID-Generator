@@ -5,8 +5,9 @@ from openpyxl import load_workbook
 from .functions import *
 from .excel_styles import *
 
-def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_carga, primera_planilla: str = None):
+def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordinacion, month, numero_carga, primera_planilla: str = None, monto_bono: float = 0):
     año_actual = datetime.datetime.now().year
+    es_enero = month.lower() == 'enero'
     
     try:
         limpiar_cache_excel()
@@ -41,9 +42,10 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
 
         agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
-        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto)
+        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto, datos_docentes)
+        agrupar = agregar_servicio_coordinacion(agrupar, excel_coordinacion, normalizar_texto, datos_docentes)  # Nueva línea
 
-        TABLA = construir_tabla_planilla_con_cache(agrupar)
+        TABLA = construir_tabla_planilla_con_cache(agrupar, es_enero, monto_bono)
 
         estado_planilla = "Primera planilla" if numero_carga == 1 else "Segunda planilla"
         if numero_carga == 1:
@@ -66,11 +68,17 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 clasif_df = cargar_excel_con_cache(excel_exa_clasif, sheet_name=0, header=1)
                 clasif_df.to_excel(writer, sheet_name="Examen de clasificación", index=False)
             
+            # Crear hoja de coordinación si existe el archivo
+            if excel_coordinacion and os.path.exists(excel_coordinacion):
+                tabla_coordinacion = construir_tabla_coordinacion(excel_coordinacion, normalizar_texto, datos_docentes)
+                tabla_coordinacion.to_excel(writer, sheet_name="Servicio actualización", index=False)
+            
             # Construir hoja Planilla_Generador usando datos ya procesados
             agrupar_gen = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto)
+            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto, datos_docentes)
+            agrupar_gen = agregar_servicio_coordinacion(agrupar_gen, excel_coordinacion, normalizar_texto, datos_docentes)  # Nueva línea
 
-            TABLA_GENERADOR = construir_tabla_planilla_con_cache(agrupar_gen)
+            TABLA_GENERADOR = construir_tabla_planilla_con_cache(agrupar_gen, es_enero, monto_bono)
             TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
                 'Categoria (Letra)': 'Categoria_letra',
                 'Categoria (Monto)': 'Categoria_monto',
@@ -84,7 +92,8 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 'Celular': 'Numero_celular',
                 'Dirección': 'Domicilio_docente',
                 'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_contrato'
+                'N° Contrato': 'Nro_contrato',
+                'Servicio Actualización': 'Servicio_actualizacion'
             }).to_excel(writer, sheet_name="Planilla_Generador", index=False)
 
 
@@ -98,8 +107,9 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
                 # Optimización: Reutilizar cálculos ya realizados en lugar de duplicar
                 # Esta operación es idéntica a agrupar_gen, el cache la detectará automáticamente
                 agrupar_consol = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-                agrupar_consol = agregar_examen_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto)
-                TABLA_CONSOLIDADA = construir_tabla_planilla_con_cache(agrupar_consol)
+                agrupar_consol = agregar_examen_clasificacion(agrupar_consol, excel_exa_clasif, normalizar_texto, datos_docentes)
+                agrupar_consol = agregar_servicio_coordinacion(agrupar_consol, excel_coordinacion, normalizar_texto, datos_docentes)  # Nueva línea
+                TABLA_CONSOLIDADA = construir_tabla_planilla_con_cache(agrupar_consol, es_enero, monto_bono)
                 TABLA_CONSOLIDADA.to_excel(writer, sheet_name="Planilla consolidada", index=False)
         
         wb = load_workbook(ruta_salida)
@@ -107,6 +117,9 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
         titulo_hojas = [
             ("Examen de clasificación", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+            
+            ("Servicio actualización", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nSERVICIO DE ACTUALIZACIÓN DE MATERIALES - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
             
             (f"{numero_carga_letra} Planilla {month}", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\n{numero_carga_letra.upper()} PLANILLA - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
@@ -127,6 +140,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, month, numero_
 
         hojas_ordenadas = [
             "Examen de clasificación",
+            "Servicio actualización",  # Nueva hoja
             nombre_hoja_carga,
             f"{numero_carga_letra} Planilla {month}",
             "Planilla_Generador"

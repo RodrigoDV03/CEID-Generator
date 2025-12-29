@@ -5,7 +5,7 @@ import sys
 import threading
 from tkinter import filedialog
 from datetime import datetime
-from .envio_correos import procesar_correos_administrativos, procesar_correos_docente, enviar_correo_administrativo, enviar_correo_docente
+from .envio_correos import procesar_correos_docente_gmail, procesar_correos_administrativos_gmail, enviar_lote_desde_gui_docentes, enviar_lote_desde_gui_administrativos
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
@@ -22,6 +22,7 @@ def iniciar_interfaz_correos(callback_volver=None):
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    año_var = ctk.StringVar(value=str(datetime.now().year))
     tipo_var = ctk.StringVar(value="Docente")
 
     ruta_excel = None
@@ -74,6 +75,10 @@ def iniciar_interfaz_correos(callback_volver=None):
     # --- FECHA ---
     etiqueta(card, "Mes:")
     crear_option_menu(card, mes_var, meses)
+    
+    etiqueta(card, "Año:")
+    años_disponibles = [str(año) for año in range(datetime.now().year - 2, datetime.now().year + 3)]
+    crear_option_menu(card, año_var, años_disponibles)
 
     # --- BOTÓN GENERAR DATA ---
     def generar_data():
@@ -85,9 +90,9 @@ def iniciar_interfaz_correos(callback_volver=None):
             nonlocal data_para_envio
             try:
                 if tipo_var.get() == "Docente":
-                    data_para_envio = procesar_correos_docente(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                    data_para_envio = procesar_correos_docente_gmail(ruta_excel, hoja_var.get(), pdfs_seleccionados)
                 else:
-                    data_para_envio = procesar_correos_administrativos(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                    data_para_envio = procesar_correos_administrativos_gmail(ruta_excel, hoja_var.get(), pdfs_seleccionados)
 
                 if not data_para_envio:
                     messagebox.showwarning("Aviso", "No se generó ninguna coincidencia para envío.")
@@ -135,22 +140,11 @@ def iniciar_interfaz_correos(callback_volver=None):
 
         def tarea_envio():
             try:
-                for item in data_para_envio:
-                    if tipo_var.get() == "Docente":
-                        enviar_correo_docente(
-                            nombre=item['nombre'],
-                            pdf_path=item['pdf_path'],
-                            destinatario=item['correo'],
-                            mes=mes_var.get(),
-                            servicio=item['servicio']
-                        )
-                    else:
-                        enviar_correo_administrativo(
-                            nombre=item['nombre'],
-                            pdf_path=item['pdf_path'],
-                            destinatario=item['correo'],
-                            mes=mes_var.get()
-                        )
+                año_seleccionado = int(año_var.get())
+                if tipo_var.get() == "Docente":
+                    enviar_lote_desde_gui_docentes(data_para_envio, mes_var.get(), año_seleccionado)
+                else:
+                    enviar_lote_desde_gui_administrativos(data_para_envio, mes_var.get(), año_seleccionado)
 
                 messagebox.showinfo("Éxito", "Todos los correos fueron enviados correctamente.")
             except Exception as e:

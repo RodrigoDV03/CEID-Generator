@@ -61,8 +61,22 @@ def aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla=
         celda_total.alignment = center_alignment
         celda_total.fill = header_fill
 
-        # Columnas a sumar - aplicar en lote
-        columnas_sumar = ['H', 'I', 'J', 'K', 'L', 'M']
+        # Detectar si la columna I es "Bono" para ajustar las columnas a sumar
+        es_enero = False
+        if ws.max_row >= 2:
+            cell_value = ws.cell(row=2, column=9).value
+            if cell_value and "Bono" in str(cell_value):
+                es_enero = True
+        
+        # Columnas a sumar - ajustadas según si es enero o no
+        if es_enero:
+            # H=Curso Dictado, I=Bono, J=Extra Curso, K=Cantidad, L=Diseño, M=Examen, N=Servicio, O=Total
+            columnas_sumar = ['H', 'I', 'J', 'L', 'M', 'N', 'O']  # No incluir K (Cantidad Cursos)
+            columnas_moneda = ['E', 'H', 'I', 'L', 'M', 'N', 'O']
+        else:
+            # H=Curso Dictado, I=Extra Curso, J=Cantidad, K=Diseño, L=Examen, M=Servicio, N=Total
+            columnas_sumar = ['H', 'I', 'K', 'L', 'M', 'N']  # No incluir J (Cantidad Cursos)
+            columnas_moneda = ['E', 'H', 'K', 'L', 'M', 'N']
         
         for col in columnas_sumar:
             celda = ws[f"{col}{fila_total}"]
@@ -71,8 +85,6 @@ def aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla=
             celda.alignment = center_alignment
             celda.border = thin_border
 
-        columnas_moneda = ['E', 'H', 'K', 'L', 'M']
-        
         for col in columnas_moneda:
             # Aplicar formato a todo el rango de una vez
             for row_num in range(3, fila_total + 1):
@@ -81,24 +93,54 @@ def aplicar_formato_excel_optimizado(ws, max_col, titulo_fusionado, es_planilla=
     ajustar_anchos_columnas_optimizado(ws, max_col)
 
 def ajustar_anchos_columnas_optimizado(ws, max_col):
-    anchos_predefinidos = {
-        1: 5,   # N°
-        2: 30,  # Docente
-        3: 15,  # Sede
-        4: 8,   # Categoria (Letra)
-        5: 12,  # Categoria (Monto)
-        6: 15,  # N°. Ruc
-        7: 40,  # Curso
-        8: 12,  # Curso Dictado
-        9: 10,  # Extra Curso
-        10: 12, # Cantidad Cursos
-        11: 15, # Diseño de Examenes
-        12: 12, # Examen Clasif.
-        13: 15, # Total Pago S/.
-        14: 10  # Estado
-    }
+    # Detectar si la columna I es "Bono" (cuando es enero) o "Extra Curso" (resto del año)
+    es_enero = False
+    if ws.max_row >= 2:  # Verificar que haya headers
+        cell_value = ws.cell(row=2, column=9).value
+        if cell_value and "Bono" in str(cell_value):
+            es_enero = True
     
-    for col in range(1, min(max_col + 1, len(anchos_predefinidos) + 1)):
+    if es_enero:
+        # Mapeo de columnas cuando hay Bono
+        anchos_predefinidos = {
+            1: 5,   # N°
+            2: 30,  # Docente
+            3: 15,  # Sede
+            4: 8,   # Categoria (Letra)
+            5: 12,  # Categoria (Monto)
+            6: 15,  # N°. Ruc
+            7: 40,  # Curso
+            8: 12,  # Curso Dictado
+            9: 10,  # Bono
+            10: 10, # Extra Curso
+            11: 12, # Cantidad Cursos
+            12: 15, # Diseño de Examenes
+            13: 12, # Examen Clasif.
+            14: 15, # Servicio Actualización
+            15: 15, # Total Pago S/.
+            16: 10  # Estado
+        }
+    else:
+        # Mapeo de columnas sin Bono
+        anchos_predefinidos = {
+            1: 5,   # N°
+            2: 30,  # Docente
+            3: 15,  # Sede
+            4: 8,   # Categoria (Letra)
+            5: 12,  # Categoria (Monto)
+            6: 15,  # N°. Ruc
+            7: 40,  # Curso
+            8: 12,  # Curso Dictado
+            9: 10,  # Extra Curso
+            10: 12, # Cantidad Cursos
+            11: 15, # Diseño de Examenes
+            12: 12, # Examen Clasif.
+            13: 15, # Servicio Actualización
+            14: 15, # Total Pago S/.
+            15: 10  # Estado
+        }
+    
+    for col in range(1, max_col + 1):
         column_letter = get_column_letter(col)
         if col in anchos_predefinidos:
             ws.column_dimensions[column_letter].width = anchos_predefinidos[col]
