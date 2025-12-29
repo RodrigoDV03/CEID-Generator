@@ -22,6 +22,7 @@ def iniciar_interfaz_correos(callback_volver=None):
 
     hoja_var = ctk.StringVar()
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    año_var = ctk.StringVar(value=str(datetime.now().year))
     tipo_var = ctk.StringVar(value="Docente")
 
     ruta_excel = None
@@ -74,6 +75,10 @@ def iniciar_interfaz_correos(callback_volver=None):
     # --- FECHA ---
     etiqueta(card, "Mes:")
     crear_option_menu(card, mes_var, meses)
+    
+    etiqueta(card, "Año:")
+    años_disponibles = [str(año) for año in range(datetime.now().year - 2, datetime.now().year + 3)]
+    crear_option_menu(card, año_var, años_disponibles)
 
     # --- BOTÓN GENERAR DATA ---
     def generar_data():
@@ -135,10 +140,11 @@ def iniciar_interfaz_correos(callback_volver=None):
 
         def tarea_envio():
             try:
+                año_seleccionado = int(año_var.get())
                 if tipo_var.get() == "Docente":
-                    enviar_lote_desde_gui_docentes(data_para_envio, mes_var.get())
+                    enviar_lote_desde_gui_docentes(data_para_envio, mes_var.get(), año_seleccionado)
                 else:
-                    enviar_lote_desde_gui_administrativos(data_para_envio, mes_var.get())
+                    enviar_lote_desde_gui_administrativos(data_para_envio, mes_var.get(), año_seleccionado)
 
                 messagebox.showinfo("Éxito", "Todos los correos fueron enviados correctamente.")
             except Exception as e:
