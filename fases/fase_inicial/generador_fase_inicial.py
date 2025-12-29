@@ -30,6 +30,11 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         else:
             categoria_valor = float(categoria_valor)
         ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
+        
+        # Leer servicio de actualización y bono PRIMERO (antes de usarlos)
+        servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
+        bono = float(getattr(fila, "Bono", 0))
+        
         if tipo_fase_inicial == "administrativo":
             descripcion = str(getattr(fila, "Curso", ""))
             finalidad_publica = str(getattr(fila, "Finalidad_publica", ""))
@@ -39,14 +44,11 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
             actividades_admin = str(getattr(fila, "Actividades_admin", ""))
         else:
             descripcion_raw = str(getattr(fila, "Curso", ""))
-            descripcion = redactar_cursos(descripcion_raw)
+            descripcion = redactar_cursos(descripcion_raw, tiene_bono=(bono > 0))
         disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
         disenio_cant_horas = disenio_examenes / categoria_valor
         horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
         clasif_valor = int(getattr(fila, "Examen_clasif", 0))
-        
-        # NUEVO: Agregar servicio de actualización
-        servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
         
         direccion = str(getattr(fila, "Domicilio_docente", '')).strip()
         correo = str(getattr(fila, "Correo_personal", ''))
@@ -78,9 +80,10 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
         monto_total_letras = monto_a_letras(monto_total)
         
         # NUEVO: Cálcular montos para el formato del monto referencial
-        monto_sin_actualizacion = monto_total - servicio_actualizacion
+        monto_sin_actualizacion = monto_total - servicio_actualizacion - bono
         monto_sin_actualizacion_letras = monto_a_letras(monto_sin_actualizacion)
         servicio_actualizacion_letras = monto_a_letras(servicio_actualizacion)
+        bono_letras = monto_a_letras(bono)
 
         # NUEVO: Generar actividades_docentes
         actividades_base = "• Dictar clases, preparar las clases, evaluar a los alumnos, diseñar exámenes, entregar notas y presentar informe de dictado de curso."
@@ -151,7 +154,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "descripcion": descripcion_final,
                 "actividades_docentes": actividades_docentes,
                 "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras),
+                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono, bono_letras, monto_total, monto_total_letras),
                 "modalidad_servicio": modalidad_servicio,
             }
 
@@ -167,7 +170,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                     "actividades_admin": actividades_admin,
                     "actividades_docentes": actividades_docentes,
                     "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                    "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras),
+                    "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono, bono_letras, monto_total, monto_total_letras),
                     "modalidad_servicio": modalidad_servicio
                 }
 
@@ -237,7 +240,7 @@ def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_des
                 "descripcion_servicio": descripcion_final,
                 "actividades_admin": actividades_admin,
                 "categoria_monto": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, monto_total, monto_total_letras) if servicio_actualizacion > 0 else f"S/. {monto_total:,.2f} ({monto_total_letras})",
+                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono, bono_letras, monto_total, monto_total_letras) if (servicio_actualizacion > 0 or bono > 0) else f"S/. {monto_total:,.2f} ({monto_total_letras})",
                 "dni_cot": f"DNI: {dni_docente}",
                 "modalidad_servicio": modalidad_servicio,
             }

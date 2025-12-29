@@ -19,10 +19,15 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
 
     ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
     descripcion_raw = str(getattr(fila, "Curso", ""))
+    
+    # Leer servicio de actualización y bono
+    servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
+    bono = float(getattr(fila, "Bono", 0))
+    
     if tipo_fase_final == "administrativo":
         descripcion = str(getattr(fila, "Curso", "N/A"))
     else:
-        descripcion = redactar_cursos(descripcion_raw)
+        descripcion = redactar_cursos(descripcion_raw, tiene_bono=(bono > 0))
     disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
     disenio_cant_horas = disenio_examenes / categoria_valor
     horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"

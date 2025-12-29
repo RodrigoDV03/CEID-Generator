@@ -597,7 +597,7 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos
 
 # --------------------------- CONSTRUCCIÓN DE TABLAS ---------------------------
 
-def construir_tabla_planilla(df):
+def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
     # Asegurar que los campos necesarios existen y tienen valores por defecto
     df = df.copy()
     campos_requeridos = {
@@ -615,7 +615,8 @@ def construir_tabla_planilla(df):
         else:
             df[campo] = df[campo].fillna(valor_default)
     
-    tabla = pd.DataFrame({
+    # Construir diccionario base de columnas
+    columnas_tabla = {
         'N°': range(1, len(df) + 1),
         'Docente': df['Docente'],
         'Sede': df['Sede'],
@@ -623,15 +624,25 @@ def construir_tabla_planilla(df):
         'Categoria (Monto)': df['Categoria (Monto)'],
         'N°. Ruc': df['N°. Ruc'],
         'Curso': df['curso'],
-        'Curso Dictado': df['Curso Dictado'],
+        'Curso Dictado': df['Curso Dictado']
+    }
+    
+    # Agregar columna Bono solo si es enero
+    if es_enero:
+        columnas_tabla['Bono'] = monto_bono
+    
+    # Continuar con el resto de columnas
+    columnas_tabla.update({
         'Extra Curso': 0,
         'Cantidad Cursos': df['cantidad_cursos'],
         'Diseño de Examenes': df['Diseño de Examenes'],
         'Examen Clasif.': df['Examen Clasif.'],
-        'Servicio Actualización': df['Servicio Actualización'],  # Nueva columna
+        'Servicio Actualización': df['Servicio Actualización'],
         'Total Pago S/.': 0,
         'Estado': df['Estado']
     })
+    
+    tabla = pd.DataFrame(columnas_tabla)
     
     # AGREGAR SERVICIO DE ACTUALIZACIÓN A LA COLUMNA CURSO CUANDO CORRESPONDA
     def agregar_servicio_a_curso(row):
@@ -654,8 +665,14 @@ def construir_tabla_planilla(df):
     
     tabla['Curso'] = tabla.apply(agregar_servicio_a_curso, axis=1)
     
-    tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + 
-                                tabla['Examen Clasif.'] + tabla['Servicio Actualización'])  # Incluir en el total
+    # Calcular total incluyendo Bono si existe
+    if es_enero:
+        tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Bono'] + tabla['Extra Curso'] + 
+                                    tabla['Diseño de Examenes'] + tabla['Examen Clasif.'] + 
+                                    tabla['Servicio Actualización'])
+    else:
+        tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + 
+                                    tabla['Examen Clasif.'] + tabla['Servicio Actualización'])
     
     # Ordenar alfabéticamente por nombre de docente
     tabla = tabla.sort_values('Docente').reset_index(drop=True)
@@ -916,24 +933,24 @@ def obtener_header_planilla_con_cache(ruta_planilla):
         print(f"Error al obtener header: {e}")
         return None
     
-def construir_tabla_planilla_con_cache(df):
+def construir_tabla_planilla_con_cache(df, es_enero=False, monto_bono=0):
     try:
-        # Crear hash basado en las columnas relevantes para la tabla
+        # Crear hash basado en las columnas relevantes para la tabla y parámetros adicionales
         columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
         
         df_relevante = df[columnas_relevantes]
-        key_tabla = hash(df_relevante.to_string())
+        key_tabla = hash(df_relevante.to_string() + str(es_enero) + str(monto_bono))
         
         # Verificar cache
         if key_tabla in _cache_tablas_construidas:
             return _cache_tablas_construidas[key_tabla].copy()
         
         # Si no está en cache, construir y guardar
-        tabla = construir_tabla_planilla(df)
+        tabla = construir_tabla_planilla(df, es_enero, monto_bono)
         _cache_tablas_construidas[key_tabla] = tabla.copy()
         
         return tabla
         
     except Exception as e:
         # Fallback: usar función original si hay error en cache
-        return construir_tabla_planilla(df)
+        return construir_tabla_planilla(df, es_enero, monto_bono)
