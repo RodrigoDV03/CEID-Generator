@@ -1,217 +1,212 @@
-import os
-import pandas as pd
 import datetime
-from fases.functions import *
+import pandas as pd
+from typing import Optional
+from fases.models import DocenteData, PaymentData, DocumentConfig
+from fases.services import (
+    ExcelReaderService, 
+    DocenteService, 
+    PaymentService, 
+    DescriptionService
+)
+from .builders import ConformidadBuilder, ControlAvanceBuilder
 
-def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, tipo_fase_final):
 
-    docente = str(getattr(fila, "Docente", "N/A"))
-    nombre_docente = docente
-
-    if not os.path.exists(ruta_conformidad):
-        raise FileNotFoundError(f"No se encontró la plantilla: {ruta_conformidad}")
+class FaseFinalGenerator:
     
-    categoria_valor = getattr(fila, "Categoria_monto", 1)
-    if pd.isna(categoria_valor):
-        categoria_valor = 1
-    else:
-        categoria_valor = float(categoria_valor)
-
-    ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
-    descripcion_raw = str(getattr(fila, "Curso", ""))
+    def __init__(self, config: DocumentConfig):
+        self.config = config
+        
+        # Servicios
+        self.excel_service = ExcelReaderService()
+        self.docente_service = DocenteService()
+        self.payment_service = PaymentService()
+        self.description_service = DescriptionService()
+        
+        # Builders
+        self.conformidad_builder = ConformidadBuilder(config)
+        self.control_builder = ControlAvanceBuilder(config)
     
-    # Leer servicio de actualización y bono
-    servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
-    bono = float(getattr(fila, "Bono", 0))
+    def generar_descripcion_completa(
+        self, 
+        docente: DocenteData, 
+        payment: PaymentData
+    ) -> str:
+        # Para administrativos, retornar el curso directamente
+        if self.config.es_administrativo:
+            return docente.curso
+        
+        # Para docentes, redactar cursos con formato
+        descripcion_base = self.description_service.redactar_cursos(
+            docente.curso,
+            tiene_bono=payment.tiene_bono
+        )
+        
+        # Generar descripciones de horas
+        horas_disenio, horas_clasif = self.payment_service.generar_descripcion_horas(payment)
+        
+        # Generar descripción completa
+        return self.description_service.generar_descripcion_completa(
+            descripcion_base,
+            payment,
+            horas_disenio,
+            horas_clasif,
+            es_administrativo=self.config.es_administrativo
+        )
     
-    # Para administrativos: el bono solo se suma al total, no se muestra separado ni en texto
-    if tipo_fase_final == "administrativo":
-        descripcion = str(getattr(fila, "Curso", "N/A"))
-        bono_para_mostrar = 0  # No mostrar bono separado en administrativos
-    else:
-        descripcion = redactar_cursos(descripcion_raw, tiene_bono=(bono > 0))
-        bono_para_mostrar = bono  # Mostrar bono separado en docentes
+    def generar_conformidad(
+        self,
+        docente: DocenteData,
+        payment: PaymentData
+    ) -> str:
+        # Crear carpeta del docente
+        carpeta_docente = self.docente_service.crear_carpeta_docente(
+            self.config.carpeta_destino,
+            self.config,
+            docente
+        )
+        
+        # Generar descripción completa
+        descripcion_completa = self.generar_descripcion_completa(docente, payment)
+        
+        # Generar documento
+        ruta = self.conformidad_builder.generar(
+            docente, 
+            payment, 
+            descripcion_completa, 
+            carpeta_docente
+        )
+        
+        return ruta
     
-    disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
-    disenio_cant_horas = disenio_examenes / categoria_valor
-    horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
-    clasif_valor = int(getattr(fila, "Examen_clasif", 0))
-
-    clasif_cant_horas = clasif_valor / categoria_valor
-    if clasif_cant_horas == 1:
-        horas_clasif = f"{int(round(clasif_cant_horas))} hora de examen de clasificación"
-    else:
-        horas_clasif = f"{int(round(clasif_cant_horas))} horas de examen de clasificación"
-
-
-    if tipo_fase_final == "administrativo":
-        descripcion_final = descripcion
-    else:
-        if disenio_cant_horas == 0:
-            descripcion_final = f"{descripcion}"   
-        elif clasif_valor == 0:
-            descripcion_final = f"{descripcion} y {horas_disenio}"
-        else:
-            descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
+    def generar_control_avance(
+        self,
+        docente: DocenteData,
+        payment: PaymentData
+    ) -> Optional[str]:
+        # Solo para docentes con contrato
+        if not docente.es_contrato:
+            return None
+        
+        # Solo si se especificó número de armada
+        if self.config.numero_armada == 'sin armada':
+            return None
+        
+        # Crear carpeta del docente
+        carpeta_docente = self.docente_service.crear_carpeta_docente(
+            self.config.carpeta_destino,
+            self.config,
+            docente
+        )
+        
+        # Generar documento
+        ruta = self.control_builder.generar(
+            docente,
+            payment,
+            carpeta_docente
+        )
+        
+        return ruta
     
-    monto_categoria_letras = monto_a_letras(categoria_valor)
-    monto_total_base = getattr(fila, "Total_pago", 0)
-    
-    # Para administrativos: sumar el bono al monto total
-    if tipo_fase_final == "administrativo":
-        monto_total = monto_total_base + bono
-    else:
-        monto_total = monto_total_base
-    
-    monto_total_letras = monto_a_letras(monto_total) 
-    nro_contrato_val = getattr(fila, "Nro_Contrato", "")
-    
-    try:
-        nro_contrato = str(int(float(nro_contrato_val)))
-    except (ValueError, TypeError):
-        nro_contrato = str(nro_contrato_val)
-
-    if tipo_fase_final == "administrativo":
-        modalidad_servicio = "presencial"
-    else:
-        modalidad_servicio = "híbrida"
-
-    reemplazos_conformidad = {
-        "nombre_docente": str(nombre_docente),
-        "ruc": str(ruc),
-        "descripcion_cursos": str(descripcion_final),
-        "monto_subtotal": f"S/. {monto_total:,.2f} ({str(monto_total_letras)})",
-        "monto_hora": f"S/. {categoria_valor:,.2f} ({str(monto_categoria_letras)})",
-        "Nro_Contrato": str(nro_contrato),
-        "numero_armada": str(numero_armada),
-        "modalidad_servicio": str(modalidad_servicio)
-    }
-
-    carpeta_final = os.path.dirname(ruta_destino)
-    os.makedirs(carpeta_final, exist_ok=True)
-    generar_documento(ruta_conformidad, reemplazos_conformidad, ruta_destino)
-    if tipo_fase_final == "administrativo":
-        if os.path.exists(ruta_destino):
-            doc = Document(ruta_destino)
-            for parrafo in doc.paragraphs:
-                for run in parrafo.runs:
-                    if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                        run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-            for tabla in doc.tables:
-                for fila in tabla.rows:
-                    for celda in fila.cells:
-                        for parrafo in celda.paragraphs:
-                            for run in parrafo.runs:
-                                if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                                    run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-            doc.save(ruta_destino)
-    return ruta_destino
-
-def generar_control_avance(fila_control, doc_control, ruta_destino, tipo_fase_final):
-
-    nombre_docente = str(getattr(fila_control, "APELLIDOS Y NOMBRES", ""))
-    idioma_docente = str(getattr(fila_control, "Especialidad", ""))
-    numero_contrato = getattr(fila_control, "Numero de contrato", "")
-
-    try:
-        numero_contrato_str = str(int(float(numero_contrato)))
-    except (ValueError, TypeError):
-        numero_contrato_str = str(numero_contrato)
-    
-    monto_total = getattr(fila_control, "MONTO TOTAL PARA CONTRATO S/", 0)
-    primera_armada = getattr(fila_control, "Primera armada", 0)
-    segunda_armada = getattr(fila_control, "Segunda armada", 0)
-    total_primera = getattr(fila_control, "Primera armada", 0)
-    total_segunda = getattr(fila_control, "Segunda armada", 0)
-    total_tercera = getattr(fila_control, "Tercera armada", 0)
-    saldo_restante = getattr(fila_control, "Saldo restante", 0)
-    saldo_primera = monto_total - primera_armada
-    saldo_segunda = saldo_primera - segunda_armada
-
-    # === Reemplazar en documento ===
-
-    reemplazos_armada = {
-        "Nombre_Docente": str(nombre_docente),
-        "Nro_Contrato": numero_contrato_str,
-        "Idioma_Docente": str(idioma_docente),
-        "Monto_Total": f"S/. {monto_total:,.2f}",
-        "Total_Primera": f"S/. {total_primera:,.2f}",
-        "Total_Segunda": f"S/. {total_segunda:,.2f}",
-        "Total_Tercera": f"S/. {total_tercera:,.2f}",
-        "Saldo_Restante": f"S/. {saldo_restante:,.2f}",
-        "Saldo_Primera": f"S/. {saldo_primera:,.2f}",
-        "Saldo_Segunda": f"S/. {saldo_segunda:,.2f}"
-    }
-
-    carpeta_final = os.path.dirname(ruta_destino)
-    os.makedirs(carpeta_final, exist_ok=True)
-    generar_documento(doc_control, reemplazos_armada, ruta_destino)
-    return ruta_destino
-
-
-def procesar_planilla_fase_final(planilla_path, excel_control_pagos, hoja, carpeta_salida, mes, numero_armada, tipo_fase_final):
-    año_actual = datetime.datetime.now().year
-    df = pd.read_excel(planilla_path, sheet_name=hoja)
-    df.columns = df.columns.str.strip()
-
-    if tipo_fase_final == "planilla docente (con contrato)":
-        df_control = pd.read_excel(excel_control_pagos, sheet_name=0, header=1)
-
-    for _, fila in df.iterrows():
+    def procesar_docente(
+        self,
+        docente: DocenteData,
+        payment: PaymentData
+    ) -> None:
+        # Validar docente
+        es_valido, mensaje = self.docente_service.validar_docente(docente)
+        if not es_valido:
+            print(f"❌ Error - {mensaje}")
+            return
+        
         try:
-            # Obtener el nombre del docente de la columna ya limpia
-            docente = str(getattr(fila, "Docente", "N/A"))
-            # Debug: mostrar información si el docente es N/A
-            if docente == "N/A":
-                print(f"No se pudo obtener el nombre del docente. Columnas disponibles: {list(df.columns)}")
-                continue  # Saltar esta fila si no hay nombre de docente
-
-            estado = str(getattr(fila, "Estado_docente", "")).strip().upper()
-
-            if estado == "CONTRATO" or estado == "Contrato":
-                ruta_conformidad = ruta_absoluta_relativa("Modelos_documentos/conformidad_contrato.docx")
-            elif estado == "TERCERO" or estado == "Tercero":
-                ruta_conformidad = ruta_absoluta_relativa("Modelos_documentos/conformidad_tercero.docx")
-            else:
-                raise ValueError(f"Estado inválido: {estado}")
-
-            carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", docente)
-            os.makedirs(carpeta_final, exist_ok=True)
-            nombre_archivo_conformidad = f"CONFORMIDAD - {docente} - {mes} {año_actual}.docx"
-            ruta_destino_conformidad = os.path.join(carpeta_final, nombre_archivo_conformidad)
-            generador_conformidad(fila, ruta_conformidad, ruta_destino_conformidad, numero_armada, tipo_fase_final)
-
-            print(f"{docente} - Documento de conformidad generado correctamente.")
+            # Generar conformidad (para todos)
+            self.generar_conformidad(docente, payment)
+            print(f"✅ {docente.nombre} - Documento de conformidad generado correctamente.")
+            
         except Exception as e:
-            print(f"Error procesando fila para {docente}: {e}")
-            continue
-
-
-    if tipo_fase_final == "planilla docente (con contrato)":
-        for _, fila_control in df_control.iterrows():
+            print(f"❌ Error generando conformidad para {docente.nombre}: {e}")
+    
+    def procesar_control_pagos(
+        self,
+        df_control: 'pd.DataFrame'
+    ) -> None:
+        for _, fila in df_control.iterrows():
             try:
-                docente = str(getattr(fila_control, "APELLIDOS Y NOMBRES", "N/A")).strip()
-
-                if numero_armada == 'primera':
-                    doc_control = ruta_absoluta_relativa("Modelos_documentos/control_pagos_primera.docx")
-                elif numero_armada == 'segunda':
-                    doc_control = ruta_absoluta_relativa("Modelos_documentos/control_pagos_segunda.docx")
-                elif numero_armada == 'tercera':
-                    doc_control = ruta_absoluta_relativa("Modelos_documentos/control_pagos_tercera.docx")
-                else:
-                    raise ValueError(f"Número de armada inválido: {numero_armada}")
+                # Extraer nombre del docente
+                nombre = self.excel_service.extraer_docente_nombre_control(fila)
+                if nombre == "N/A":
+                    continue
                 
-                carpeta_final = os.path.join(carpeta_salida, "FASE FINAL", docente)
-                os.makedirs(carpeta_final, exist_ok=True)
-
-                nombre_archivo_control = f"CONTROL DE AVANCE - {docente} - {mes} {año_actual}.docx"
-                ruta_destino_control = os.path.join(carpeta_final, nombre_archivo_control)
-
-                generar_control_avance(fila_control, doc_control, ruta_destino_control, tipo_fase_final)
-
-                print(f"{docente} - Control de pagos generado correctamente.")
-
+                # Crear objeto DocenteData básico
+                docente = DocenteData(
+                    nombre=nombre,
+                    dni="",
+                    ruc="",
+                    especialidad=str(getattr(fila, "Especialidad", "")),
+                    numero_contrato=self.excel_service.extraer_numero_contrato_control(fila),
+                    estado_docente="CONTRATO"
+                )
+                
+                # Extraer datos de pago del control
+                payment = self.excel_service.extraer_payment_data_control(fila)
+                
+                # Generar control de avance
+                ruta = self.generar_control_avance(docente, payment)
+                if ruta:
+                    print(f"✅ {nombre} - Control de pagos generado correctamente.")
+                
             except Exception as e:
-                print(f"Error procesando fila para {docente}: {e}")
+                print(f"❌ Error procesando control para {nombre}: {e}")
                 continue
 
+
+def procesar_planilla_fase_final(
+    planilla_path: str,
+    excel_control_pagos: Optional[str],
+    hoja: str,
+    carpeta_salida: str,
+    mes: str,
+    numero_armada: str,
+    tipo_fase_final: str
+) -> None:
+    # Crear configuración
+    config = DocumentConfig(
+        mes=mes,
+        anio=datetime.datetime.now().year,
+        numero_armada=numero_armada,
+        tipo_fase="final",
+        tipo_docente=tipo_fase_final,
+        carpeta_destino=carpeta_salida
+    )
+    
+    # Crear generador
+    generador = FaseFinalGenerator(config)
+    
+    # Leer planilla principal
+    excel_service = ExcelReaderService()
+    df = excel_service.leer_planilla(planilla_path, hoja)
+    
+    # Procesar cada docente (conformidad)
+    for _, fila in df.iterrows():
+        try:
+            # Extraer datos
+            docente = excel_service.extraer_docente_data(fila)
+            payment = excel_service.extraer_payment_data(fila)
+            
+            # Procesar docente
+            generador.procesar_docente(docente, payment)
+            
+        except ValueError as e:
+            print(f"Error: {e}")
+            continue
+        except Exception as e:
+            print(f"Error inesperado: {e}")
+            continue
+    
+    # Procesar control de pagos si aplica
+    if tipo_fase_final == "planilla docente (con contrato)" and excel_control_pagos:
+        try:
+            df_control = excel_service.leer_control_pagos(excel_control_pagos)
+            generador.procesar_control_pagos(df_control)
+        except Exception as e:
+            print(f"Error procesando control de pagos: {e}")

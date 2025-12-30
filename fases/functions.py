@@ -1,17 +1,17 @@
 import pandas as pd
 import os
-import sys
-import re
 from docx import Document
 from decimal import Decimal, ROUND_HALF_UP
 from num2words import num2words
+from fases.utils import TextUtils, PathUtils
 
+# Mantener funciones antiguas por compatibilidad
 def limpiar_nombre_archivo(nombre):
-    return re.sub(r'[\\/*?:"<>|]', "", nombre)
+    return TextUtils.limpiar_nombre_archivo(nombre)
 
 
 def limpiar_numero(valor):
-    return "" if pd.isna(valor) else str(valor).split('.')[0]
+    return TextUtils.limpiar_numero(valor)
 
 
 def reemplazar_en_parrafos(documento, reemplazos):
@@ -86,11 +86,7 @@ def redactar_cursos(cadena, tiene_bono=False):
         return f"servicio de dictado de {', '.join(elementos_descripcion)}"
 
 def ruta_absoluta_relativa(path_relativo):
-    if getattr(sys, 'frozen', False):
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, path_relativo)
+    return PathUtils.ruta_absoluta_relativa(path_relativo)
 
 def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
     if modelo_path and os.path.exists(modelo_path):

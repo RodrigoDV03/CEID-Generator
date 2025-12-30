@@ -1,280 +1,134 @@
-import os
-import pandas as pd
 import datetime
-from fases.functions import *
-from docx2pdf import convert
+from fases.models import DocenteData, PaymentData, DocumentConfig
+from fases.services import (
+    ExcelReaderService, 
+    DocenteService, 
+    PaymentService, 
+    DescriptionService
+)
+from .builders import OficioBuilder, TdrBuilder, CotizacionBuilder
 
-def procesar_planilla_fase_inicial(planilla_path, hoja_seleccionada, carpeta_destino, mes, numero_armada, tipo_fase_inicial):
-    año_actual = datetime.datetime.now().year
 
-    datos = pd.read_excel(planilla_path, sheet_name=hoja_seleccionada)
-    datos.columns = datos.columns.str.strip()
-
-    carpeta_principal = os.path.join(carpeta_destino, 'FASE INICIAL')
-    os.makedirs(carpeta_principal, exist_ok=True)
-
-    for i, fila in enumerate(datos.itertuples(index=False), start=1):
-        docente = str(getattr(fila, "Docente", "N/A"))
-
-        if docente == "N/A":
-            print(f"Fila {i}: No se pudo obtener el nombre del docente. Columnas disponibles: {list(datos.columns)}")
-            continue
+class FaseInicialGenerator:
+    
+    def __init__(self, config: DocumentConfig):
+        self.config = config
         
-        nombre_docente = limpiar_nombre_archivo(docente)
-        carpeta_docente = os.path.join(carpeta_principal, nombre_docente)
-        os.makedirs(carpeta_docente, exist_ok=True)
-
-        categoria_valor = getattr(fila, "Categoria_monto", 1)
-        if pd.isna(categoria_valor):
-            categoria_valor = 1
-        else:
-            categoria_valor = float(categoria_valor)
-        ruc = limpiar_numero(getattr(fila, "N_Ruc", ""))
+        # Servicios
+        self.excel_service = ExcelReaderService()
+        self.docente_service = DocenteService()
+        self.payment_service = PaymentService()
+        self.description_service = DescriptionService()
         
-        # Leer servicio de actualización y bono PRIMERO (antes de usarlos)
-        servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
-        bono = float(getattr(fila, "Bono", 0))
+        # Builders
+        self.oficio_builder = OficioBuilder(config)
+        self.tdr_builder = TdrBuilder(config)
+        self.cotizacion_builder = CotizacionBuilder(config)
+    
+    def generar_descripcion_completa(
+        self, 
+        docente: DocenteData, 
+        payment: PaymentData
+    ) -> str:
+        # Para administrativos, retornar el curso directamente
+        if self.config.es_administrativo:
+            return docente.curso
         
-        if tipo_fase_inicial == "administrativo":
-            descripcion = str(getattr(fila, "Curso", ""))
-            finalidad_publica = str(getattr(fila, "Finalidad_publica", ""))
-            formacion_academica = str(getattr(fila, "Formacion_academica", ""))
-            experiencia_laboral = str(getattr(fila, "Experiencia_laboral", ""))
-            requisitos_adi = str(getattr(fila, "Requisitos_adicional", ""))
-            actividades_admin = str(getattr(fila, "Actividades_admin", ""))
-        else:
-            descripcion_raw = str(getattr(fila, "Curso", ""))
-            descripcion = redactar_cursos(descripcion_raw, tiene_bono=(bono > 0))
-        disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
-        disenio_cant_horas = disenio_examenes / categoria_valor
-        horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
-        clasif_valor = int(getattr(fila, "Examen_clasif", 0))
+        # Para docentes, redactar cursos con formato
+        descripcion_base = self.description_service.redactar_cursos(
+            docente.curso,
+            tiene_bono=payment.tiene_bono
+        )
         
-        direccion = str(getattr(fila, "Domicilio_docente", '')).strip()
-        correo = str(getattr(fila, "Correo_personal", ''))
-        celular = limpiar_numero(getattr(fila, "Numero_celular", ""))
-        dni_docente = limpiar_numero(getattr(fila, "Numero_dni", ""))
-        if len(dni_docente) < 8:
-            dni_docente = dni_docente.zfill(8)
-
-
-
-        clasif_cant_horas = clasif_valor / categoria_valor
-        if clasif_cant_horas == 1:
-            horas_clasif = f"{int(round(clasif_cant_horas))} hora de examen de clasificación"
-        else:
-            horas_clasif = f"{int(round(clasif_cant_horas))} horas de examen de clasificación"
-
-        if tipo_fase_inicial == "administrativo":
-            descripcion_final = f"{descripcion}"
-        else:
-            if disenio_cant_horas == 0:
-                descripcion_final = f"{descripcion}"   
-            elif clasif_valor == 0:
-                descripcion_final = f"{descripcion} y {horas_disenio}"
-            else:
-                descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
-
-        monto_categoria_letras = monto_a_letras(categoria_valor)
-        monto_total_base = getattr(fila, "Total_pago", 0)
+        # Generar descripciones de horas
+        horas_disenio, horas_clasif = self.payment_service.generar_descripcion_horas(payment)
         
-        # Para administrativos: sumar el bono al monto total
-        if tipo_fase_inicial == "administrativo":
-            monto_total = monto_total_base + bono
-        else:
-            monto_total = monto_total_base
+        # Generar descripción completa
+        return self.description_service.generar_descripcion_completa(
+            descripcion_base,
+            payment,
+            horas_disenio,
+            horas_clasif,
+            es_administrativo=self.config.es_administrativo
+        )
+    
+    def generar_documentos_docente(
+        self,
+        docente: DocenteData,
+        payment: PaymentData
+    ) -> None:
+        # Validar docente
+        es_valido, mensaje = self.docente_service.validar_docente(docente)
+        if not es_valido:
+            print(f"❌ Error - {mensaje}")
+            return
         
-        monto_total_letras = monto_a_letras(monto_total)
+        # Crear carpeta del docente
+        carpeta_docente = self.docente_service.crear_carpeta_docente(
+            self.config.carpeta_destino,
+            self.config,
+            docente
+        )
         
-        # NUEVO: Cálcular montos para el formato del monto referencial
-        # Para administrativos: el bono solo se suma al total, no se muestra separado
-        if tipo_fase_inicial == "administrativo":
-            monto_sin_actualizacion = monto_total - servicio_actualizacion
-            bono_para_mostrar = 0  # No mostrar bono separado en administrativos
-        else:
-            monto_sin_actualizacion = monto_total - servicio_actualizacion - bono
-            bono_para_mostrar = bono  # Mostrar bono separado en docentes
+        # Generar descripción completa
+        descripcion_completa = self.generar_descripcion_completa(docente, payment)
         
-        monto_sin_actualizacion_letras = monto_a_letras(monto_sin_actualizacion)
-        servicio_actualizacion_letras = monto_a_letras(servicio_actualizacion)
-        bono_letras = monto_a_letras(bono_para_mostrar)
-
-        # NUEVO: Generar actividades_docentes
-        actividades_base = "• Dictar clases, preparar las clases, evaluar a los alumnos, diseñar exámenes, entregar notas y presentar informe de dictado de curso."
-        actividades_adicionales = ("• Revisar y actualizar los materiales de enseñanza conforme a los planes de estudio "
-                                        "vigentes.\n• Elaborar y mejorar materiales didácticos y recursos pedagógicos para clases presenciales y "
-                                        "virtuales.\n• Actualizar instrumentos de evaluación (exámenes y prácticas).")
-        
-        if servicio_actualizacion > 0 and monto_sin_actualizacion > 0:
-            actividades_docentes = f"{actividades_base}\n{actividades_adicionales}"
-        elif servicio_actualizacion > 0 and monto_sin_actualizacion == 0:
-            actividades_docentes = actividades_adicionales
-        else:
-            actividades_docentes = actividades_base
-        
-        tipo_contrato = getattr(fila, "Estado_docente", "N/A")
-        nro_contrato_val = getattr(fila, "Nro_Contrato", "N/A")
         try:
-            nro_contrato = str(int(float(nro_contrato_val)))
-        except (ValueError, TypeError):
-            nro_contrato = str(nro_contrato_val)
-
-        if tipo_fase_inicial == "administrativo":
-            modalidad_servicio = "presencial"
-        else:
-            modalidad_servicio = "híbrida"
-
-        # -------- GENERAR OFICIO --------
-        if tipo_contrato == "CONTRATO":
-            ruta_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_contrato.docx')
-        elif tipo_contrato == "TERCERO":
-            ruta_oficio = ruta_absoluta_relativa('./Modelos_documentos/oficio_tercero.docx')
-        else:
-            ruta_oficio = None
-
-        reemplazos_oficio = {
-            "Nro_Contrato": nro_contrato,
-            "docente": docente,
-            "descripcion": descripcion_final,
-            "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-            "monto_subtotal": f"S/. {monto_total:,.2f} ({monto_total_letras})",
-            "numero_armada": numero_armada,
-            "modalidad_servicio": modalidad_servicio
-        }
-        ruta_salida_oficio = os.path.join(carpeta_docente, f"OFICIO - {nombre_docente} - {mes} {año_actual}.docx")
-        generar_documento(ruta_oficio, reemplazos_oficio, ruta_salida_oficio)
-        if tipo_fase_inicial == "administrativo":
-            if os.path.exists(ruta_salida_oficio):
-                doc = Document(ruta_salida_oficio)
-                for parrafo in doc.paragraphs:
-                    for run in parrafo.runs:
-                        if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                            run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-                for tabla in doc.tables:
-                    for fila in tabla.rows:
-                        for celda in fila.cells:
-                            for parrafo in celda.paragraphs:
-                                for run in parrafo.runs:
-                                    if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                                        run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-                doc.save(ruta_salida_oficio)
-
-        # -------- GENERAR TDR --------
-        if tipo_contrato == "TERCERO":
-            tipo_tdr = str(getattr(fila, "Categoria_letra", "")).strip().upper()
-            ruta_tdr = ruta_absoluta_relativa(f'./Modelos_documentos/tdr_tipo{tipo_tdr}_.docx')
-
-            reemplazos_tdr = {
-                "descripcion": descripcion_final,
-                "actividades_docentes": actividades_docentes,
-                "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono_para_mostrar, bono_letras, monto_total, monto_total_letras),
-                "modalidad_servicio": modalidad_servicio,
-            }
-
-            if tipo_fase_inicial == "administrativo":
-                ruta_tdr = ruta_absoluta_relativa('./Modelos_documentos/tdr_administrativo.docx')
-
-                reemplazos_tdr = {
-                    "descripcion": descripcion_final,
-                    "finalidad_publica": finalidad_publica,
-                    "formacion_academica": formacion_academica,
-                    "experiencia_laboral": experiencia_laboral,
-                    "requisitos_adicional": requisitos_adi,
-                    "actividades_admin": actividades_admin,
-                    "actividades_docentes": actividades_docentes,
-                    "categoria": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                    "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono_para_mostrar, bono_letras, monto_total, monto_total_letras),
-                    "modalidad_servicio": modalidad_servicio
-                }
-
-            ruta_salida_tdr = os.path.join(carpeta_docente, f"TDR - {nombre_docente} - {mes} {año_actual}.docx")
-            generar_documento(ruta_tdr, reemplazos_tdr, ruta_salida_tdr)
-            if tipo_fase_inicial == "administrativo":
-                if os.path.exists(ruta_salida_tdr):
-                    doc = Document(ruta_salida_tdr)
-                    for parrafo in doc.paragraphs:
-                        for run in parrafo.runs:
-                            if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                                run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-                    for tabla in doc.tables:
-                        for fila in tabla.rows:
-                            for celda in fila.cells:
-                                for parrafo in celda.paragraphs:
-                                    for run in parrafo.runs:
-                                        if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                                            run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-                    doc.save(ruta_salida_tdr)
-            ruta_salida_tdr_pdf = ruta_salida_tdr.replace('.docx', '.pdf')
-            convert(ruta_salida_tdr, ruta_salida_tdr_pdf)
-
-        # -------- GENERAR COTIZACIÓN --------
-
-        if tipo_fase_inicial == "administrativo" or (tipo_fase_inicial != "administrativo" and tipo_contrato == "TERCERO"):
-            ruta_cotizacion = ruta_absoluta_relativa('./Modelos_documentos/modelo_cotizacion.docx')
-
-            if tipo_fase_inicial != "administrativo":
-                if servicio_actualizacion > 0 and monto_sin_actualizacion > 0:
-                    actividades_admin = """-	Dictar clases.
--	Preparar las clases.
--	Evaluar a los alumnos.
--	Diseñar exámenes.
--	Entregar acta de nota.
--	Presentar informe de dictado de curso.
--   Revisar y actualizar los materiales de enseñanza conforme a los planes de estudio vigentes.
--   Elaborar y mejorar materiales didácticos y recursos pedagógicos para clases presenciales y virtuales.
--   Actualizar instrumentos de evaluación (exámenes y prácticas).
-"""
-                elif servicio_actualizacion > 0 and monto_sin_actualizacion == 0:
-                    actividades_admin = """-	Revisar y actualizar los materiales de enseñanza conforme a los planes de estudio vigentes.
--	Elaborar y mejorar materiales didácticos y recursos pedagógicos para clases presenciales y virtuales.
--	Actualizar instrumentos de evaluación (exámenes y prácticas).
-"""
-                else:
-                    actividades_admin = """-	Dictar clases.
--	Preparar las clases.
--	Evaluar a los alumnos.
--	Diseñar exámenes.
--	Entregar acta de nota.
--	Presentar informe de dictado de curso.
-"""
-                ruta_firma = ruta_absoluta_relativa(f'firmas_docentes/{nombre_docente}.png')
-            else:
-                ruta_firma = ruta_absoluta_relativa(f'firmas_admin/{nombre_docente}.png')
-
-
+            # 1. Generar OFICIO (para todos)
+            self.oficio_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
             
+            # 2. Generar TDR (solo para terceros)
+            if docente.es_tercero:
+                self.tdr_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
             
-            reemplazos = {
-                "nombre_docente": docente,
-                "direccion_cot": f"Dirección: {direccion}",
-                "ruc_docente_cot": f"RUC N.º {ruc}",
-                "correo_docente_cot": f"Correo: {correo}",
-                "celular_cot": f"Teléfono: {celular}",
-                "descripcion_servicio": descripcion_final,
-                "actividades_admin": actividades_admin,
-                "categoria_monto": f"S/. {categoria_valor:,.2f} ({monto_categoria_letras})",
-                "monto_subtotal": generar_monto_referencial(monto_sin_actualizacion, monto_sin_actualizacion_letras, servicio_actualizacion, servicio_actualizacion_letras, bono_para_mostrar, bono_letras, monto_total, monto_total_letras) if (servicio_actualizacion > 0 or bono_para_mostrar > 0) else f"S/. {monto_total:,.2f} ({monto_total_letras})",
-                "dni_cot": f"DNI: {dni_docente}",
-                "modalidad_servicio": modalidad_servicio,
-            }
+            # 3. Generar COTIZACIÓN (para administrativos o terceros)
+            if self.config.es_administrativo or docente.es_tercero:
+                self.cotizacion_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
+            
+            print(f"✅ {docente.nombre} - Documentos generados correctamente.")
+            
+        except Exception as e:
+            print(f"❌ Error generando documentos para {docente.nombre}: {e}")
 
-            ruta_salida_cot = os.path.join(carpeta_docente, f"COTIZACIÓN - {nombre_docente} - {mes} {año_actual}.docx")
-            generar_documento(ruta_cotizacion, reemplazos, ruta_salida_cot, ruta_firma)
-            if tipo_fase_inicial == "administrativo":
-                if os.path.exists(ruta_salida_cot):
-                    doc = Document(ruta_salida_cot)
-                    for parrafo in doc.paragraphs:
-                        for run in parrafo.runs:
-                            if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                                run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-                    for tabla in doc.tables:
-                        for fila in tabla.rows:
-                            for celda in fila.cells:
-                                for parrafo in celda.paragraphs:
-                                    for run in parrafo.runs:
-                                        if ", monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text or "Monto por hora: S/. 1.00 (uno y 00/100 soles)" in run.text:
-                                            run.text = run.text.replace(", monto por hora: S/. 1.00 (uno y 00/100 soles)", "").replace("Monto por hora: S/. 1.00 (uno y 00/100 soles)", "")
-                    doc.save(ruta_salida_cot)
 
-        print(f"{docente} - Documentos generados correctamente.")
+def procesar_planilla_fase_inicial(
+    planilla_path: str,
+    hoja_seleccionada: str,
+    carpeta_destino: str,
+    mes: str,
+    numero_armada: str,
+    tipo_fase_inicial: str
+) -> None:
+    # Crear configuración
+    config = DocumentConfig(
+        mes=mes,
+        anio=datetime.datetime.now().year,
+        numero_armada=numero_armada,
+        tipo_fase="inicial",
+        tipo_docente=tipo_fase_inicial,
+        carpeta_destino=carpeta_destino
+    )
+    
+    # Crear generador
+    generador = FaseInicialGenerator(config)
+    
+    # Leer planilla
+    excel_service = ExcelReaderService()
+    df = excel_service.leer_planilla(planilla_path, hoja_seleccionada)
+    
+    # Procesar cada fila
+    for i, fila in enumerate(df.itertuples(index=False), start=1):
+        try:
+            # Extraer datos
+            docente = excel_service.extraer_docente_data(fila)
+            payment = excel_service.extraer_payment_data(fila)
+            
+            # Generar documentos
+            generador.generar_documentos_docente(docente, payment)
+            
+        except ValueError as e:
+            print(f"Fila {i}: {e}")
+            continue
+        except Exception as e:
+            print(f"Fila {i}: Error inesperado - {e}")
+            continue
