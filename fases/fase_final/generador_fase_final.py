@@ -24,10 +24,14 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
     servicio_actualizacion = float(getattr(fila, "Servicio_actualizacion", 0))
     bono = float(getattr(fila, "Bono", 0))
     
+    # Para administrativos: el bono solo se suma al total, no se muestra separado ni en texto
     if tipo_fase_final == "administrativo":
         descripcion = str(getattr(fila, "Curso", "N/A"))
+        bono_para_mostrar = 0  # No mostrar bono separado en administrativos
     else:
         descripcion = redactar_cursos(descripcion_raw, tiene_bono=(bono > 0))
+        bono_para_mostrar = bono  # Mostrar bono separado en docentes
+    
     disenio_examenes = float(getattr(fila, "Disenio_examenes", 0))
     disenio_cant_horas = disenio_examenes / categoria_valor
     horas_disenio = f"{int(round(disenio_cant_horas))} horas de diseño de exámenes"
@@ -51,7 +55,14 @@ def generador_conformidad(fila, ruta_conformidad, ruta_destino, numero_armada, t
             descripcion_final = f"{descripcion}, {horas_disenio} y {horas_clasif}"
     
     monto_categoria_letras = monto_a_letras(categoria_valor)
-    monto_total = getattr(fila, "Total_pago", 0)
+    monto_total_base = getattr(fila, "Total_pago", 0)
+    
+    # Para administrativos: sumar el bono al monto total
+    if tipo_fase_final == "administrativo":
+        monto_total = monto_total_base + bono
+    else:
+        monto_total = monto_total_base
+    
     monto_total_letras = monto_a_letras(monto_total) 
     nro_contrato_val = getattr(fila, "Nro_Contrato", "")
     
