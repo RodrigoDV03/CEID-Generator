@@ -13,6 +13,7 @@ from googleapiclient.errors import HttpError
 from .config import TipoCorreo, AÑO_ACTUAL
 from .gmail_service import GmailService
 from .email_builder import EmailBuilderFactory
+from .gmail_service import autenticar_gmail
 
 
 logger = logging.getLogger(__name__)
@@ -287,10 +288,9 @@ def enviar_correo_personalizado(
     email_personalizado.enviar(nombre, pdf_path, destinatario, mes, tipo_enum, servicio)
 
 
-def enviar_lote_desde_gui(data_para_envio: list, mes: str, tipo: str) -> None:
+def enviar_lote_desde_gui(data_para_envio: list, mes: str, tipo: str, anio: Optional[int] = None) -> None:
     logger.debug("enviar_lote_desde_gui() está deprecated. Usar LoteEmailSender.")
     
-    from .gmail_service import autenticar_gmail
     service = autenticar_gmail()
     
     gmail_service = GmailService()
