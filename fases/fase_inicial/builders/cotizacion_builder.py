@@ -25,26 +25,28 @@ class CotizacionBuilder:
             self.config.es_administrativo
         )
         
-        # Generar actividades para cotización (formato con guiones)
-        actividades = self.description_service.generar_actividades_admin_cotizacion(payment)
+        # Generar actividades según el tipo
+        if self.config.es_administrativo:
+            # Para administrativos, las actividades están en actividades_admin
+            actividades = docente.actividades_admin
+        else:
+            # Para docentes, generar actividades con formato de guiones
+            actividades = self.description_service.generar_actividades_admin_cotizacion(payment)
         
         # Obtener datos de contacto formateados
         contacto = self.docente_service.obtener_datos_contacto_formateados(docente)
         
-        # Determinar formato de monto subtotal
-        if payment.tiene_servicio_actualizacion or montos['bono_para_mostrar'] > 0:
-            monto_subtotal = self.payment_service.generar_monto_referencial(
-                montos['monto_sin_actualizacion'],
-                montos['monto_sin_actualizacion_letras'],
-                montos['servicio_actualizacion'],
-                montos['servicio_actualizacion_letras'],
-                montos['bono_para_mostrar'],
-                montos['bono_letras'],
-                montos['monto_total'],
-                montos['monto_total_letras']
-            )
-        else:
-            monto_subtotal = montos['monto_total_formato']
+        # Generar monto referencial con nota de impuestos
+        monto_subtotal = self.payment_service.generar_monto_referencial(
+            montos['monto_sin_actualizacion'],
+            montos['monto_sin_actualizacion_letras'],
+            montos['servicio_actualizacion'],
+            montos['servicio_actualizacion_letras'],
+            montos['bono_para_mostrar'],
+            montos['bono_letras'],
+            montos['monto_total'],
+            montos['monto_total_letras']
+        )
         
         reemplazos = {
             "nombre_docente": docente.nombre,

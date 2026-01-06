@@ -1,4 +1,3 @@
-import pandas as pd
 import os
 from docx import Document
 from decimal import Decimal, ROUND_HALF_UP

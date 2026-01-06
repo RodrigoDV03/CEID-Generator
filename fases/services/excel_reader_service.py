@@ -48,6 +48,7 @@ class ExcelReaderService:
             requisitos_adicional=str(getattr(fila, "Requisitos_adicional", "")),
             finalidad_publica=str(getattr(fila, "Finalidad_publica", "")),
             especialidad=str(getattr(fila, "Especialidad", "")),
+            actividades_admin=str(getattr(fila, "Actividades_admin", "")),
             estado_docente=str(getattr(fila, "Estado_docente", "TERCERO")).strip().upper(),
             numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_contrato", ""))
         )
