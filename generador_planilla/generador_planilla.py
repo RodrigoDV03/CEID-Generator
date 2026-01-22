@@ -9,12 +9,19 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
     año_actual = datetime.datetime.now().year
     es_enero = month.lower() == 'enero'
     
+    print(f"🚀 Iniciando generación de planilla para {month} {año_actual}")
+    print(f"📁 Archivo coordinación: {excel_coordinacion}")
+    
     try:
         limpiar_cache_excel()
         limpiar_cache_procesamiento()
         
+        print("📂 Cargando archivo de datos...")
         datos = cargar_archivo(data_path)
+        print(f"✅ Datos cargados: {len(datos)} registros")
+        
         datos_docentes = pd.read_excel(excel_docentes, sheet_name="list")
+        print(f"✅ Docentes cargados: {len(datos_docentes)} registros")
 
         datos = limpiar_docentes(datos, 'docente')
         datos_docentes = limpiar_docentes(datos_docentes, 'Docente')
@@ -42,8 +49,14 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 print(f"⚠️ Error al comparar con la primera planilla: {e}")
 
         agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
+        print("✅ Agrupación completada")
+        
         agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto, datos_docentes)
-        agrupar = agregar_servicio_coordinacion(agrupar, excel_coordinacion, normalizar_texto, datos_docentes)  # Nueva línea
+        print("✅ Examen de clasificación agregado")
+        
+        print("🔄 Procesando servicio de coordinación...")
+        agrupar = agregar_servicio_coordinacion(agrupar, excel_coordinacion, normalizar_texto, datos_docentes)
+        print("✅ Servicio de coordinación agregado")
 
         TABLA = construir_tabla_planilla_con_cache(agrupar, es_enero, monto_bono)
 
@@ -155,6 +168,9 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         return f"{nombre_salida} generado correctamente."
 
     except Exception as e:
+        import traceback
+        print(f"❌ Error completo:")
+        print(traceback.format_exc())
         return f"❌ Error: {e}"
     finally:
         limpiar_cache_planilla()

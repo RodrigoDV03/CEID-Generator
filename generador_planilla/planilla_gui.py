@@ -22,7 +22,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
 
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     carga_var = ctk.IntVar(value=1)
-    monto_bono_var = ctk.DoubleVar(value=0)
+    monto_bono_var = ctk.StringVar(value="0")
 
     # --- Header ---
     titulo(root, "Generador de Planilla - CEID")
@@ -94,7 +94,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
             marco_bono.pack(fill="x", padx=30, pady=10)
         else:
             marco_bono.pack_forget()
-            monto_bono_var.set(0)
+            monto_bono_var.set("0")
     
     mes_var.trace_add("write", actualizar_visibilidad_bono)
     actualizar_visibilidad_bono()
@@ -141,23 +141,29 @@ def iniciar_interfaz_planilla(callback_volver=None):
         # Validar monto del bono si es enero
         if mes_var.get() == "Enero":
             try:
-                monto = monto_bono_var.get()
+                monto_str = monto_bono_var.get().strip()
+                if monto_str == "":
+                    monto = 0.0
+                else:
+                    monto = float(monto_str)
                 if monto < 0:
                     messagebox.showerror("Error", "⚠️ El monto del bono no puede ser negativo.")
                     return
-            except:
+            except ValueError:
                 messagebox.showerror("Error", "⚠️ El monto del bono debe ser un número válido.")
                 return
+        else:
+            monto = 0.0
         
         resultado = generar_planilla(
             archivo_cursos_path, 
-            archivo_docentes_path, 
+            archivo_docentes_path,
             archivo_clasif_path, 
-            archivo_coordinacion_path,  # Nuevo parámetro
+            archivo_coordinacion_path,
             mes_var.get(), 
             carga_var.get(), 
             archivo_planilla_anterior_path if carga_var.get()==2 else None,
-            monto_bono_var.get()  # Nuevo parámetro para el bono
+            monto
         )
         if resultado.startswith("Error"):
             messagebox.showerror("Error", resultado)

@@ -8,14 +8,22 @@ import unicodedata
 def cargar_archivo(ruta):
     extension = os.path.splitext(ruta)[-1].lower()
     if extension == ".csv":
-        # Intentar lectura normal primero
+        # Intentar lectura normal primero con detección automática de delimitador
         try:
-            df = pd.read_csv(ruta)
-            # Si tiene solo una columna, probablemente está mal formateado
-            if len(df.columns) == 1:
-                return parsear_csv_comillas_dobles(ruta)
-            return df
-        except Exception:
+            # Primero intentar con punto y coma (;)
+            df = pd.read_csv(ruta, sep=';', encoding='utf-8-sig')
+            if len(df.columns) > 1:
+                return df
+            
+            # Si solo tiene una columna, intentar con coma
+            df = pd.read_csv(ruta, sep=',', encoding='utf-8-sig')
+            if len(df.columns) > 1:
+                return df
+            
+            # Si todavía no funciona, usar el parser personalizado
+            return parsear_csv_comillas_dobles(ruta)
+        except Exception as e:
+            print(f"⚠️ Error al leer CSV con pandas: {e}")
             return parsear_csv_comillas_dobles(ruta)
     elif extension in [".xls", ".xlsx"]:
         return pd.read_excel(ruta)
@@ -25,12 +33,18 @@ def cargar_archivo(ruta):
 def parsear_csv_comillas_dobles(ruta):
     """Parsea CSV con formato de comillas dobles anidadas"""
     
+    print(f"🔍 Parseando CSV: {ruta}")
+    
     with open(ruta, 'r', encoding='utf-8') as f:
         lineas = f.readlines()
     
+    print(f"📄 Total de líneas en archivo: {len(lineas)}")
+    if lineas:
+        print(f"📝 Primera línea (raw): {repr(lineas[0][:200])}")  # Mostrar primeros 200 caracteres
+    
     datos_parseados = []
     
-    for linea in lineas:
+    for idx, linea in enumerate(lineas):
         linea = linea.strip()
         if not linea:
             continue
@@ -81,6 +95,10 @@ def parsear_csv_comillas_dobles(ruta):
         if campo_actual:
             campos.append(campo_actual.strip())
         
+        # Debug: mostrar info de la primera línea (headers)
+        if idx == 0:
+            print(f"🔤 Headers detectados ({len(campos)} columnas): {campos}")
+        
         # Limitar a 13 columnas
         if len(campos) > 13:
             campos = campos[:13]
@@ -90,7 +108,25 @@ def parsear_csv_comillas_dobles(ruta):
     if datos_parseados:
         headers = datos_parseados[0]
         filas = datos_parseados[1:]
-        return pd.DataFrame(filas, columns=headers)
+        
+        # Debug: verificar consistencia
+        if filas:
+            print(f"📊 Primera fila de datos ({len(filas[0])} columnas): {filas[0][:3]}...")
+        
+        # Verificar que todas las filas tengan el mismo número de columnas que el header
+        max_cols = len(headers)
+        filas_ajustadas = []
+        for fila in filas:
+            if len(fila) < max_cols:
+                # Rellenar con valores vacíos si faltan columnas
+                fila = fila + [''] * (max_cols - len(fila))
+            elif len(fila) > max_cols:
+                # Truncar si hay más columnas
+                fila = fila[:max_cols]
+            filas_ajustadas.append(fila)
+        
+        print(f"✅ Creando DataFrame con {len(headers)} columnas y {len(filas_ajustadas)} filas")
+        return pd.DataFrame(filas_ajustadas, columns=headers)
     
     return pd.DataFrame()
 
@@ -168,10 +204,14 @@ def aplicar_transformaciones_base(datos):
     # Aplicar modalidad (mantener apply por ahora ya que la lógica es compleja)
     datos_transformados['modalidad'] = datos_transformados.apply(ajustar_modalidad, axis=1)
     
-    # NUEVO: Procesar cursos intensivos (duplicar filas y agregar "Intensivo" al nivel)
-    datos_transformados = procesar_cursos_intensivos(datos_transformados)
+    # Agregar "Intensivo" al nivel para cursos intensivos (sin duplicar filas)
+    mask_intensivo = datos_transformados['modalidad'] == 'INTENSIVO VIRTUAL'
+    for idx in datos_transformados[mask_intensivo].index:
+        nivel_original = str(datos_transformados.loc[idx, 'nivel']).strip()
+        if not nivel_original.startswith('Intensivo'):
+            datos_transformados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
     
-    # Construir curso de forma vectorizada (se ejecuta después del procesamiento intensivo)
+    # Construir curso de forma vectorizada
     datos_transformados['Curso'] = (
         datos_transformados['idioma'].astype(str) + ' ' + 
         datos_transformados['nivel'].astype(str) + ' ' + 
@@ -386,8 +426,10 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
         coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
         
         # Agrupar por docente (sumar horas si aparece múltiples veces)
-        coordinacion_agrupado = coordinacion_df.groupby(columna_docente)[columna_horas].sum().reset_index()
-        coordinacion_agrupado.columns = ['Docente_Original', 'Horas_Total']
+        print(f"📊 Antes de agrupar - columnas: {coordinacion_df.columns.tolist()}")
+        coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
+        print(f"📊 Después de agrupar - columnas: {coordinacion_agrupado.columns.tolist()}, shape: {coordinacion_agrupado.shape}")
+        coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
         
         # Aplicar normalización para matching
         coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
@@ -743,8 +785,10 @@ def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_doce
         coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
         
         # Agrupar por docente (sumar horas si aparece múltiples veces)
-        coordinacion_agrupado = coordinacion_df.groupby(columna_docente)[columna_horas].sum().reset_index()
-        coordinacion_agrupado.columns = ['Docente_Original', 'Horas_Total']
+        print(f"📊 Antes de agrupar (tabla) - columnas: {coordinacion_df.columns.tolist()}")
+        coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
+        print(f"📊 Después de agrupar (tabla) - columnas: {coordinacion_agrupado.columns.tolist()}, shape: {coordinacion_agrupado.shape}")
+        coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
         
         # Aplicar normalización para matching
         coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
