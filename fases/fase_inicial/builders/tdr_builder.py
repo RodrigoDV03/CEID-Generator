@@ -55,7 +55,7 @@ class TdrBuilder:
                 "formacion_academica": docente.formacion_academica,
                 "experiencia_laboral": docente.experiencia_laboral,
                 "requisitos_adicional": docente.requisitos_adicional,
-                "actividades_admin": docente.curso  # Para administrativos, curso contiene actividades
+                "actividades_admin": docente.actividades_admin  # Para administrativos, curso contiene actividades
             })
         
         return reemplazos
