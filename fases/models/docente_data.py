@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 
 
@@ -22,6 +21,7 @@ class DocenteData:
     requisitos_adicional: str = ""
     finalidad_publica: str = ""
     especialidad: str = ""
+    actividades_admin: str = ""
     
     # Tipo de contrato
     estado_docente: str = "TERCERO"  # "CONTRATO" o "TERCERO"

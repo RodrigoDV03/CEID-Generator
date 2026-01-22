@@ -81,15 +81,18 @@ class PaymentService:
         if len(lineas) > 1:
             lineas.append(
                 f"Monto total: S/. {monto_total:,.2f} ({monto_total_letras}). "
-                "Incluye el impuesto y la contribución de ley"
+                "Incluye el impuesto y la contribución de ley."
             )
         else:
-            # Si solo hay un concepto, solo agregar la nota de impuestos
-            lineas.append("Incluye el impuesto y la contribución de ley")
-            lineas_texto = lineas[0]
-            if not lineas_texto.endswith("."):
-                lineas_texto += "."
-            return lineas_texto.replace(".", ". Incluye el impuesto y la contribución de ley", 1)
+            # Si solo hay un concepto, agregar la nota de impuestos al final
+            if len(lineas) > 0:
+                lineas_texto = lineas[0]
+                # Remover el punto final si existe, para evitar doble punto
+                if lineas_texto.endswith("."):
+                    lineas_texto = lineas_texto[:-1]
+                # Agregar la nota de impuestos con punto final
+                lineas_texto += ". Incluye el impuesto y la contribución de ley."
+                return lineas_texto
         
         return "\n".join(lineas)
     
