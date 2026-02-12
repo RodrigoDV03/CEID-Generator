@@ -1,180 +1,223 @@
 import customtkinter as ctk
 from tkinter import filedialog
+from datetime import datetime
 import os
+
 from .generador_planilla import generar_planilla
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
-def iniciar_interfaz_planilla(callback_volver=None):
-    archivo_cursos_path = ""
-    archivo_docentes_path = ""
-    archivo_clasif_path = ""
-    archivo_coordinacion_path = ""  # Nueva variable
-    archivo_planilla_anterior_path = ""
 
+def iniciar_interfaz_planilla(callback_volver=None):
+    # =========================
+    # VARIABLES DE ESTADO
+    # =========================
+    archivo_cursos = ""
+    archivo_docentes = ""
+    archivo_clasif = ""
+    archivo_coordinacion = ""
+    archivo_planilla_anterior = ""
+    carpeta_destino = ""
+
+    # =========================
+    # CONFIG APP
+    # =========================
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
     root = ctk.CTk()
-    root.title("Generador de Planilla - CEID")
+    root.title("Generador de Planillas - CEID")
     root.after(100, lambda: root.state("zoomed"))
     root.configure(fg_color=BG_COLOR)
 
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     carga_var = ctk.IntVar(value=1)
-    monto_bono_var = ctk.StringVar(value="0")
+    bono_var = ctk.StringVar(value="0")
 
-    # --- Header ---
-    titulo(root, "Generador de Planilla - CEID")
+    # =========================
+    # FUNCIONES AUXILIARES
+    # =========================
+    def estado(label, texto, color=WHITE_COLOR):
+        label.configure(text=texto, text_color=color)
 
-    # --- Tarjeta principal ---
-    card = ctk.CTkFrame(root, fg_color=SECTION_COLOR, corner_radius=15)
-    card.pack(padx=40, pady=20, fill="x", expand=False)
+    def validar_formulario():
+        valido = (
+            archivo_cursos and
+            archivo_docentes and
+            archivo_clasif and
+            (carga_var.get() == 1 or archivo_planilla_anterior)
+        )
+        btn_generar.configure(state="normal" if valido else "disabled")
 
-    # ---------------- SECCIÓN: Mes y carga ----------------
-    etiqueta(card, "Seleccione el mes de la planilla a elaborar:")
+    # =========================
+    # HEADER
+    # =========================
+    titulo(root, "Generador de Planillas – CEID")
 
-    crear_option_menu(card, variable=mes_var, opciones=meses)
+    contenedor = ctk.CTkScrollableFrame(root, fg_color=BG_COLOR)
+    contenedor.pack(fill="both", expand=True, padx=40, pady=20)
 
-    lbl_carga = ctk.CTkLabel(card, text="Número de planilla:", font=FONT_SECTION, text_color=WHITE_COLOR)
-    lbl_carga.pack(anchor="w", padx=20, pady=(10, 5))
-    ctk.CTkRadioButton(card, text="1 (Primera planilla)", variable=carga_var, value=1, text_color=WHITE_COLOR).pack(anchor="w", padx=35)
-    ctk.CTkRadioButton(card, text="2 (Segunda planilla)", variable=carga_var, value=2, text_color=WHITE_COLOR).pack(anchor="w", padx=35, pady=(0, 10))
+    # =====================================================
+    # ① CONFIGURACIÓN GENERAL
+    # =====================================================
+    frame_conf = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_conf.pack(fill="x", pady=10)
 
-    # ---------------- SECCIÓN: Planilla anterior ----------------
-    marco_planilla_anterior = ctk.CTkFrame(card, fg_color="transparent")
-    marco_planilla_anterior.pack(fill="x", padx=30, pady=10)
+    etiqueta(frame_conf, "① Configuración General")
 
-    seccion_titulo = ctk.CTkLabel(marco_planilla_anterior, text="Planilla anterior", font=FONT_SECTION, text_color=WHITE_COLOR)
-    seccion_titulo.pack(anchor="w", pady=(0, 5))
+    crear_option_menu(frame_conf, mes_var, meses)
 
-    label_planilla_estado = ctk.CTkLabel(marco_planilla_anterior, text="📂 No seleccionado", text_color=WHITE_COLOR)
-    label_planilla_estado.pack(side="left", padx=10, pady=10)
+    ctk.CTkRadioButton(
+        frame_conf, text="Primera planilla",
+        variable=carga_var, value=1, text_color=WHITE_COLOR
+    ).pack(anchor="w", padx=30)
 
-    def seleccionar_planilla_anterior():
-        archivo = filedialog.askopenfilename(filetypes=[("Archivos Excel", "*.xlsx *.xls")])
-        if archivo:
-            nonlocal archivo_planilla_anterior_path
-            archivo_planilla_anterior_path = archivo
-            label_planilla_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=WHITE_COLOR)
+    ctk.CTkRadioButton(
+        frame_conf, text="Segunda planilla",
+        variable=carga_var, value=2, text_color=WHITE_COLOR
+    ).pack(anchor="w", padx=30, pady=(0, 10))
 
-    btn_planilla_anterior = ctk.CTkButton(marco_planilla_anterior, text="Seleccionar archivo", command=seleccionar_planilla_anterior, width=160,
-                                            fg_color=BUTTON_BG_COLOR, hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON)
-    btn_planilla_anterior.pack(side="right", padx=15)
+    # Bono solo Enero
+    frame_bono = ctk.CTkFrame(frame_conf, fg_color="transparent")
+    lbl_bono = ctk.CTkLabel(frame_bono, text="Monto bono (solo enero)", text_color=WHITE_COLOR)
+    entry_bono = ctk.CTkEntry(frame_bono, textvariable=bono_var, width=200)
 
-    def actualizar_visibilidad_planilla_anterior(*args):
-        if carga_var.get() == 2:
-            marco_planilla_anterior.pack(fill="x", padx=30, pady=10)
-        else:
-            marco_planilla_anterior.pack_forget()
-            nonlocal archivo_planilla_anterior_path
-            archivo_planilla_anterior_path = ""
-            label_planilla_estado.configure(text="📂 No seleccionado", text_color=WHITE_COLOR)
-
-    carga_var.trace_add("write", actualizar_visibilidad_planilla_anterior)
-    actualizar_visibilidad_planilla_anterior()
-
-    # ---------------- SECCIÓN: Monto Bono (solo para enero) ----------------
-    marco_bono = ctk.CTkFrame(card, fg_color="transparent")
-    
-    seccion_bono_titulo = ctk.CTkLabel(marco_bono, text="Monto del Bono", font=FONT_SECTION, text_color=WHITE_COLOR)
-    seccion_bono_titulo.pack(anchor="w", pady=(0, 5))
-    
-    marco_bono_input = ctk.CTkFrame(marco_bono, fg_color="transparent")
-    marco_bono_input.pack(fill="x")
-    
-    ctk.CTkLabel(marco_bono_input, text="Ingrese el monto del bono:", text_color=WHITE_COLOR).pack(side="left", padx=10)
-    
-    entry_bono = ctk.CTkEntry(marco_bono_input, textvariable=monto_bono_var, width=200, 
-                               placeholder_text="Ej: 500.00")
-    entry_bono.pack(side="left", padx=10)
-    
-    def actualizar_visibilidad_bono(*args):
+    def toggle_bono(*_):
         if mes_var.get() == "Enero":
-            marco_bono.pack(fill="x", padx=30, pady=10)
+            frame_bono.pack(anchor="w", padx=30, pady=10)
         else:
-            marco_bono.pack_forget()
-            monto_bono_var.set("0")
-    
-    mes_var.trace_add("write", actualizar_visibilidad_bono)
-    actualizar_visibilidad_bono()
+            frame_bono.pack_forget()
+            bono_var.set("0")
 
-    # ---------------- SECCIÓN: Archivos ----------------
-    def crear_selector_archivo(master, texto_label, extensiones, actualizar_func):
-        frame = ctk.CTkFrame(master, fg_color="transparent")
-        frame.pack(fill="x", padx=30, pady=10)
+    lbl_bono.pack(anchor="w")
+    entry_bono.pack(anchor="w")
+    mes_var.trace_add("write", toggle_bono)
+    toggle_bono()
 
-        lbl = ctk.CTkLabel(frame, text=texto_label, font=FONT_SECTION, text_color=WHITE_COLOR)
-        lbl.pack(anchor="w", pady=(0, 5))
+    # =====================================================
+    # ② ARCHIVOS OBLIGATORIOS
+    # =====================================================
+    frame_req = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_req.pack(fill="x", pady=10)
 
-        container = ctk.CTkFrame(frame, fg_color="transparent")
-        container.pack(fill="x")
+    etiqueta(frame_req, "② Archivos obligatorios")
 
-        label_estado = ctk.CTkLabel(container, text="📂 No seleccionado", text_color=WHITE_COLOR)
-        label_estado.pack(side="left", padx=10, pady=10)
+    def selector_archivo(texto, extensiones, setter):
+        frame = ctk.CTkFrame(frame_req, fg_color="transparent")
+        frame.pack(fill="x", padx=30, pady=5)
+
+        lbl = ctk.CTkLabel(frame, text=texto, text_color=WHITE_COLOR)
+        lbl.pack(anchor="w")
+
+        estado_lbl = ctk.CTkLabel(frame, text="📂 No seleccionado", text_color="#B0B0B0")
+        estado_lbl.pack(side="left", padx=10)
 
         def seleccionar():
             archivo = filedialog.askopenfilename(filetypes=[extensiones])
             if archivo:
-                actualizar_func(archivo)
-                label_estado.configure(text=f"📁 {os.path.basename(archivo)}", text_color=WHITE_COLOR)
+                setter(archivo)
+                estado(estado_lbl, f"✅ {os.path.basename(archivo)}", "#4CAF50")
+                validar_formulario()
 
-        ctk.CTkButton(container, text="Seleccionar archivo", command=seleccionar, width=160, fg_color=BUTTON_BG_COLOR,
-                        hover_color=BUTTON_HOVER_BG_COLOR, text_color=WHITE_COLOR, font=FONT_BUTTON).pack(side="right", padx=10)
+        ctk.CTkButton(
+            frame, text="Seleccionar",
+            command=seleccionar,
+            width=140
+        ).pack(side="right")
 
-    def actualizar_cursos(path): nonlocal archivo_cursos_path; archivo_cursos_path = path
-    def actualizar_docentes(path): nonlocal archivo_docentes_path; archivo_docentes_path = path
-    def actualizar_clasif(path): nonlocal archivo_clasif_path; archivo_clasif_path = path
-    def actualizar_coordinacion(path): nonlocal archivo_coordinacion_path; archivo_coordinacion_path = path  # Nueva función
+    def set_cursos(v): nonlocal archivo_cursos; archivo_cursos = v
+    def set_docentes(v): nonlocal archivo_docentes; archivo_docentes = v
+    def set_clasif(v): nonlocal archivo_clasif; archivo_clasif = v
 
-    crear_selector_archivo(card, "Adjunte el archivo de la data de cursos del mes", ("Archivos CSV", "*.csv"), actualizar_cursos)
-    crear_selector_archivo(card, "Adjunte el archivo de la lista de docentes", ("Archivos Excel", "*.xlsx *.xls"), actualizar_docentes)
-    crear_selector_archivo(card, "Adjunte el archivo de Examen de Clasificación", ("Archivos Excel", "*.xlsx *.xls"), actualizar_clasif)
-    crear_selector_archivo(card, "Adjunte el archivo de Coordinación (Actualización de Materiales)", ("Archivos Excel", "*.xlsx *.xls"), actualizar_coordinacion)  # Nueva línea
+    selector_archivo("Archivo de cursos (CSV)", ("CSV", "*.csv"), set_cursos)
+    selector_archivo("Lista de docentes (Excel)", ("Excel", "*.xlsx *.xls"), set_docentes)
+    selector_archivo("Examen de clasificación", ("Excel", "*.xlsx *.xls"), set_clasif)
 
-    # ---------------- BOTÓN DE PROCESAR ----------------
+    # =====================================================
+    # ③ ARCHIVOS ADICIONALES
+    # =====================================================
+    frame_opt = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_opt.pack(fill="x", pady=10)
+
+    etiqueta(frame_opt, "③ Archivos adicionales")
+
+    def set_coord(v): nonlocal archivo_coordinacion; archivo_coordinacion = v
+    selector_archivo("Coordinación / Actualización", ("Excel", "*.xlsx *.xls"), set_coord)
+
+    # Planilla anterior (solo segunda carga)
+    def set_planilla(v): nonlocal archivo_planilla_anterior; archivo_planilla_anterior = v
+
+    def toggle_planilla_anterior(*_):
+        if carga_var.get() == 2:
+            selector_archivo(
+                "Planilla anterior (obligatorio)",
+                ("Excel", "*.xlsx *.xls"),
+                set_planilla
+            )
+        validar_formulario()
+
+    carga_var.trace_add("write", toggle_planilla_anterior)
+
+    # =====================================================
+    # ④ DESTINO Y EJECUCIÓN
+    # =====================================================
+    frame_exec = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_exec.pack(fill="x", pady=10)
+
+    etiqueta(frame_exec, "④ Destino y ejecución")
+
+    lbl_destino = ctk.CTkLabel(
+        frame_exec,
+        text="📂 Carpeta destino: automática",
+        text_color="#B0B0B0"
+    )
+    lbl_destino.pack(anchor="w", padx=30)
+
+    def elegir_destino():
+        nonlocal carpeta_destino
+        carpeta = filedialog.askdirectory()
+        if carpeta:
+            carpeta_destino = carpeta
+            estado(lbl_destino, f"📁 {carpeta}", "#4CAF50")
+
+    ctk.CTkButton(
+        frame_exec, text="Elegir carpeta",
+        command=elegir_destino
+    ).pack(anchor="w", padx=30, pady=10)
+
+    # =========================
+    # BOTÓN GENERAR
+    # =========================
     def procesar():
-        if not archivo_cursos_path or not archivo_docentes_path or not archivo_clasif_path:
-            messagebox.showerror("Faltan archivos", "⚠️ Debes seleccionar al menos: cursos, docentes y examen de clasificación.")
+        if not messagebox.askyesno("Confirmar", "¿Generar la planilla con los datos seleccionados?"):
             return
-        
-        # Validar monto del bono si es enero
-        if mes_var.get() == "Enero":
-            try:
-                monto_str = monto_bono_var.get().strip()
-                if monto_str == "":
-                    monto = 0.0
-                else:
-                    monto = float(monto_str)
-                if monto < 0:
-                    messagebox.showerror("Error", "⚠️ El monto del bono no puede ser negativo.")
-                    return
-            except ValueError:
-                messagebox.showerror("Error", "⚠️ El monto del bono debe ser un número válido.")
-                return
-        else:
-            monto = 0.0
-        
+
         resultado = generar_planilla(
-            archivo_cursos_path, 
-            archivo_docentes_path,
-            archivo_clasif_path, 
-            archivo_coordinacion_path,
-            mes_var.get(), 
-            carga_var.get(), 
-            archivo_planilla_anterior_path if carga_var.get()==2 else None,
-            monto
+            archivo_cursos,
+            archivo_docentes,
+            archivo_clasif,
+            archivo_coordinacion,
+            mes_var.get(),
+            carga_var.get(),
+            archivo_planilla_anterior if carga_var.get() == 2 else None,
+            float(bono_var.get() or 0),
+            carpeta_destino or None
         )
-        if resultado.startswith("Error"):
+
+        if resultado.startswith("❌"):
             messagebox.showerror("Error", resultado)
         else:
             messagebox.showinfo("Éxito", resultado)
 
-    boton_generador(card, "Generar Planilla", procesar)
+    btn_generar = ctk.CTkButton(
+        contenedor,
+        text="GENERAR PLANILLA",
+        height=50,
+        state="disabled",
+        command=procesar
+    )
+    btn_generar.pack(pady=20)
 
-    # ---------------- Footer y volver ----------------
     boton_volver(root, callback_volver)
-
     footer(root)
-
     root.mainloop()

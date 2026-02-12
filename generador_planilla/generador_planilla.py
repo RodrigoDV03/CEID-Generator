@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from .functions import *
 from .excel_styles import *
 
-def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordinacion, month, numero_carga, primera_planilla: str = None, monto_bono: float = 0):
+def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordinacion, month, numero_carga, primera_planilla: str = None, monto_bono: float = 0, carpeta_destino: str = None):
     año_actual = datetime.datetime.now().year
     es_enero = month.lower() == 'enero'
     
@@ -67,8 +67,13 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
             numero_carga_letra = "Segunda"
         nombre_hoja_carga = f"{numero_carga_letra} carga académica"
 
-        carpeta_salida = f"{month} {año_actual}"
-        os.makedirs(carpeta_salida, exist_ok=True)
+        # Usar carpeta destino seleccionada o crear carpeta por defecto
+        if carpeta_destino and os.path.isdir(carpeta_destino):
+            carpeta_salida = carpeta_destino
+        else:
+            carpeta_salida = f"{month} {año_actual}"
+            os.makedirs(carpeta_salida, exist_ok=True)
+        
         nombre_salida = f"{estado_planilla} {month} {año_actual}.xlsx"
         ruta_salida = os.path.join(carpeta_salida, nombre_salida)
 
