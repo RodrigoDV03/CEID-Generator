@@ -50,7 +50,8 @@ class ExcelReaderService:
             especialidad=str(getattr(fila, "Especialidad", "")),
             actividades_admin=str(getattr(fila, "Actividades_admin", "")),
             estado_docente=str(getattr(fila, "Estado_docente", "TERCERO")).strip().upper(),
-            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_contrato", ""))
+            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_contrato", "")),
+            idioma = str(getattr(fila, "Docente_idioma", ""))
         )
     
     @staticmethod

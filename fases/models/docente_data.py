@@ -22,6 +22,7 @@ class DocenteData:
     finalidad_publica: str = ""
     especialidad: str = ""
     actividades_admin: str = ""
+    idioma: str = ""
     
     # Tipo de contrato
     estado_docente: str = "TERCERO"  # "CONTRATO" o "TERCERO"

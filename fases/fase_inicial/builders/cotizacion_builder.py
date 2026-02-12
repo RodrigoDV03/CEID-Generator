@@ -50,6 +50,7 @@ class CotizacionBuilder:
         
         reemplazos = {
             "nombre_docente": docente.nombre,
+            "idioma_docente": docente.idioma,
             "descripcion_servicio": descripcion_completa,
             "actividades_admin": actividades,
             "categoria_monto": montos['categoria_formato'],
