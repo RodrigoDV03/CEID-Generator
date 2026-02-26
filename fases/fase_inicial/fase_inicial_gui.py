@@ -40,8 +40,7 @@ def iniciar_interfaz_fase_inicial(callback_volver=None):
 
     def seleccionar_archivo():
         nonlocal planilla_path
-        ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes",
-                                          filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        ruta = filedialog.askopenfilename(title="Seleccionar planilla del mes", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if ruta:
             try:
                 hojas = pd.ExcelFile(ruta).sheet_names

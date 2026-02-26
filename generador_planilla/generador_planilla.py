@@ -20,6 +20,12 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         datos = cargar_archivo(data_path)
         print(f"✅ Datos cargados: {len(datos)} registros")
         
+        # Procesar CSV con nuevo formato de columnas
+        if 'Detalle Curso' in datos.columns or 'Horario Completo' in datos.columns:
+            print("🔄 Detectado nuevo formato de CSV, procesando columnas...")
+            datos = procesar_csv_nuevo_formato(datos)
+            print("✅ Columnas del CSV procesadas correctamente")
+        
         datos_docentes = pd.read_excel(excel_docentes, sheet_name="list")
         print(f"✅ Docentes cargados: {len(datos_docentes)} registros")
 

@@ -55,7 +55,7 @@ class CotizacionBuilder:
             "actividades_admin": actividades,
             "categoria_monto": montos['categoria_formato'],
             "monto_subtotal": monto_subtotal,
-            "modalidad_servicio": self.config.modalidad_servicio,
+            "modalidad_servicio": docente.modalidad_texto,
         }
         
         # Agregar datos de contacto

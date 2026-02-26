@@ -35,7 +35,7 @@ class ConformidadBuilder:
             "monto_hora": montos['categoria_formato'],
             "Nro_Contrato": numero_contrato,
             "numero_armada": self.config.numero_armada,
-            "modalidad_servicio": self.config.modalidad_servicio
+            "modalidad_servicio": docente.modalidad_texto
         }
     
     def generar(

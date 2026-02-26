@@ -5,161 +5,263 @@ import sys
 import threading
 from tkinter import filedialog
 from datetime import datetime
-from .envio_correos import procesar_correos_docente_gmail, procesar_correos_administrativos_gmail, enviar_lote_desde_gui_docentes, enviar_lote_desde_gui_administrativos
+
+from .envio_correos import (
+    procesar_correos_docente_gmail,
+    procesar_correos_administrativos_gmail,
+    enviar_lote_desde_gui_docentes,
+    enviar_lote_desde_gui_administrativos
+)
+
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
+
 def iniciar_interfaz_correos(callback_volver=None):
+
+    # =========================
+    # CONFIG GENERAL
+    # =========================
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
-    data_para_envio = []
-
     root = ctk.CTk()
-    root.title("Envío de correos | CEID")
-    root.configure(fg_color=BG_COLOR)
+    root.title("Envío de correos – CEID")
     root.after(100, lambda: root.state("zoomed"))
+    root.configure(fg_color=BG_COLOR)
 
-    hoja_var = ctk.StringVar()
+    # =========================
+    # VARIABLES DE ESTADO
+    # =========================
+    tipo_var = ctk.StringVar(value="Docente")
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
     año_var = ctk.StringVar(value=str(datetime.now().year))
-    tipo_var = ctk.StringVar(value="Docente")
 
-    ruta_excel = None
-    pdfs_seleccionados = []
+    ruta_excel = ""
+    pdfs = []
+    data_envio = []
 
-    # --- TÍTULO PRINCIPAL ---
-    titulo(root, "Envío de correos | CEID")
+    # =========================
+    # FUNCIONES AUXILIARES
+    # =========================
+    def set_estado(label, texto, color="#B0B0B0"):
+        label.configure(text=texto, text_color=color)
 
-    # --- CARD PRINCIPAL ---
-    card = ctk.CTkFrame(root, fg_color=SECTION_COLOR, corner_radius=15)
-    card.pack(padx=40, pady=20, fill="both", expand=False)
+    def validar_generar():
+        valido = bool(ruta_excel and pdfs)
+        btn_generar.configure(state="normal" if valido else "disabled")
 
-    # --- TIPO DE DESTINATARIO ---
-    etiqueta(card, "Tipo de destinatario:")
-    crear_option_menu(card, tipo_var, ["Docente", "Administrativo"])
+    def validar_envio():
+        btn_enviar.configure(
+            state="normal" if data_envio else "disabled"
+        )
 
-    # --- ARCHIVO EXCEL ---
-    etiqueta(card, "Seleccionar excel de docentes o administrativos:")
+    # =========================
+    # HEADER
+    # =========================
+    titulo(root, "Envío de Correos – CEID")
 
-    def seleccionar_archivo():
+    contenedor = ctk.CTkScrollableFrame(root, fg_color=BG_COLOR)
+    contenedor.pack(fill="both", expand=True, padx=40, pady=20)
+
+    # =====================================================
+    # ① CONFIGURACIÓN DEL ENVÍO
+    # =====================================================
+    frame_conf = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_conf.pack(fill="x", pady=10)
+
+    etiqueta(frame_conf, "① Configuración del envío")
+
+    crear_option_menu(frame_conf, tipo_var, ["Docente", "Administrativo"])
+    crear_option_menu(frame_conf, mes_var, meses)
+
+    años = [str(a) for a in range(datetime.now().year - 2, datetime.now().year + 3)]
+    crear_option_menu(frame_conf, año_var, años)
+
+    # =====================================================
+    # ② ARCHIVOS REQUERIDOS
+    # =====================================================
+    frame_archivos = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_archivos.pack(fill="x", pady=10)
+
+    etiqueta(frame_archivos, "② Archivos requeridos")
+
+    # ---- EXCEL ----
+    lbl_excel = ctk.CTkLabel(frame_archivos, text="📂 Excel no seleccionado", text_color="#B0B0B0")
+    lbl_excel.pack(anchor="w", padx=30, pady=5)
+
+    def seleccionar_excel():
         nonlocal ruta_excel
-        ruta = filedialog.askopenfilename(title="Seleccionar excel de docentes o administrativos", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
+        ruta = filedialog.askopenfilename(
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+        )
         if ruta:
             try:
-                hojas = pd.ExcelFile(ruta).sheet_names
-                hoja_var.set("list")
-                label_excel.configure(text=f"📁 {os.path.basename(ruta)}", text_color=WHITE_COLOR)
-                boton_gen_data.configure(state="normal")
+                pd.ExcelFile(ruta)
                 ruta_excel = ruta
+                set_estado(lbl_excel, f"✅ {os.path.basename(ruta)}", "#4CAF50")
+                validar_generar()
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudieron leer las hojas:\n{e}")
+                messagebox.showerror("Error", f"No se pudo leer el Excel:\n{e}")
 
-    boton_excel, label_excel = crear_boton_archivo(card, "📂 No seleccionado", seleccionar_archivo)
+    ctk.CTkButton(
+        frame_archivos,
+        text="Seleccionar Excel",
+        command=seleccionar_excel,
+        width=180
+    ).pack(anchor="w", padx=30)
 
-    # --- ARCHIVOS PDF ---
-    etiqueta(card, "Seleccionar PDFs de órdenes de servicio:")
+    # ---- PDFs ----
+    lbl_pdfs = ctk.CTkLabel(frame_archivos, text="📂 Ningún PDF seleccionado", text_color="#B0B0B0")
+    lbl_pdfs.pack(anchor="w", padx=30, pady=5)
 
     def seleccionar_pdfs():
-        nonlocal pdfs_seleccionados
+        nonlocal pdfs
         rutas = filedialog.askopenfilenames(
-            title="Seleccionar PDFs de órdenes de servicio",
             filetypes=[("Archivos PDF", "*.pdf")]
         )
         if rutas:
-            pdfs_seleccionados = list(rutas)
-            label_pdfs.configure(text=f"📁 {len(pdfs_seleccionados)} PDFs seleccionados", text_color=WHITE_COLOR)
+            pdfs = list(rutas)
+            set_estado(lbl_pdfs, f"✅ {len(pdfs)} PDFs seleccionados", "#4CAF50")
+            validar_generar()
 
-    boton_pdfs, label_pdfs = crear_boton_archivo(card, "📂 Ningún PDF seleccionado", seleccionar_pdfs)
+    ctk.CTkButton(
+        frame_archivos,
+        text="Seleccionar PDFs",
+        command=seleccionar_pdfs,
+        width=180
+    ).pack(anchor="w", padx=30, pady=(0, 10))
 
-    # --- FECHA ---
-    etiqueta(card, "Mes:")
-    crear_option_menu(card, mes_var, meses)
-    
-    etiqueta(card, "Año:")
-    años_disponibles = [str(año) for año in range(datetime.now().year - 2, datetime.now().year + 3)]
-    crear_option_menu(card, año_var, años_disponibles)
+    # =====================================================
+    # ③ GENERAR Y VALIDAR DATOS
+    # =====================================================
+    frame_gen = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_gen.pack(fill="x", pady=10)
 
-    # --- BOTÓN GENERAR DATA ---
+    etiqueta(frame_gen, "③ Generar y validar datos")
+
+    lbl_estado_data = ctk.CTkLabel(
+        frame_gen,
+        text="⏳ Aún no se han generado datos",
+        text_color="#B0B0B0"
+    )
+    lbl_estado_data.pack(anchor="w", padx=30)
+
     def generar_data():
-        nonlocal data_para_envio
-        if not ruta_excel or not hoja_var.get() or not pdfs_seleccionados:
-            messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
-            return
+        nonlocal data_envio
+        btn_generar.configure(state="disabled")
+        set_estado(lbl_estado_data, "⏳ Generando datos...", "#FFA726")
+
         def tarea():
-            nonlocal data_para_envio
+            nonlocal data_envio
             try:
                 if tipo_var.get() == "Docente":
-                    data_para_envio = procesar_correos_docente_gmail(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                    data_envio = procesar_correos_docente_gmail(ruta_excel, "list", pdfs)
                 else:
-                    data_para_envio = procesar_correos_administrativos_gmail(ruta_excel, hoja_var.get(), pdfs_seleccionados)
+                    data_envio = procesar_correos_administrativos_gmail(ruta_excel, "list", pdfs)
 
-                if not data_para_envio:
-                    messagebox.showwarning("Aviso", "No se generó ninguna coincidencia para envío.")
+                if not data_envio:
+                    set_estado(lbl_estado_data, "⚠️ No se encontraron coincidencias", "#FF7043")
                 else:
-                    messagebox.showinfo("Éxito", f"Datos generados. Revisar antes de enviar.")
+                    set_estado(
+                        lbl_estado_data,
+                        f"✅ {len(data_envio)} correos listos para envío",
+                        "#4CAF50"
+                    )
+                    validar_envio()
+
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo procesar: {e}")
+                messagebox.showerror("Error", f"No se pudo procesar:\n{e}")
+            finally:
+                btn_generar.configure(state="normal")
 
         threading.Thread(target=tarea).start()
 
-    boton_gen_data = boton_generador(card, "Generar Datos", generar_data)
+    btn_generar = ctk.CTkButton(
+        frame_gen,
+        text="Generar datos",
+        state="disabled",
+        command=generar_data,
+        width=200
+    )
+    btn_generar.pack(anchor="w", padx=30, pady=10)
 
-    # --- CONSOLA EMBEBIDA ---
-    consola_frame = ctk.CTkFrame(root, fg_color=CONSOLE_BG, corner_radius=12)
-    consola_frame.pack(padx=40, pady=(10, 20), fill="both", expand=True)
-    consola_text = ctk.CTkTextbox(consola_frame, height=120, wrap="word", fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
-    consola_text.pack(padx=10, pady=10, fill="both", expand=True)
-    consola_text.configure(state="disabled")
+    # =====================================================
+    # CONSOLA
+    # =====================================================
+    consola_frame = ctk.CTkFrame(contenedor, fg_color=CONSOLE_BG, corner_radius=12)
+    consola_frame.pack(fill="both", expand=True, pady=10)
 
-    class TextRedirector:
-        def __init__(self, text_widget):
-            self.text_widget = text_widget
-        def write(self, message):
-            if self.text_widget.winfo_exists():
-                self.text_widget.configure(state="normal")
-                self.text_widget.insert("end", message)
-                self.text_widget.see("end")
-                self.text_widget.configure(state="disabled")
+    consola = ctk.CTkTextbox(
+        consola_frame,
+        fg_color=CONSOLE_BG,
+        text_color=WHITE_COLOR,
+        wrap="word"
+    )
+    consola.pack(fill="both", expand=True, padx=10, pady=10)
+    consola.configure(state="disabled")
+
+    class Redirector:
+        def write(self, msg):
+            consola.configure(state="normal")
+            consola.insert("end", msg)
+            consola.see("end")
+            consola.configure(state="disabled")
         def flush(self): pass
 
-    sys.stdout = TextRedirector(consola_text)
-    sys.stderr = TextRedirector(consola_text)
+    sys.stdout = Redirector()
+    sys.stderr = Redirector()
 
-    # --- BOTÓN ENVIAR CORREOS ---
+    # =====================================================
+    # ④ ENVÍO FINAL
+    # =====================================================
+    frame_envio = ctk.CTkFrame(contenedor, fg_color=SECTION_COLOR, corner_radius=15)
+    frame_envio.pack(fill="x", pady=10)
+
+    etiqueta(frame_envio, "④ Envío final")
+
     def enviar():
-        if not data_para_envio:
-            messagebox.showerror("Error", "No hay datos para enviar. Primero genere la data.")
+        if not data_envio:
             return
 
-        respuesta = messagebox.askyesno("Confirmación", f"Se enviarán {len(data_para_envio)} correos. ¿Continuar?")
-        if not respuesta:
+        resumen = (
+            f"Se enviarán {len(data_envio)} correos\n\n"
+            f"¿Desea continuar?"
+        )
+
+        if not messagebox.askyesno("Confirmar envío", resumen):
             return
 
-        boton_envio.configure(state="disabled")  # Deshabilita el botón mientras se envía
+        btn_enviar.configure(state="disabled")
 
         def tarea_envio():
             try:
-                año_seleccionado = int(año_var.get())
+                año = int(año_var.get())
                 if tipo_var.get() == "Docente":
-                    enviar_lote_desde_gui_docentes(data_para_envio, mes_var.get(), año_seleccionado)
+                    enviar_lote_desde_gui_docentes(data_envio, mes_var.get(), año)
                 else:
-                    enviar_lote_desde_gui_administrativos(data_para_envio, mes_var.get(), año_seleccionado)
+                    enviar_lote_desde_gui_administrativos(data_envio, mes_var.get(), año)
 
-                messagebox.showinfo("Éxito", "Todos los correos fueron enviados correctamente.")
+                messagebox.showinfo("Éxito", "Correos enviados correctamente.")
             except Exception as e:
-                messagebox.showerror("Error", f"Fallo en el envío: {e}")
+                messagebox.showerror("Error", f"Fallo en el envío:\n{e}")
             finally:
-                boton_envio.configure(state="normal")
+                btn_enviar.configure(state="normal")
 
         threading.Thread(target=tarea_envio).start()
 
-    boton_envio = boton_generador(card, "Enviar Correos", enviar)
+    btn_enviar = ctk.CTkButton(
+        frame_envio,
+        text="Enviar correos",
+        height=45,
+        state="disabled",
+        command=enviar
+    )
+    btn_enviar.pack(padx=30, pady=15)
 
-    # --- BOTÓN VOLVER ---
+    # =========================
+    # FOOTER
+    # =========================
     boton_volver(root, callback_volver)
-
-    # --- FOOTER ---
     footer(root)
-
     root.mainloop()

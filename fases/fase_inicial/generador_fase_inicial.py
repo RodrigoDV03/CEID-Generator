@@ -37,7 +37,8 @@ class FaseInicialGenerator:
         # Para docentes, redactar cursos con formato
         descripcion_base = self.description_service.redactar_cursos(
             docente.curso,
-            tiene_bono=payment.tiene_bono
+            tiene_bono=payment.tiene_bono,
+            tiene_servicio_actualizacion=payment.tiene_servicio_actualizacion
         )
         
         # Generar descripciones de horas

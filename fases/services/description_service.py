@@ -5,7 +5,7 @@ from fases.models import PaymentData
 class DescriptionService:
     
     @staticmethod
-    def redactar_cursos(cadena_cursos: str, tiene_bono: bool = False) -> str:
+    def redactar_cursos(cadena_cursos: str, tiene_bono: bool = False, tiene_servicio_actualizacion: bool = False) -> str:
         if not isinstance(cadena_cursos, str):
             return "N/A"
         
@@ -22,6 +22,12 @@ class DescriptionService:
             else:
                 # Para cursos académicos normales, agregar el formato tradicional
                 elementos_descripcion.append(f"28 horas de clases de {curso}")
+        
+        # Agregar servicio de actualización si existe y no está ya en la lista
+        if tiene_servicio_actualizacion:
+            # Verificar que no esté ya agregado desde la columna Curso
+            if not any("Servicio de actualización" in elem for elem in elementos_descripcion):
+                elementos_descripcion.append("Servicio de actualización de materiales de enseñanza")
         
         # Agregar el bono al final si existe
         if tiene_bono:
@@ -89,8 +95,7 @@ class DescriptionService:
     @staticmethod
     def generar_actividades_docentes(payment: PaymentData) -> str:
         actividades_base = (
-            "• Dictar clases, preparar las clases, evaluar a los alumnos, "
-            "diseñar exámenes, entregar notas y presentar informe de dictado de curso."
+            "• Dictar clases, preparar las clases, evaluar a los alumnos, diseñar exámenes, entregar notas y presentar informe de dictado de curso."
         )
         
         actividades_actualizacion = (

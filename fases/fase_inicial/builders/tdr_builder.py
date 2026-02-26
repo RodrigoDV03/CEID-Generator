@@ -45,7 +45,7 @@ class TdrBuilder:
             "actividades_docentes": actividades,
             "categoria": montos['categoria_formato'],
             "monto_subtotal": monto_referencial,
-            "modalidad_servicio": self.config.modalidad_servicio,
+            "modalidad_servicio": docente.modalidad_texto,
         }
         
         # Agregar campos adicionales para administrativos

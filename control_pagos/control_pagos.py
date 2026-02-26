@@ -43,7 +43,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         header_row_temp = None
         for r in range(1, min(ws_temp.max_row, 15) + 1):
             values = [str(c.value).strip() if c.value is not None else "" for c in ws_temp[r]]
-            if any(v.upper() == "APELLIDOS Y NOMBRES" for v in values):
+            if any(v.upper() == "DOCENTE" for v in values):
                 header_row_temp = r
                 break
         
@@ -52,7 +52,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
                 nombre_cell = None
                 for col in range(1, ws_temp.max_column + 1):
                     header_val = str(ws_temp.cell(header_row_temp, col).value or "").strip().upper()
-                    if header_val == "APELLIDOS Y NOMBRES":
+                    if header_val == "DOCENTE":
                         nombre_cell = ws_temp.cell(row, col)
                         break
                 
@@ -90,15 +90,15 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     ws = wb.active
     ws_values = wb_values.active
 
-    # "APELLIDOS Y NOMBRES"
+    # "DOCENTE"
     header_row = None
     for r in range(1, min(ws.max_row, 15) + 1):
         values = [str(c.value).strip() if c.value is not None else "" for c in ws[r]]
-        if any(v.upper() == "APELLIDOS Y NOMBRES" for v in values):
+        if any(v.upper() == "DOCENTE" for v in values):
             header_row = r
             break
     if header_row is None:
-        raise RuntimeError("No se encontró la fila de encabezados con 'APELLIDOS Y NOMBRES'.")
+        raise RuntimeError("No se encontró la fila de encabezados con 'DOCENTE'.")
 
     headers = {}
     for cell in ws[header_row]:
@@ -107,8 +107,8 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
             headers[key] = cell.column
 
     req = [
-        "APELLIDOS Y NOMBRES",
-        "MONTO TOTAL PARA CONTRATO S/",
+        "DOCENTE",
+        "TOTAL",
         "PRIMERA ARMADA",
         "SEGUNDA ARMADA",
         "TERCERA ARMADA",
@@ -119,8 +119,8 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         if _norm(titulo) not in headers:
             raise RuntimeError(f"No se encontró la columna: {titulo}")
 
-    col_idx_nombre  = headers["APELLIDOS Y NOMBRES"]
-    col_idx_total   = headers["MONTO TOTAL PARA CONTRATO S/"]
+    col_idx_nombre  = headers["DOCENTE"]
+    col_idx_total   = headers["TOTAL"]
     col_idx_primera = headers["PRIMERA ARMADA"]
     col_idx_segunda = headers["SEGUNDA ARMADA"]
     col_idx_tercera = headers["TERCERA ARMADA"]
@@ -143,7 +143,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     first_data_row = header_row + 1
     for r in range(first_data_row, ws.max_row + 1):
         nombre = ws.cell(row=r, column=col_idx_nombre).value
-        if not nombre or str(nombre).strip().upper() in {"APELLIDOS Y NOMBRES", ""}:
+        if not nombre or str(nombre).strip().upper() in {"DOCENTE", ""}:
             continue
 
         monto = monto_por_nombre(str(nombre))

@@ -134,6 +134,155 @@ def limpiar_docentes(df, col):
     df[col] = df[col].astype(str).str.strip()
     return df
 
+def procesar_csv_nuevo_formato(df):
+    """
+    Procesa el DataFrame con el nuevo formato de columnas del CSV y lo convierte
+    al formato interno esperado por el sistema.
+    
+    Nuevas columnas esperadas:
+    - Programa Educativo
+    - Detalle Curso
+    - Modalidad
+    - Sede
+    - Horario Completo
+    - Docente
+    - Fecha Inicio Clases
+    - Fecha Fin Clases
+    - Total Matriculados
+    """
+    import re
+    
+    df_procesado = df.copy()
+    
+    # Mapeo directo de columnas
+    mapeo_columnas = {
+        'Modalidad': 'modalidad',
+        'Sede': 'sede',
+        'Docente': 'docente',
+        'Total Matriculados': 'matriculados'
+    }
+    
+    # Renombrar columnas directas
+    for col_origen, col_destino in mapeo_columnas.items():
+        if col_origen in df_procesado.columns:
+            df_procesado[col_destino] = df_procesado[col_origen]
+    
+    # Procesar "Detalle Curso" para extraer idioma, nivel y ciclo
+    if 'Detalle Curso' in df_procesado.columns:
+        def extraer_info_curso(detalle):
+            if pd.isna(detalle):
+                return pd.Series({'idioma': '', 'nivel': '', 'ciclo': ''})
+            
+            detalle_str = str(detalle).strip()
+            # Patrón: "Idioma Nivel Número"
+            # Ejemplos: "Alemán Básico 2", "Francés Básico 1", "Inglés Avanzado 3"
+            patron = r'^([A-Za-zÀ-ÿ]+)\s+([A-Za-zÀ-ÿ]+)\s+(\d+)$'
+            match = re.match(patron, detalle_str)
+            
+            if match:
+                idioma = match.group(1)
+                nivel = match.group(2)
+                ciclo = match.group(3)
+                return pd.Series({'idioma': idioma, 'nivel': nivel, 'ciclo': ciclo})
+            else:
+                # Si no coincide con el patrón, intentar una extracción más flexible
+                partes = detalle_str.split()
+                if len(partes) >= 3:
+                    # Último elemento debe ser número (ciclo)
+                    ciclo = partes[-1]
+                    # Penúltimo elemento es el nivel
+                    nivel = partes[-2]
+                    # Todo lo demás es el idioma
+                    idioma = ' '.join(partes[:-2])
+                    return pd.Series({'idioma': idioma, 'nivel': nivel, 'ciclo': ciclo})
+                else:
+                    return pd.Series({'idioma': detalle_str, 'nivel': '', 'ciclo': ''})
+        
+        df_info = df_procesado['Detalle Curso'].apply(extraer_info_curso)
+        df_procesado['idioma'] = df_info['idioma']
+        df_procesado['nivel'] = df_info['nivel']
+        df_procesado['ciclo'] = df_info['ciclo']
+    
+    # Procesar "Horario Completo" para extraer dias, horainicio y horafin
+    if 'Horario Completo' in df_procesado.columns:
+        def extraer_info_horario(horario):
+            if pd.isna(horario):
+                return pd.Series({'dias': '', 'horainicio': '', 'horafin': ''})
+            
+            horario_str = str(horario).strip()
+            
+            # Mapeo de días en español a inglés
+            dias_map = {
+                'Lun': 'MONDAY',
+                'Mar': 'TUESDAY',
+                'Mie': 'WEDNESDAY',
+                'Mié': 'WEDNESDAY',
+                'Jue': 'THURSDAY',
+                'Vie': 'FRIDAY',
+                'Sab': 'SATURDAY',
+                'Sáb': 'SATURDAY',
+                'Dom': 'SUNDAY'
+            }
+            
+            # Patrón: "Día1,Día2,Día3 HH:MM am/pm - HH:MM am/pm"
+            # Ejemplo: "Lun,Mar,Mie,Jue 07:30 pm - 09:30 pm"
+            try:
+                # Separar días del rango de horas
+                if ' ' in horario_str:
+                    partes = horario_str.split(' ', 1)
+                    dias_str = partes[0]
+                    horas_str = partes[1] if len(partes) > 1 else ''
+                    
+                    # Procesar días
+                    dias_lista = [d.strip() for d in dias_str.split(',')]
+                    dias_ingles = [dias_map.get(d, d.upper()) for d in dias_lista]
+                    dias_formateado = '{' + ','.join(dias_ingles) + '}'
+                    
+                    # Procesar horas
+                    if '-' in horas_str:
+                        horas_partes = horas_str.split('-')
+                        hora_inicio_str = horas_partes[0].strip()
+                        hora_fin_str = horas_partes[1].strip() if len(horas_partes) > 1 else ''
+                        
+                        # Convertir de 12h a 24h
+                        def convertir_12h_a_24h(hora_str):
+                            # Patrón: "07:30 pm" o "08:00 am"
+                            patron = r'(\d{1,2}):(\d{2})\s*(am|pm)'
+                            match = re.search(patron, hora_str, re.IGNORECASE)
+                            if match:
+                                hora = int(match.group(1))
+                                minuto = match.group(2)
+                                periodo = match.group(3).lower()
+                                
+                                if periodo == 'pm' and hora != 12:
+                                    hora += 12
+                                elif periodo == 'am' and hora == 12:
+                                    hora = 0
+                                
+                                return f"{hora:02d}:{minuto}:00"
+                            return hora_str
+                        
+                        hora_inicio = convertir_12h_a_24h(hora_inicio_str)
+                        hora_fin = convertir_12h_a_24h(hora_fin_str)
+                        
+                        return pd.Series({
+                            'dias': dias_formateado,
+                            'horainicio': hora_inicio,
+                            'horafin': hora_fin
+                        })
+                
+                return pd.Series({'dias': '', 'horainicio': '', 'horafin': ''})
+            except Exception as e:
+                print(f"Error al procesar horario '{horario_str}': {e}")
+                return pd.Series({'dias': '', 'horainicio': '', 'horafin': ''})
+        
+        df_horario = df_procesado['Horario Completo'].apply(extraer_info_horario)
+        df_procesado['dias'] = df_horario['dias']
+        df_procesado['horainicio'] = df_horario['horainicio']
+        df_procesado['horafin'] = df_horario['horafin']
+    
+    return df_procesado
+
 # ---------------- TRANSFORMACIONES DE DATOS ----------------
 
 def traducir_dias(dias_raw: str) -> str:

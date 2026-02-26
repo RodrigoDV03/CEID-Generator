@@ -37,7 +37,7 @@ class OficioBuilder:
             "categoria": montos['categoria_formato'],
             "monto_subtotal": montos['monto_total_formato'],
             "numero_armada": self.config.numero_armada,
-            "modalidad_servicio": self.config.modalidad_servicio
+            "modalidad_servicio": docente.modalidad_texto
         }
     
     def generar(
