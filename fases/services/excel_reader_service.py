@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import List, Any
-from fases.models import DocenteData, PaymentData
+from fases.models import DocenteData, PaymentData, CursoDetalle
 
 
 class ExcelReaderService:
@@ -100,3 +100,49 @@ class ExcelReaderService:
             # Si no se puede convertir, retornar como string limpio
             valor_str = str(valor).strip()
             return valor_str if valor_str else "001"
+    
+    @staticmethod
+    def leer_cursos_detallados_por_docente(
+        ruta_excel: str,
+        nombre_hoja: str,
+        nombre_docente: str
+    ) -> List[CursoDetalle]:
+        """
+        Lee la hoja Planilla_Generador expandida y extrae todos los cursos/servicios
+        de un docente específico con su modalidad.
+        
+        Args:
+            ruta_excel: Ruta al archivo Excel de la planilla
+            nombre_hoja: Nombre de la hoja (generalmente "Planilla_Generador")
+            nombre_docente: Nombre del docente a buscar
+        
+        Returns:
+            Lista de objetos CursoDetalle con todos los cursos/servicios del docente
+        """
+        try:
+            df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
+            df.columns = df.columns.str.strip()
+            
+            # Filtrar solo las filas de este docente
+            filas_docente = df[df['Docente'].str.strip().str.upper() == nombre_docente.strip().upper()]
+            
+            cursos = []
+            for _, fila in filas_docente.iterrows():
+                try:
+                    curso = CursoDetalle(
+                        nombre=str(fila['Curso_Individual']),
+                        modalidad=str(fila['Modalidad_Curso']),
+                        tipo_servicio=str(fila['Tipo_Servicio']),
+                        horas=int(fila['Horas_Servicio']) if not pd.isna(fila['Horas_Servicio']) else 0,
+                        monto=float(fila['Monto_Individual']) if not pd.isna(fila['Monto_Individual']) else 0.0
+                    )
+                    cursos.append(curso)
+                except Exception as e:
+                    print(f"⚠️ Error al procesar curso: {e}")
+                    continue
+            
+            return cursos
+            
+        except Exception as e:
+            print(f"⚠️ Error al leer cursos detallados: {e}")
+            return []

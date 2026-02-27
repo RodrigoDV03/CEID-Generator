@@ -1,7 +1,7 @@
 import os
-from typing import Dict
+from typing import Dict, List
 from docx2pdf import convert
-from fases.models import DocenteData, PaymentData, DocumentConfig
+from fases.models import DocenteData, PaymentData, DocumentConfig, CursoDetalle
 from fases.services import PaymentService, DescriptionService, DocumentGeneratorService
 from fases.utils import PathUtils
 
@@ -18,7 +18,8 @@ class TdrBuilder:
         self,
         docente: DocenteData,
         payment: PaymentData,
-        descripcion_completa: str
+        descripcion_completa: str,
+        cursos_detallados: List[CursoDetalle] = None
     ) -> Dict[str, str]:
         montos = self.payment_service.calcular_montos_completos(
             payment, 
@@ -40,12 +41,19 @@ class TdrBuilder:
             montos['monto_total_letras']
         )
         
+        # Generar modalidad_servicio: Usar agrupación por modalidad si hay cursos detallados
+        if cursos_detallados:
+            modalidad_servicio = self.description_service.agrupar_por_modalidad_tdr(cursos_detallados)
+        else:
+            # Fallback: usar modalidad única del docente
+            modalidad_servicio = docente.modalidad_texto
+        
         reemplazos = {
             "descripcion": descripcion_completa,
             "actividades_docentes": actividades,
             "categoria": montos['categoria_formato'],
             "monto_subtotal": monto_referencial,
-            "modalidad_servicio": docente.modalidad_texto,
+            "modalidad_servicio": modalidad_servicio,
         }
         
         # Agregar campos adicionales para administrativos
@@ -65,7 +73,8 @@ class TdrBuilder:
         docente: DocenteData,
         payment: PaymentData,
         descripcion_completa: str,
-        carpeta_docente: str
+        carpeta_docente: str,
+        cursos_detallados: List[CursoDetalle] = None
     ) -> str:
         # Obtener plantilla
         if self.config.es_administrativo:
@@ -76,8 +85,8 @@ class TdrBuilder:
                 f'./Modelos_documentos/tdr_tipo{docente.categoria_letra}_.docx'
             )
         
-        # Construir reemplazos
-        reemplazos = self.construir_reemplazos(docente, payment, descripcion_completa)
+        # Construir reemplazos (pasar cursos_detallados)
+        reemplazos = self.construir_reemplazos(docente, payment, descripcion_completa, cursos_detallados)
         
         # Generar nombre de archivo
         nombre_archivo = f"TDR - {docente.nombre_limpio} - {self.config.mes} {self.config.anio}.docx"

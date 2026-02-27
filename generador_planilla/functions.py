@@ -708,9 +708,9 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos
             # Buscar la columna de Monto de manera más específica
             columna_monto = None
             
-            # Prioridad 1: Buscar exactamente 'Monto'
-            if 'Monto' in clasif_df.columns:
-                columna_monto = 'Monto'
+            # Prioridad 1: Buscar exactamente 'Monto Total'
+            if 'Monto Total' in clasif_df.columns:
+                columna_monto = 'Monto Total'
             else:
                 # Prioridad 2: Buscar variaciones de 'Monto'
                 for col in clasif_df.columns:
@@ -1147,3 +1147,109 @@ def construir_tabla_planilla_con_cache(df, es_enero=False, monto_bono=0):
     except Exception as e:
         # Fallback: usar función original si hay error en cache
         return construir_tabla_planilla(df, es_enero, monto_bono)
+
+# ================================= EXPANSIÓN DE FILAS POR CURSO CON MODALIDAD ===================================================
+
+def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
+    """
+    Expande el DataFrame agrupado creando una fila por cada curso/servicio individual.
+    Cada fila incluye: curso individual, modalidad específica, tipo de servicio, horas y monto.
+    
+    Args:
+        agrupar_df: DataFrame con docentes agrupados (una fila por docente)
+        datos_csv_procesados: DataFrame original con información de cada curso
+    
+    Returns:
+        DataFrame expandido con múltiples filas por docente
+    """
+    filas_expandidas = []
+    
+    for _, row_docente in agrupar_df.iterrows():
+        # Usar el nombre ORIGINAL del CSV (columna 'docente' en minúscula)
+        # en lugar del nombre oficial (columna 'Docente' con mayúscula)
+        docente_nombre_csv = row_docente.get('docente', row_docente.get('Docente', None))
+        
+        # Validar que el nombre del docente no sea None o vacío
+        if pd.isna(docente_nombre_csv) or not str(docente_nombre_csv).strip():
+            print(f"⚠️ Saltando fila con nombre de docente vacío o None")
+            continue
+        
+        # Convertir a string y limpiar
+        docente_nombre_limpio = str(docente_nombre_csv).strip().upper()
+        
+        # Obtener todos los cursos de este docente del CSV original
+        cursos_docente = datos_csv_procesados[
+            datos_csv_procesados['docente'].fillna('').astype(str).str.strip().str.upper() == docente_nombre_limpio
+        ]
+        
+        # Debug: mostrar si no se encuentran cursos
+        if cursos_docente.empty:
+            print(f"⚠️ No se encontraron cursos para: {docente_nombre_csv} (oficial: {row_docente.get('Docente', 'N/A')})")
+        
+        # Para cada curso académico del docente
+        for _, curso_row in cursos_docente.iterrows():
+            fila_curso = row_docente.copy()
+            fila_curso['Curso_Individual'] = curso_row['Curso']
+            fila_curso['Modalidad_Curso'] = curso_row['modalidad']
+            fila_curso['Tipo_Servicio'] = 'CURSO_DICTADO'
+            fila_curso['Horas_Servicio'] = 28
+            # Validar categoria_monto antes de multiplicar
+            categoria_monto = row_docente['Categoria (Monto)'] if not pd.isna(row_docente['Categoria (Monto)']) else 0
+            fila_curso['Monto_Individual'] = categoria_monto * 28
+            filas_expandidas.append(fila_curso)
+        
+        # Agregar fila para examen de clasificación si aplica
+        examen_clasif = row_docente['Examen Clasif.'] if not pd.isna(row_docente['Examen Clasif.']) else 0
+        if examen_clasif > 0:
+            fila_examen = row_docente.copy()
+            fila_examen['Curso_Individual'] = 'Examen de clasificación'
+            fila_examen['Modalidad_Curso'] = 'VIRTUAL'
+            fila_examen['Tipo_Servicio'] = 'EXAMEN_CLASIF'
+            categoria_monto = row_docente['Categoria (Monto)'] if not pd.isna(row_docente['Categoria (Monto)']) else 1
+            horas_examen = int(examen_clasif / categoria_monto) if categoria_monto > 0 else 0
+            fila_examen['Horas_Servicio'] = horas_examen
+            fila_examen['Monto_Individual'] = examen_clasif
+            filas_expandidas.append(fila_examen)
+        
+        # Agregar fila para diseño de exámenes si aplica
+        diseno_examenes = row_docente['Diseño de Examenes'] if not pd.isna(row_docente['Diseño de Examenes']) else 0
+        if diseno_examenes > 0:
+            fila_diseno = row_docente.copy()
+            fila_diseno['Curso_Individual'] = 'Diseño de exámenes'
+            fila_diseno['Modalidad_Curso'] = 'N/A'
+            fila_diseno['Tipo_Servicio'] = 'DISENO_EXAMENES'
+            categoria_monto = row_docente['Categoria (Monto)'] if not pd.isna(row_docente['Categoria (Monto)']) else 1
+            horas_diseno = int(diseno_examenes / categoria_monto) if categoria_monto > 0 else 0
+            fila_diseno['Horas_Servicio'] = horas_diseno
+            fila_diseno['Monto_Individual'] = diseno_examenes
+            filas_expandidas.append(fila_diseno)
+        
+        # Agregar fila para servicio de actualización si aplica
+        servicio_act = row_docente['Servicio Actualización'] if not pd.isna(row_docente['Servicio Actualización']) else 0
+        if servicio_act > 0:
+            fila_servicio = row_docente.copy()
+            fila_servicio['Curso_Individual'] = 'Servicio de actualización de materiales de enseñanza'
+            fila_servicio['Modalidad_Curso'] = 'VIRTUAL'
+            fila_servicio['Tipo_Servicio'] = 'SERVICIO_ACTUALIZACION'
+            # Usar las horas reales del archivo de coordinación, NO calcularlas
+            horas_servicio = int(row_docente['Horas_Total']) if 'Horas_Total' in row_docente and not pd.isna(row_docente['Horas_Total']) else 0
+            fila_servicio['Horas_Servicio'] = horas_servicio
+            fila_servicio['Monto_Individual'] = servicio_act
+            filas_expandidas.append(fila_servicio)
+    
+    # Convertir lista de filas en DataFrame
+    if not filas_expandidas:
+        print("⚠️ No se generaron filas expandidas")
+        # Retornar DataFrame vacío con las columnas esperadas
+        columnas_nuevas = ['Curso_Individual', 'Modalidad_Curso', 'Tipo_Servicio', 'Horas_Servicio', 'Monto_Individual']
+        columnas_resto = [col for col in agrupar_df.columns]
+        return pd.DataFrame(columns=columnas_nuevas + columnas_resto)
+    
+    df_expandido = pd.DataFrame(filas_expandidas)
+    
+    # Reordenar columnas para que las nuevas estén al principio
+    columnas_nuevas = ['Curso_Individual', 'Modalidad_Curso', 'Tipo_Servicio', 'Horas_Servicio', 'Monto_Individual']
+    columnas_resto = [col for col in df_expandido.columns if col not in columnas_nuevas]
+    df_expandido = df_expandido[columnas_nuevas + columnas_resto]
+    
+    return df_expandido

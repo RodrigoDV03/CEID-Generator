@@ -1,5 +1,5 @@
 import datetime
-from fases.models import DocenteData, PaymentData, DocumentConfig
+from fases.models import DocenteData, PaymentData, DocumentConfig, CursoDetalle
 from fases.services import (
     ExcelReaderService, 
     DocenteService, 
@@ -28,35 +28,47 @@ class FaseInicialGenerator:
     def generar_descripcion_completa(
         self, 
         docente: DocenteData, 
-        payment: PaymentData
+        payment: PaymentData,
+        planilla_path: str
     ) -> str:
         # Para administrativos, retornar el curso directamente
         if self.config.es_administrativo:
             return docente.curso
         
-        # Para docentes, redactar cursos con formato
-        descripcion_base = self.description_service.redactar_cursos(
-            docente.curso,
-            tiene_bono=payment.tiene_bono,
-            tiene_servicio_actualizacion=payment.tiene_servicio_actualizacion
+        # Leer cursos detallados desde Planilla_Generador expandida
+        cursos_detallados = self.excel_service.leer_cursos_detallados_por_docente(
+            planilla_path,
+            "Planilla_Generador",
+            docente.nombre
         )
         
-        # Generar descripciones de horas
-        horas_disenio, horas_clasif = self.payment_service.generar_descripcion_horas(payment)
+        if not cursos_detallados:
+            # Fallback: usar método antiguo si no hay cursos detallados
+            descripcion_base = self.description_service.redactar_cursos(
+                docente.curso,
+                tiene_bono=payment.tiene_bono,
+                tiene_servicio_actualizacion=payment.tiene_servicio_actualizacion
+            )
+            
+            # Generar descripciones de horas
+            horas_disenio, horas_clasif = self.payment_service.generar_descripcion_horas(payment)
+            
+            return self.description_service.generar_descripcion_completa(
+                descripcion_base,
+                payment,
+                horas_disenio,
+                horas_clasif,
+                es_administrativo=self.config.es_administrativo
+            )
         
-        # Generar descripción completa
-        return self.description_service.generar_descripcion_completa(
-            descripcion_base,
-            payment,
-            horas_disenio,
-            horas_clasif,
-            es_administrativo=self.config.es_administrativo
-        )
+        # NUEVO: Usar descripción con modalidades
+        return self.description_service.redactar_servicios_con_modalidad(cursos_detallados)
     
     def generar_documentos_docente(
         self,
         docente: DocenteData,
-        payment: PaymentData
+        payment: PaymentData,
+        planilla_path: str
     ) -> None:
         # Validar docente
         es_valido, mensaje = self.docente_service.validar_docente(docente)
@@ -71,16 +83,23 @@ class FaseInicialGenerator:
             docente
         )
         
+        # Leer cursos detallados desde Planilla_Generador expandida
+        cursos_detallados = self.excel_service.leer_cursos_detallados_por_docente(
+            planilla_path,
+            "Planilla_Generador",
+            docente.nombre
+        )
+        
         # Generar descripción completa
-        descripcion_completa = self.generar_descripcion_completa(docente, payment)
+        descripcion_completa = self.generar_descripcion_completa(docente, payment, planilla_path)
         
         try:
             # 1. Generar OFICIO (para todos)
             self.oficio_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
             
-            # 2. Generar TDR (solo para terceros)
+            # 2. Generar TDR (solo para terceros) - pasar cursos_detallados
             if docente.es_tercero:
-                self.tdr_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
+                self.tdr_builder.generar(docente, payment, descripcion_completa, carpeta_docente, cursos_detallados)
             
             # 3. Generar COTIZACIÓN (para administrativos o terceros)
             if self.config.es_administrativo or docente.es_tercero:
@@ -124,8 +143,8 @@ def procesar_planilla_fase_inicial(
             docente = excel_service.extraer_docente_data(fila)
             payment = excel_service.extraer_payment_data(fila)
             
-            # Generar documentos
-            generador.generar_documentos_docente(docente, payment)
+            # Generar documentos (pasar planilla_path para leer cursos detallados)
+            generador.generar_documentos_docente(docente, payment, planilla_path)
             
         except ValueError as e:
             print(f"Fila {i}: {e}")

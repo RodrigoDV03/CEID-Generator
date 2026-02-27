@@ -16,7 +16,6 @@ def iniciar_interfaz_planilla(callback_volver=None):
     archivo_docentes = ""
     archivo_clasif = ""
     archivo_coordinacion = ""
-    archivo_planilla_anterior = ""
     carpeta_destino = ""
 
     # =========================
@@ -31,7 +30,6 @@ def iniciar_interfaz_planilla(callback_volver=None):
     root.configure(fg_color=BG_COLOR)
 
     mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
-    carga_var = ctk.IntVar(value=1)
     bono_var = ctk.StringVar(value="0")
 
     # =========================
@@ -44,8 +42,7 @@ def iniciar_interfaz_planilla(callback_volver=None):
         valido = (
             archivo_cursos and
             archivo_docentes and
-            archivo_clasif and
-            (carga_var.get() == 1 or archivo_planilla_anterior)
+            archivo_clasif
         )
         btn_generar.configure(state="normal" if valido else "disabled")
 
@@ -66,16 +63,6 @@ def iniciar_interfaz_planilla(callback_volver=None):
     etiqueta(frame_conf, "① Configuración General")
 
     crear_option_menu(frame_conf, mes_var, meses)
-
-    ctk.CTkRadioButton(
-        frame_conf, text="Primera planilla",
-        variable=carga_var, value=1, text_color=WHITE_COLOR
-    ).pack(anchor="w", padx=30)
-
-    ctk.CTkRadioButton(
-        frame_conf, text="Segunda planilla",
-        variable=carga_var, value=2, text_color=WHITE_COLOR
-    ).pack(anchor="w", padx=30, pady=(0, 10))
 
     # Bono solo Enero
     frame_bono = ctk.CTkFrame(frame_conf, fg_color="transparent")
@@ -144,20 +131,6 @@ def iniciar_interfaz_planilla(callback_volver=None):
     def set_coord(v): nonlocal archivo_coordinacion; archivo_coordinacion = v
     selector_archivo("Coordinación / Actualización", ("Excel", "*.xlsx *.xls"), set_coord)
 
-    # Planilla anterior (solo segunda carga)
-    def set_planilla(v): nonlocal archivo_planilla_anterior; archivo_planilla_anterior = v
-
-    def toggle_planilla_anterior(*_):
-        if carga_var.get() == 2:
-            selector_archivo(
-                "Planilla anterior (obligatorio)",
-                ("Excel", "*.xlsx *.xls"),
-                set_planilla
-            )
-        validar_formulario()
-
-    carga_var.trace_add("write", toggle_planilla_anterior)
-
     # =====================================================
     # ④ DESTINO Y EJECUCIÓN
     # =====================================================
@@ -198,8 +171,6 @@ def iniciar_interfaz_planilla(callback_volver=None):
             archivo_clasif,
             archivo_coordinacion,
             mes_var.get(),
-            carga_var.get(),
-            archivo_planilla_anterior if carga_var.get() == 2 else None,
             float(bono_var.get() or 0),
             carpeta_destino or None
         )

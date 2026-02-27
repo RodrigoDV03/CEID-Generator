@@ -1,5 +1,5 @@
 from typing import List
-from fases.models import PaymentData
+from fases.models import PaymentData, CursoDetalle
 
 
 class DescriptionService:
@@ -140,3 +140,113 @@ class DescriptionService:
         
         # Solo clases
         return actividades_base
+    
+    # ============= NUEVOS MÉTODOS CON MODALIDADES ============= 
+    
+    @staticmethod
+    def redactar_servicios_con_modalidad(cursos_detallados: List[CursoDetalle]) -> str:
+        """
+        Genera descripción de servicios con modalidad específica para cada uno.
+        Usado en OFICIO, COTIZACIÓN y CONFORMIDAD.
+        
+        Ejemplo:
+        "28 horas de clases de Inglés Avanzado 2 bajo la modalidad presencial,
+        28 horas de clases de Inglés Avanzado 9 bajo la modalidad virtual,
+        10 horas de examen de clasificación bajo la modalidad virtual
+        y 8 horas de diseño de exámenes"
+        
+        Args:
+            cursos_detallados: Lista de objetos CursoDetalle
+        
+        Returns:
+            Descripción completa con modalidades
+        """
+        if not cursos_detallados:
+            return "N/A"
+        
+        descripciones = []
+        for curso in cursos_detallados:
+            descripciones.append(curso.generar_descripcion_individual())
+        
+        # Unir con el formato adecuado
+        if len(descripciones) == 1:
+            # Un solo elemento
+            if cursos_detallados[0].es_servicio_especial or cursos_detallados[0].tipo_servicio == "BONO":
+                return descripciones[0]
+            else:
+                return f"servicio de dictado de {descripciones[0]}"
+        
+        elif len(descripciones) == 2:
+            # Dos elementos, usar "y"
+            primer_elem = descripciones[0]
+            segundo_elem = descripciones[1]
+            
+            # Si el primero es curso, agregar prefijo
+            if cursos_detallados[0].es_curso_academico:
+                primer_elem = f"servicio de dictado de {primer_elem}"
+            
+            return f"{primer_elem} y {segundo_elem}"
+        
+        else:
+            # Más de dos elementos, usar comas y "y" al final
+            primer_elem = descripciones[0]
+            if cursos_detallados[0].es_curso_academico:
+                primer_elem = f"servicio de dictado de {primer_elem}"
+            
+            # Todos los elementos del medio con comas
+            elementos_medio = descripciones[1:-1]
+            ultimo_elem = descripciones[-1]
+            
+            partes = [primer_elem] + elementos_medio
+            return f"{', '.join(partes)} y {ultimo_elem}"
+    
+    @staticmethod
+    def agrupar_por_modalidad_tdr(cursos_detallados: List[CursoDetalle]) -> str:
+        """
+        Agrupa cursos/servicios por modalidad para el TDR.
+        
+        Formato de salida:
+        "Presencial: Inglés Avanzado 2
+        Virtual: Inglés Avanzado 9, Examen de clasificación"
+        
+        Args:
+            cursos_detallados: Lista de objetos CursoDetalle
+        
+        Returns:
+            Texto agrupado por modalidad
+        """
+        if not cursos_detallados:
+            return "N/A"
+        
+        # Agrupar por modalidad
+        presencial = []
+        virtual = []
+        otras = []
+        
+        for curso in cursos_detallados:
+            # Excluir servicios sin modalidad (diseño de exámenes, bono)
+            if curso.es_sin_modalidad:
+                continue
+            
+            modalidad = curso.modalidad_texto.lower()
+            
+            if modalidad == "presencial":
+                presencial.append(curso.nombre)
+            elif modalidad == "virtual":
+                virtual.append(curso.nombre)
+            else:
+                otras.append(f"{curso.nombre} ({modalidad})")
+        
+        # Construir texto final
+        lineas = []
+        
+        if presencial:
+            lineas.append(f"Presencial: {', '.join(presencial)}")
+        
+        if virtual:
+            lineas.append(f"Virtual: {', '.join(virtual)}")
+        
+        if otras:
+            lineas.append(f"Otras: {', '.join(otras)}")
+        
+        return "\n".join(lineas) if lineas else "N/A"

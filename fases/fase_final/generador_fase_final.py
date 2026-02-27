@@ -1,7 +1,7 @@
 import datetime
 import pandas as pd
 from typing import Optional
-from fases.models import DocenteData, PaymentData, DocumentConfig
+from fases.models import DocenteData, PaymentData, DocumentConfig, CursoDetalle
 from fases.services import (
     ExcelReaderService, 
     DocenteService, 
@@ -29,35 +29,47 @@ class FaseFinalGenerator:
     def generar_descripcion_completa(
         self, 
         docente: DocenteData, 
-        payment: PaymentData
+        payment: PaymentData,
+        planilla_path: str
     ) -> str:
         # Para administrativos, retornar el curso directamente
         if self.config.es_administrativo:
             return docente.curso
         
-        # Para docentes, redactar cursos con formato
-        descripcion_base = self.description_service.redactar_cursos(
-            docente.curso,
-            tiene_bono=payment.tiene_bono,
-            tiene_servicio_actualizacion=payment.tiene_servicio_actualizacion
+        # Leer cursos detallados desde Planilla_Generador expandida
+        cursos_detallados = self.excel_service.leer_cursos_detallados_por_docente(
+            planilla_path,
+            "Planilla_Generador",
+            docente.nombre
         )
         
-        # Generar descripciones de horas
-        horas_disenio, horas_clasif = self.payment_service.generar_descripcion_horas(payment)
+        if not cursos_detallados:
+            # Fallback: usar método antiguo si no hay cursos detallados
+            descripcion_base = self.description_service.redactar_cursos(
+                docente.curso,
+                tiene_bono=payment.tiene_bono,
+                tiene_servicio_actualizacion=payment.tiene_servicio_actualizacion
+            )
+            
+            # Generar descripciones de horas
+            horas_disenio, horas_clasif = self.payment_service.generar_descripcion_horas(payment)
+            
+            return self.description_service.generar_descripcion_completa(
+                descripcion_base,
+                payment,
+                horas_disenio,
+                horas_clasif,
+                es_administrativo=self.config.es_administrativo
+            )
         
-        # Generar descripción completa
-        return self.description_service.generar_descripcion_completa(
-            descripcion_base,
-            payment,
-            horas_disenio,
-            horas_clasif,
-            es_administrativo=self.config.es_administrativo
-        )
+        # NUEVO: Usar descripción con modalidades
+        return self.description_service.redactar_servicios_con_modalidad(cursos_detallados)
     
     def generar_conformidad(
         self,
         docente: DocenteData,
-        payment: PaymentData
+        payment: PaymentData,
+        planilla_path: str
     ) -> str:
         # Crear carpeta del docente
         carpeta_docente = self.docente_service.crear_carpeta_docente(
@@ -67,7 +79,7 @@ class FaseFinalGenerator:
         )
         
         # Generar descripción completa
-        descripcion_completa = self.generar_descripcion_completa(docente, payment)
+        descripcion_completa = self.generar_descripcion_completa(docente, payment, planilla_path)
         
         # Generar documento
         ruta = self.conformidad_builder.generar(
@@ -111,7 +123,8 @@ class FaseFinalGenerator:
     def procesar_docente(
         self,
         docente: DocenteData,
-        payment: PaymentData
+        payment: PaymentData,
+        planilla_path: str
     ) -> None:
         # Validar docente
         es_valido, mensaje = self.docente_service.validar_docente(docente)
@@ -121,7 +134,7 @@ class FaseFinalGenerator:
         
         try:
             # Generar conformidad (para todos)
-            self.generar_conformidad(docente, payment)
+            self.generar_conformidad(docente, payment, planilla_path)
             print(f"✅ {docente.nombre} - Documento de conformidad generado correctamente.")
             
         except Exception as e:
@@ -194,8 +207,8 @@ def procesar_planilla_fase_final(
             docente = excel_service.extraer_docente_data(fila)
             payment = excel_service.extraer_payment_data(fila)
             
-            # Procesar docente
-            generador.procesar_docente(docente, payment)
+            # Procesar docente (pasar planilla_path para leer cursos detallados)
+            generador.procesar_docente(docente, payment, planilla_path)
             
         except ValueError as e:
             print(f"Error: {e}")
