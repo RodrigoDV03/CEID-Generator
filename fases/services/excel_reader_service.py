@@ -123,6 +123,14 @@ class ExcelReaderService:
             df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
             df.columns = df.columns.str.strip()
             
+            # Validar que existan las columnas necesarias para cursos detallados
+            columnas_requeridas = ['Curso_Individual', 'Modalidad_Curso', 'Tipo_Servicio', 'Horas_Servicio', 'Monto_Individual']
+            columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
+            
+            if columnas_faltantes:
+                # Silenciosamente retornar lista vacía si no tiene la estructura expandida
+                return []
+            
             # Filtrar solo las filas de este docente
             filas_docente = df[df['Docente'].str.strip().str.upper() == nombre_docente.strip().upper()]
             
@@ -144,5 +152,5 @@ class ExcelReaderService:
             return cursos
             
         except Exception as e:
-            print(f"⚠️ Error al leer cursos detallados: {e}")
+            # Error silencioso, retornar lista vacía para usar fallback
             return []

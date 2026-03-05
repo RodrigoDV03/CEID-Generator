@@ -127,12 +127,20 @@ class DocumentGeneratorService:
         from fases.functions import ruta_absoluta_relativa
         
         rutas_plantillas = {
-            'oficio_contrato': './Modelos_documentos/oficio_contrato.docx',
-            'oficio_tercero': './Modelos_documentos/oficio_tercero.docx',
+            # Oficios - Docentes
+            'oficio_docente_contrato': './Modelos_documentos/oficio_docente_contrato.docx',
+            'oficio_docente_tercero': './Modelos_documentos/oficio_docente_tercero.docx',
+            # Oficios - Administrativos
+            'oficio_admin_contrato': './Modelos_documentos/oficio_admin_contrato.docx',
+            'oficio_admin_tercero': './Modelos_documentos/oficio_admin_tercero.docx',
+            # TDR
             'tdr_administrativo': './Modelos_documentos/tdr_administrativo.docx',
+            # Cotización
             'cotizacion': './Modelos_documentos/modelo_cotizacion.docx',
+            # Conformidades
             'conformidad_contrato': './Modelos_documentos/conformidad_contrato.docx',
             'conformidad_tercero': './Modelos_documentos/conformidad_tercero.docx',
+            # Control de pagos
             'control_primera': './Modelos_documentos/control_pagos_primera.docx',
             'control_segunda': './Modelos_documentos/control_pagos_segunda.docx',
             'control_tercera': './Modelos_documentos/control_pagos_tercera.docx'
@@ -140,7 +148,9 @@ class DocumentGeneratorService:
         
         # Determinar la clave según el contexto
         if tipo_documento == 'oficio':
-            clave = f'oficio_{tipo_contrato.lower()}'
+            # Seleccionar según tipo de persona (admin/docente) y tipo de contrato
+            tipo_persona = 'admin' if config.es_administrativo else 'docente'
+            clave = f'oficio_{tipo_persona}_{tipo_contrato.lower()}'
         elif tipo_documento == 'tdr' and config.es_administrativo:
             clave = 'tdr_administrativo'
         elif tipo_documento == 'conformidad':

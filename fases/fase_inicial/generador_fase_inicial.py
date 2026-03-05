@@ -84,11 +84,14 @@ class FaseInicialGenerator:
         )
         
         # Leer cursos detallados desde Planilla_Generador expandida
-        cursos_detallados = self.excel_service.leer_cursos_detallados_por_docente(
-            planilla_path,
-            "Planilla_Generador",
-            docente.nombre
-        )
+        # Solo para docentes, no para administrativos
+        cursos_detallados = []
+        if not self.config.es_administrativo:
+            cursos_detallados = self.excel_service.leer_cursos_detallados_por_docente(
+                planilla_path,
+                "Planilla_Generador",
+                docente.nombre
+            )
         
         # Generar descripción completa
         descripcion_completa = self.generar_descripcion_completa(docente, payment, planilla_path)
