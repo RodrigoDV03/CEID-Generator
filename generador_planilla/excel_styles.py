@@ -165,3 +165,113 @@ def ordenar_hojas_excel(wb, hojas_ordenadas):
         wb._sheets.insert(idx, wb[hoja])
     wb._sheets = wb._sheets[:len(nuevas_hojas)] + [s for s in wb._sheets if s.title not in nuevas_hojas]
     return wb
+
+def aplicar_formato_planilla_generador(wb, nombre_hoja="Planilla_Generador"):
+    """
+    Aplica formato especial a la hoja Planilla_Generador con colores alternados por docente
+    para mejorar la legibilidad y facilitar la identificación visual.
+    """
+    if nombre_hoja not in wb.sheetnames:
+        return
+    
+    ws = wb[nombre_hoja]
+    
+    # Colores alternados para docentes (tonos azul claro y gris claro)
+    color_docente_1 = PatternFill(start_color="E3F2FD", end_color="E3F2FD", fill_type="solid")  # Azul muy claro
+    color_docente_2 = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")  # Gris muy claro
+    
+    # Colores por tipo de servicio (sutiles)
+    colores_servicio = {
+        'Curso Académico': PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid"),      # Verde claro
+        'Diseño de Exámenes': PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid"),   # Naranja claro
+        'Examen de Clasificación': PatternFill(start_color="F3E5F5", end_color="F3E5F5", fill_type="solid"),  # Púrpura claro
+        'Servicio de Actualización': PatternFill(start_color="FCE4EC", end_color="FCE4EC", fill_type="solid")  # Rosa claro
+    }
+    
+    # Borde más grueso para separar docentes
+    borde_separador = Border(
+        top=Side(style='medium', color='000000'),
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    thin_border = get_excel_style("thin_border")
+    bold_font = get_excel_style("bold_font")
+    center_alignment = get_excel_style("center_alignment")
+    
+    # Buscar columna de Docente y Tipo_Servicio_Desc
+    col_docente = None
+    col_servicio = None
+    
+    for col_idx in range(1, ws.max_column + 1):
+        cell_value = ws.cell(row=2, column=col_idx).value
+        if cell_value == 'Docente':
+            col_docente = col_idx
+        elif cell_value == 'Tipo_Servicio_Desc':
+            col_servicio = col_idx
+    
+    if not col_docente:
+        print("⚠️ No se encontró columna 'Docente' en Planilla_Generador")
+        return
+    
+    # Aplicar formato por docente
+    docente_actual = None
+    color_actual = color_docente_1
+    contador_docente = 0
+    
+    for row_idx in range(3, ws.max_row + 1):
+        docente = ws.cell(row=row_idx, column=col_docente).value
+        
+        # Cambiar de color cuando cambia el docente
+        if docente != docente_actual:
+            docente_actual = docente
+            contador_docente += 1
+            color_actual = color_docente_1 if contador_docente % 2 == 1 else color_docente_2
+            
+            # Aplicar borde superior grueso para separar docentes
+            for col_idx in range(1, ws.max_column + 1):
+                ws.cell(row=row_idx, column=col_idx).border = borde_separador
+        
+        # Aplicar color de fondo según tipo de servicio si está disponible
+        tipo_servicio = ws.cell(row=row_idx, column=col_servicio).value if col_servicio else None
+        
+        for col_idx in range(1, ws.max_column + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            
+            # Aplicar color según tipo de servicio (prioridad) o alternado por docente
+            if tipo_servicio and tipo_servicio in colores_servicio:
+                cell.fill = colores_servicio[tipo_servicio]
+            else:
+                cell.fill = color_actual
+            
+            # Mantener bordes
+            if cell.border != borde_separador:
+                cell.border = thin_border
+            
+            # Aplicar alineación centrada
+            cell.alignment = center_alignment
+    
+    # Ajustar anchos de columna específicos para Planilla_Generador
+    anchos_planilla_generador = {
+        1: 5,   # N°
+        2: 30,  # Docente
+        3: 8,   # Servicio_Nro
+        4: 20,  # Tipo_Servicio_Desc
+        5: 40,  # Curso_Individual
+        6: 15,  # Modalidad_Curso
+        7: 12,  # Horas_Servicio
+        8: 15,  # Monto_Individual
+    }
+    
+    for col_idx, ancho in anchos_planilla_generador.items():
+        if col_idx <= ws.max_column:
+            column_letter = get_column_letter(col_idx)
+            ws.column_dimensions[column_letter].width = ancho
+    
+    # Resto de columnas con ancho estándar
+    for col_idx in range(len(anchos_planilla_generador) + 1, ws.max_column + 1):
+        column_letter = get_column_letter(col_idx)
+        ws.column_dimensions[column_letter].width = 12
+    
+    print(f"✅ Formato especial aplicado a {nombre_hoja}")
