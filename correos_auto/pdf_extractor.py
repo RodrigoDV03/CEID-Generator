@@ -1,223 +1,55 @@
 import re
 import logging
-from abc import ABC, abstractmethod
 from typing import Optional, List
 from PyPDF2 import PdfReader
 
-from .config import (
-    PatronesRegex,
-    TipoPatron,
-    ServiciosConfig,
-    ValidacionConfig,
-    PRIORIDAD_PATRONES
-)
-from .validators import (
-    NombreValidator,
-    FormatoNombreConverter,
-    CandidatoNombre
-)
+from .config import PatronesRegex, ServiciosConfig
 
 
 logger = logging.getLogger(__name__)
 
 
-class PatternMatcher(ABC):
-    """Clase base abstracta para matchers de patrones de nombres."""
-    
-    def __init__(self, tipo_patron: TipoPatron):
-        """
-        Inicializa el matcher.
-        
-        Args:
-            tipo_patron: Tipo de patrón que este matcher busca
-        """
-        self.tipo_patron = tipo_patron
-        self.prioridad = PRIORIDAD_PATRONES[tipo_patron]
-    
-    @abstractmethod
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        pass
-    
-    def _crear_candidato(self, nombre: str) -> CandidatoNombre:
-        nombre_limpio = NombreValidator.limpiar(nombre)
-        return CandidatoNombre(
-            nombre=nombre_limpio,
-            patron=self.tipo_patron.value,
-            prioridad=self.prioridad
-        )
-
-
-class ConceptoUNMSMConComaMatcher(PatternMatcher):
-    """Matcher para patrón: Concepto:UNMSM seguido de números y nombre CON COMA."""
+class RUCExtractor:
+    """Extractor de RUC desde PDFs."""
     
     def __init__(self):
-        super().__init__(TipoPatron.CONCEPTO_UNMSM_CON_COMA)
-    
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        match = re.search(PatronesRegex.CONCEPTO_UNMSM_CON_COMA, texto, re.IGNORECASE)
-        if match:
-            nombre = match.group(1)
-            if NombreValidator.es_valido(nombre):
-                return self._crear_candidato(nombre)
-        return None
-
-
-class ConceptoUNMSMSinComaMatcher(PatternMatcher):
-    """Matcher para patrón: Concepto:UNMSM seguido de números y nombre SIN COMA."""
-    
-    def __init__(self):
-        super().__init__(TipoPatron.CONCEPTO_UNMSM_SIN_COMA)
-    
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        match = re.search(PatronesRegex.CONCEPTO_UNMSM_SIN_COMA, texto, re.IGNORECASE)
-        if match:
-            nombre_sin_coma = match.group(2).strip()
-            nombre_formateado = FormatoNombreConverter.convertir_a_formato_coma(nombre_sin_coma)
-            if nombre_formateado and NombreValidator.es_valido(nombre_formateado, min_letras=3):
-                return self._crear_candidato(nombre_formateado)
-        return None
-
-
-class NumerosConComaMatcher(PatternMatcher):
-    """Matcher para patrón: números largos seguidos directamente de nombre CON COMA."""
-    
-    def __init__(self):
-        super().__init__(TipoPatron.NUMEROS_CON_COMA)
-    
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        match = re.search(PatronesRegex.NUMEROS_CON_COMA, texto)
-        if match:
-            nombre = match.group(1)
-            if NombreValidator.es_valido(nombre):
-                return self._crear_candidato(nombre)
-        return None
-
-
-class NumerosSinComaMatcher(PatternMatcher):
-    """Matcher para patrón: números largos seguidos de nombre SIN COMA."""
-    
-    def __init__(self):
-        super().__init__(TipoPatron.NUMEROS_SIN_COMA)
-    
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        match = re.search(PatronesRegex.NUMEROS_SIN_COMA, texto)
-        if match:
-            nombre_sin_coma = match.group(1).strip()
-            nombre_formateado = FormatoNombreConverter.convertir_a_formato_coma(nombre_sin_coma)
-            if nombre_formateado and NombreValidator.es_valido(nombre_formateado, min_letras=3):
-                return self._crear_candidato(nombre_formateado)
-        return None
-
-
-class DespuesRUCMatcher(PatternMatcher):
-    """Matcher para patrón: nombre después de RUC (11 dígitos)."""
-    
-    def __init__(self):
-        super().__init__(TipoPatron.DESPUES_RUC)
-    
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        match = re.search(PatronesRegex.RUC_SEGUIDO_NOMBRE, texto, re.IGNORECASE | re.DOTALL)
-        if match:
-            nombre_sin_coma = match.group(2).strip()
-            # Límite de palabras para evitar capturar demasiado texto
-            if len(nombre_sin_coma.split()) <= ValidacionConfig.MAX_PALABRAS_NOMBRE_SIN_COMA:
-                nombre_formateado = FormatoNombreConverter.convertir_a_formato_coma(nombre_sin_coma)
-                if nombre_formateado and NombreValidator.es_valido(nombre_formateado, min_letras=3):
-                    return self._crear_candidato(nombre_formateado)
-        return None
-
-
-class ConSaltosMatcher(PatternMatcher):
-    """Matcher para patrón: nombres con saltos de línea."""
-    
-    def __init__(self):
-        super().__init__(TipoPatron.CON_SALTOS)
-    
-    def buscar(self, texto: str) -> Optional[CandidatoNombre]:
-        match = re.search(PatronesRegex.NOMBRE_CON_SALTOS, texto)
-        if match:
-            nombre_completo = f"{match.group(1).strip()}, {match.group(2).strip()}"
-            if NombreValidator.es_valido(nombre_completo):
-                return self._crear_candidato(nombre_completo)
-        return None
-
-
-class FallbackMatcher(PatternMatcher):
-    """Matcher fallback: busca todos los nombres con formato 'APELLIDO(S), NOMBRE(S)'."""
-    
-    def __init__(self):
-        super().__init__(TipoPatron.FALLBACK)
-    
-    def buscar(self, texto: str) -> List[CandidatoNombre]:
-        """
-        Busca todos los nombres en formato con coma.
-        
-        Returns:
-            List[CandidatoNombre]: Lista de todos los candidatos encontrados
-        """
-        matches = re.findall(PatronesRegex.NOMBRE_FALLBACK, texto)
-        candidatos = []
-        for match in matches:
-            if NombreValidator.es_valido(match):
-                candidatos.append(self._crear_candidato(match))
-        return candidatos
-
-
-class NombreExtractor:
-    
-    def __init__(self):
-        """Inicializa el extractor con todos los matchers disponibles."""
-        self.matchers: List[PatternMatcher] = [
-            ConceptoUNMSMConComaMatcher(),
-            ConceptoUNMSMSinComaMatcher(),
-            NumerosConComaMatcher(),
-            NumerosSinComaMatcher(),
-            DespuesRUCMatcher(),
-            ConSaltosMatcher(),
-            FallbackMatcher()
-        ]
+        """Inicializa el extractor de RUC."""
+        # Patrón para RUC: puede tener saltos de línea después de "RUC:"
+        self.patron_ruc = re.compile(r'\bRUC:\s*[\n\r]*\s*(\d{11})\b', re.IGNORECASE)
+        # Patrón para RUC pegado al nombre (formato común en el PDF)
+        self.patron_ruc_nombre = re.compile(r'\b(\d{11})([A-ZÁÉÍÓÚÑ\s]+,\s*[A-ZÁÉÍÓÚÑ\s]+)', re.IGNORECASE)
     
     def extraer(self, texto: str, debug: bool = False) -> Optional[str]:
-        candidatos = []
+        """
+        Extrae el RUC del texto del PDF.
         
-        # Buscar con todos los matchers
-        for matcher in self.matchers:
-            resultado = matcher.buscar(texto)
-            
-            if resultado:
-                # FallbackMatcher devuelve una lista
-                if isinstance(resultado, list):
-                    candidatos.extend(resultado)
-                else:
-                    candidatos.append(resultado)
+        Args:
+            texto: Texto extraído del PDF
+            debug: Si True, imprime información de depuración
         
-        if debug and candidatos:
-            logger.info("Candidatos encontrados:")
-            for candidato in candidatos:
-                logger.info(f"  - {candidato}")
-        
-        if not candidatos:
+        Returns:
+            RUC de 11 dígitos o None si no se encuentra
+        """
+        # Intentar primero con patrón "RUC:XXXXXXXXXX" (puede tener saltos de línea)
+        match = self.patron_ruc.search(texto)
+        if match:
+            ruc = match.group(1)
             if debug:
-                logger.info("No se encontró ningún nombre válido")
-            return None
+                logger.info(f"RUC encontrado (patrón RUC:): {ruc}")
+            return ruc
         
-        # Filtrar candidatos válidos
-        candidatos_validos = [
-            c for c in candidatos
-            if NombreValidator.es_candidato_valido(c.nombre)
-        ]
-        
-        # Si no hay válidos, usar todos
-        if not candidatos_validos:
-            candidatos_validos = candidatos
-        
-        # Seleccionar el mejor candidato
-        mejor = min(candidatos_validos, key=lambda c: (c.prioridad, -len(c.nombre)))
+        # Buscar patrón RUC pegado a nombre (11 dígitos seguidos de nombre con formato)
+        match = self.patron_ruc_nombre.search(texto)
+        if match:
+            ruc = match.group(1)
+            nombre = match.group(2).strip()
+            if debug:
+                logger.info(f"RUC encontrado (patrón RUC+nombre): {ruc} - {nombre}")
+            return ruc
         
         if debug:
-            logger.info(f"Seleccionado: {mejor.nombre}")
-        
-        return mejor.nombre
+            logger.warning("No se encontró RUC en el PDF")
+        return None
 
 
 class ServicioExtractor:
@@ -308,12 +140,13 @@ class ServicioExtractor:
 
 
 class PDFExtractor:
+    """Extractor de datos desde PDFs de órdenes de servicio."""
     
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
         self._texto: Optional[str] = None
-        self.nombre_extractor = NombreExtractor()
         self.servicio_extractor = ServicioExtractor()
+        self.ruc_extractor = RUCExtractor()
     
     @property
     def texto(self) -> str:
@@ -332,17 +165,19 @@ class PDFExtractor:
             logger.error(f"Error extrayendo texto de {self.pdf_path}: {e}")
             raise
     
-    def extraer_nombre(self, debug: bool = False) -> Optional[str]:
-        return self.nombre_extractor.extraer(self.texto, debug)
+    def extraer_ruc(self, debug: bool = False) -> Optional[str]:
+        """Extrae el RUC del PDF."""
+        return self.ruc_extractor.extraer(self.texto, debug)
     
     def extraer_servicios(self, debug: bool = False) -> Optional[str]:
+        """Extrae los servicios del PDF."""
         return self.servicio_extractor.extraer(self.texto, debug)
 
 
 # Funciones de compatibilidad con código legacy
-def extraer_nombre(pdf_path: str, debug: bool = False) -> Optional[str]:
+def extraer_ruc(pdf_path: str, debug: bool = False) -> Optional[str]:
     extractor = PDFExtractor(pdf_path)
-    return extractor.extraer_nombre(debug)
+    return extractor.extraer_ruc(debug)
 
 
 def extraer_servicios(pdf_path: str, debug: bool = False) -> Optional[str]:

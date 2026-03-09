@@ -2,23 +2,12 @@
 
 from .config import (
     AÑO_ACTUAL,
-    PALABRAS_PROHIBIDAS,
-    ValidacionConfig,
     GmailConfig,
     TipoCorreo,
-    TipoPatron,
     PatronesRegex,
     ServiciosConfig,
     EmailConfig,
-    PRIORIDAD_PATRONES,
     get_app_dir
-)
-
-from .validators import (
-    NombreValidator,
-    FormatoNombreConverter,
-    CandidatoNombre,
-    seleccionar_mejor_candidato
 )
 
 from .gmail_service import (
@@ -39,10 +28,9 @@ from .email_builder import (
 
 from .pdf_extractor import (
     PDFExtractor,
-    NombreExtractor,
     ServicioExtractor,
-    PatternMatcher,
-    extraer_nombre,  # Legacy
+    RUCExtractor,
+    extraer_ruc,  # Legacy
     extraer_servicios  # Legacy
 )
 
@@ -63,7 +51,6 @@ from .processor import (
     CorreosProcessor,
     PDFProcessor,
     ExcelReader,
-    FuzzyNameMatcher,
     DatosEnvio,
     ExcelValidationError,
     procesar_correos_docente_gmail,  # Legacy
@@ -92,23 +79,13 @@ __all__ = [
     # Constantes y configuración
     'AÑO_ACTUAL',
     'año_actual',
-    'PALABRAS_PROHIBIDAS',
     'GMAIL_CONFIG',
-    'ValidacionConfig',
     'GmailConfig',
     'TipoCorreo',
-    'TipoPatron',
     'PatronesRegex',
     'ServiciosConfig',
     'EmailConfig',
-    'PRIORIDAD_PATRONES',
     'get_app_dir',
-    
-    # Validadores
-    'NombreValidator',
-    'FormatoNombreConverter',
-    'CandidatoNombre',
-    'seleccionar_mejor_candidato',
     
     # Gmail Service
     'GmailService',
@@ -126,10 +103,9 @@ __all__ = [
     
     # PDF Extractor
     'PDFExtractor',
-    'NombreExtractor',
     'ServicioExtractor',
-    'PatternMatcher',
-    'extraer_nombre',
+    'RUCExtractor',
+    'extraer_ruc',
     'extraer_servicios',
     
     # Email Sender
@@ -148,7 +124,6 @@ __all__ = [
     'CorreosProcessor',
     'PDFProcessor',
     'ExcelReader',
-    'FuzzyNameMatcher',
     'DatosEnvio',
     'ExcelValidationError',
     'procesar_correos_docente_gmail',

@@ -1,11 +1,10 @@
 import os
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 import pandas as pd
-from fuzzywuzzy import process
 
-from .config import ValidacionConfig, TipoCorreo
+from .config import TipoCorreo
 from .pdf_extractor import PDFExtractor
 from .gmail_service import GmailService
 
@@ -42,7 +41,7 @@ class ExcelReader:
     Maneja la lectura de archivos Excel y validación de columnas requeridas.
     """
     
-    COLUMNAS_REQUERIDAS = ['Docente', 'Correo Institucional']
+    COLUMNAS_REQUERIDAS = ['Docente', 'Correo Institucional', 'N_Ruc']
     
     def __init__(self, ruta_excel: str, hoja: str):
         if not os.path.exists(ruta_excel):
@@ -77,38 +76,42 @@ class ExcelReader:
             logger.error(f"Error leyendo Excel: {e}")
             raise ExcelValidationError(f"Error leyendo el archivo Excel: {e}")
     
-    def obtener_nombres(self) -> List[str]:
-        return self.df['Docente'].astype(str).tolist()
-    
     def buscar_por_nombre(self, nombre: str) -> Optional[pd.Series]:
+        """Busca una fila por nombre exacto."""
         fila = self.df[self.df['Docente'] == nombre]
+        if not fila.empty:
+            return fila.iloc[0]
+        return None
+    
+    def buscar_por_ruc(self, ruc: str) -> Optional[pd.Series]:
+        """Busca una fila por RUC."""
+        # Convertir RUC a string y eliminar espacios
+        ruc_limpio = str(ruc).strip()
+        
+        # Normalizar RUCs del DataFrame
+        def normalizar_ruc(valor):
+            """Convierte el valor a string limpio sin decimales."""
+            if pd.isna(valor):
+                return ''
+            try:
+                # Si es numérico, convertir a int para eliminar decimales
+                return str(int(float(valor)))
+            except (ValueError, TypeError):
+                # Si no es numérico, devolver como string limpio
+                return str(valor).strip()
+        
+        df_rucs_normalizados = self.df['N_Ruc'].apply(normalizar_ruc)
+        
+        # Buscar coincidencia exacta
+        fila = self.df[df_rucs_normalizados == ruc_limpio]
+        
         if not fila.empty:
             return fila.iloc[0]
         return None
 
 
-class FuzzyNameMatcher:
-    
-    def __init__(
-        self,
-        nombres_referencia: List[str],
-        umbral_similitud: int = ValidacionConfig.UMBRAL_FUZZY_MATCHING
-    ):
-        self.nombres_referencia = nombres_referencia
-        self.umbral_similitud = umbral_similitud
-    
-    def encontrar_mejor_match(self, nombre_buscar: str) -> Optional[Tuple[str, int]]:
-        resultado = process.extractOne(nombre_buscar, self.nombres_referencia)
-        
-        if resultado and resultado[1] >= self.umbral_similitud:
-            logger.debug(f"Match encontrado: '{nombre_buscar}' -> '{resultado[0]}' ({resultado[1]}%)")
-            return resultado[0], resultado[1]
-        
-        logger.debug(f"No se encontró match para: '{nombre_buscar}'")
-        return None
-
-
 class PDFProcessor:
+    """Procesador de PDFs para extraer RUC y servicios y emparejarlos con Excel."""
     
     def __init__(
         self,
@@ -119,34 +122,27 @@ class PDFProcessor:
         self.excel_reader = excel_reader
         self.incluir_servicio = incluir_servicio
         self.debug = debug
-        self.matcher = FuzzyNameMatcher(excel_reader.obtener_nombres())
     
     def procesar_pdf(self, pdf_path: str) -> Optional[DatosEnvio]:
-        # Extraer nombre del PDF
+        # Extraer RUC del PDF (identificador único)
         extractor = PDFExtractor(pdf_path)
-        nombre_extraido = extractor.extraer_nombre(debug=self.debug)
+        ruc_extraido = extractor.extraer_ruc(debug=self.debug)
         
-        if not nombre_extraido:
-            logger.warning(f"No se encontró nombre válido en {os.path.basename(pdf_path)}")
-            print(f"⚠ No se encontró nombre válido en {os.path.basename(pdf_path)}, omitido.")
+        if not ruc_extraido:
+            logger.warning(f"No se encontró RUC en {os.path.basename(pdf_path)}")
+            print(f"⚠ No se encontró RUC en {os.path.basename(pdf_path)}, omitido.")
             return None
         
-        # Buscar coincidencia en Excel
-        match = self.matcher.encontrar_mejor_match(nombre_extraido)
+        # Buscar en Excel por RUC
+        fila = self.excel_reader.buscar_por_ruc(ruc_extraido)
         
-        if not match:
-            logger.warning(f"Coincidencia baja para '{nombre_extraido}' ({os.path.basename(pdf_path)})")
-            print(f"⚠ Coincidencia baja para '{nombre_extraido}' (archivo: {os.path.basename(pdf_path)}), omitido.")
+        if fila is None:
+            logger.warning(f"No se encontró coincidencia para RUC {ruc_extraido} ({os.path.basename(pdf_path)})")
+            print(f"⚠ No se encontró coincidencia para RUC {ruc_extraido} (archivo: {os.path.basename(pdf_path)}), omitido.")
             return None
-        
-        nombre_excel, score = match
         
         # Obtener datos del Excel
-        fila = self.excel_reader.buscar_por_nombre(nombre_excel)
-        if fila is None:
-            logger.error(f"No se encontró fila para {nombre_excel} en Excel")
-            return None
-        
+        nombre_excel = fila['Docente']
         correo = fila['Correo Institucional']
         
         # Extraer servicio si es necesario
@@ -168,7 +164,7 @@ class PDFProcessor:
         
         # Log de información
         servicio_info = f" - {servicio}" if servicio else ""
-        print(f"{nombre_excel} - {correo}{servicio_info}")
+        print(f"✓ RUC {ruc_extraido}: {nombre_excel} - {correo}{servicio_info}")
         
         return datos
     

@@ -108,7 +108,7 @@ def ajustar_anchos_columnas_optimizado(ws, max_col):
             3: 15,  # Sede
             4: 8,   # Categoria (Letra)
             5: 12,  # Categoria (Monto)
-            6: 15,  # N°. Ruc
+            6: 15,  # N_Ruc
             7: 40,  # Curso
             8: 12,  # Curso Dictado
             9: 10,  # Bono
@@ -128,7 +128,7 @@ def ajustar_anchos_columnas_optimizado(ws, max_col):
             3: 15,  # Sede
             4: 8,   # Categoria (Letra)
             5: 12,  # Categoria (Monto)
-            6: 15,  # N°. Ruc
+            6: 15,  # N_Ruc
             7: 40,  # Curso
             8: 12,  # Curso Dictado
             9: 10,  # Extra Curso

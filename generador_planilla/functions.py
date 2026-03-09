@@ -496,7 +496,7 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     # Aplicar mapeo usando el diccionario
     agrupado['Docente'] = agrupado['docente'].map(mapeo_docentes)
     
-    agrupado = agrupado.merge(datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'Estado']], on='Docente', how='left')
+    agrupado = agrupado.merge(datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N_Ruc', 'Estado']], on='Docente', how='left')
     agrupado['Curso Dictado'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 28
     agrupado['Diseño de Examenes'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 4
     return agrupado
@@ -643,7 +643,7 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
                         'Sede': docente_info['Sede'],
                         'Categoria (Letra)': docente_info['Categoria (Letra)'],
                         'Categoria (Monto)': docente_info['Categoria (Monto)'],
-                        'N°. Ruc': docente_info['N°. Ruc'],
+                        'N_Ruc': docente_info['N_Ruc'],
                         'Estado': docente_info['Estado'],
                         'curso': '',  # Sin carga académica
                         'cantidad_cursos': 0,
@@ -757,7 +757,7 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos
                             'Sede': docente_info['Sede'],
                             'Categoria (Letra)': docente_info['Categoria (Letra)'],
                             'Categoria (Monto)': docente_info['Categoria (Monto)'],
-                            'N°. Ruc': docente_info['N°. Ruc'],
+                            'N_Ruc': docente_info['N_Ruc'],
                             'Estado': docente_info['Estado'],
                             'curso': '',  # Sin carga académica
                             'cantidad_cursos': 0,
@@ -813,7 +813,7 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
         'Sede': df['Sede'],
         'Categoria (Letra)': df['Categoria (Letra)'],
         'Categoria (Monto)': df['Categoria (Monto)'],
-        'N°. Ruc': df['N°. Ruc'],
+        'N_Ruc': df['N_Ruc'],
         'Curso': df['curso'],
         'Curso Dictado': df['Curso Dictado']
     }
@@ -1129,7 +1129,7 @@ def obtener_header_planilla_con_cache(ruta_planilla):
 def construir_tabla_planilla_con_cache(df, es_enero=False, monto_bono=0):
     try:
         # Crear hash basado en las columnas relevantes para la tabla y parámetros adicionales
-        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N°. Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
+        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N_Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
         
         df_relevante = df[columnas_relevantes]
         key_tabla = hash(df_relevante.to_string() + str(es_enero) + str(monto_bono))
