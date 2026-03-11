@@ -24,7 +24,15 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
             datos = procesar_csv_nuevo_formato(datos)
             print("✅ Columnas del CSV procesadas correctamente")
         
-        datos_docentes = pd.read_excel(excel_docentes, sheet_name="list")
+        # Leer Excel de docentes forzando columna de contrato como texto
+        # para preservar ceros adelante (ej: 0057, 0130)
+        dtype_contrato = {
+            'N° Contrato': str,
+            'Nro_Contrato': str,
+            'Nro_contrato': str,
+            'Numero de contrato': str
+        }
+        datos_docentes = pd.read_excel(excel_docentes, sheet_name="list", dtype=dtype_contrato)
         print(f"✅ Docentes cargados: {len(datos_docentes)} registros")
 
         datos = limpiar_docentes(datos, 'docente')
@@ -93,7 +101,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Celular': 'Numero_celular',
                 'Dirección': 'Domicilio_docente',
                 'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_contrato',
+                'N° Contrato': 'Nro_Contrato',
                 'Servicio Actualización': 'Servicio_actualizacion'
             })
             
@@ -112,7 +120,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Celular': 'Numero_celular',
                 'Dirección': 'Domicilio_docente',
                 'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_contrato',
+                'N° Contrato': 'Nro_Contrato',
                 'Servicio Actualización': 'Servicio_actualizacion'
             })
             

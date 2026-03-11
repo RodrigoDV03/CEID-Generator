@@ -8,7 +8,16 @@ class ExcelReaderService:
     @staticmethod
     def leer_planilla(ruta_excel: str, nombre_hoja: str) -> pd.DataFrame:
         try:
-            df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
+            # Forzar que columnas de números de contrato se lean como texto (string)
+            # para preservar ceros adelante (ej: 0057, 0130)
+            dtype_dict = {
+                'Nro_Contrato': str,
+                'Nro_contrato': str,
+                'N° Contrato': str,
+                'Numero de contrato': str,
+                'Número de contrato': str
+            }
+            df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja, dtype=dtype_dict)
             df.columns = df.columns.str.strip()
             return df
         except FileNotFoundError:
@@ -18,7 +27,15 @@ class ExcelReaderService:
     
     @staticmethod
     def leer_control_pagos(ruta_excel: str) -> pd.DataFrame:
-        df = pd.read_excel(ruta_excel, sheet_name=0, header=1)
+        # Forzar que columnas de números de contrato se lean como texto
+        dtype_dict = {
+            'Numero de contrato': str,
+            'Número de contrato': str,
+            'N° Contrato': str,
+            'Nro_Contrato': str,
+            'Nro_contrato': str
+        }
+        df = pd.read_excel(ruta_excel, sheet_name=0, header=1, dtype=dtype_dict)
         df.columns = df.columns.str.strip()
         return df
     
@@ -34,6 +51,16 @@ class ExcelReaderService:
     
     @staticmethod
     def extraer_docente_data(fila: Any) -> DocenteData:
+        # Extraer número de contrato con múltiples variaciones de nombre
+        numero_contrato = ""
+        for col_name in ["Nro_Contrato", "Nro_contrato", "N° Contrato", "Numero de contrato", "Número de contrato"]:
+            try:
+                numero_contrato = getattr(fila, col_name, "")
+                if numero_contrato and numero_contrato != "":
+                    break
+            except AttributeError:
+                continue
+        
         return DocenteData(
             nombre=str(getattr(fila, "Docente", "N/A")),
             dni=ExcelReaderService._limpiar_numero(getattr(fila, "Numero_dni", "")),
@@ -50,7 +77,7 @@ class ExcelReaderService:
             especialidad=str(getattr(fila, "Especialidad", "")),
             actividades_admin=str(getattr(fila, "Actividades_admin", "")),
             estado_docente=str(getattr(fila, "Estado_docente", "TERCERO")).strip().upper(),
-            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_contrato", "")),
+            numero_contrato=ExcelReaderService._extraer_numero_contrato(numero_contrato),
             idioma = str(getattr(fila, "Docente_idioma", "")),
             modalidad = str(getattr(fila, "Modalidad", ""))
         )
@@ -85,21 +112,31 @@ class ExcelReaderService:
     
     @staticmethod
     def extraer_numero_contrato_control(fila: Any) -> str:
-        numero = getattr(fila, "Numero de contrato", "")
+        # Intentar con diferentes variaciones de nombre de columna
+        numero = ""
+        for col_name in ["Numero de contrato", "Número de contrato", "N° Contrato", "Nro_Contrato", "Nro_contrato"]:
+            try:
+                numero = getattr(fila, col_name, "")
+                if numero and numero != "":
+                    break
+            except AttributeError:
+                continue
         return ExcelReaderService._extraer_numero_contrato(numero)
     
     @staticmethod
     def _extraer_numero_contrato(valor: Any) -> str:
-        """Extrae y formatea el número de contrato."""
+        """Extrae y formatea el número de contrato preservando ceros adelante."""
         if pd.isna(valor) or valor == "" or valor == "N/A":
-            return "001"  # Valor por defecto si no hay número
-        try:
-            # Intentar convertir a entero para limpiar decimales
-            return str(int(float(valor)))
-        except (ValueError, TypeError):
-            # Si no se puede convertir, retornar como string limpio
-            valor_str = str(valor).strip()
-            return valor_str if valor_str else "001"
+            return ""  # Retornar string vacío si no hay valor
+        
+        # Convertir a string y limpiar espacios
+        valor_str = str(valor).strip()
+        
+        # Eliminar ".0" si pandas lo agregó (ej: "0057.0" -> "0057")
+        if valor_str.endswith('.0'):
+            valor_str = valor_str[:-2]
+        
+        return valor_str if valor_str else ""
     
     @staticmethod
     def leer_cursos_detallados_por_docente(

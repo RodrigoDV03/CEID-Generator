@@ -21,7 +21,10 @@ class ControlAvanceBuilder:
         saldos = self.payment_service.calcular_saldos_armadas(payment)
         
         # Asegurar que el número de contrato no esté vacío
-        numero_contrato = docente.numero_contrato if docente.numero_contrato else "001"
+        numero_contrato = docente.numero_contrato.strip() if docente.numero_contrato else ""
+        if not numero_contrato:
+            print(f"⚠️  Advertencia: {docente.nombre} no tiene número de contrato asignado")
+            numero_contrato = "[SIN_CONTRATO]"
         
         return {
             "Nombre_Docente": docente.nombre,
