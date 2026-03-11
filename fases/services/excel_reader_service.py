@@ -8,7 +8,14 @@ class ExcelReaderService:
     @staticmethod
     def leer_planilla(ruta_excel: str, nombre_hoja: str) -> pd.DataFrame:
         try:
-            df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
+            # Especificar dtype para preservar ceros iniciales en número de contrato
+            dtype_specs = {'Nro_Contrato': str}
+            df = pd.read_excel(
+                ruta_excel, 
+                sheet_name=nombre_hoja,
+                dtype=dtype_specs,
+                converters={'Nro_Contrato': lambda x: str(x).strip() if pd.notna(x) else ''}
+            )
             df.columns = df.columns.str.strip()
             return df
         except FileNotFoundError:
@@ -24,7 +31,7 @@ class ExcelReaderService:
     
     @staticmethod
     def obtener_hojas_disponibles(ruta_excel: str) -> List[str]:
-        return pd.ExcelFile(ruta_excel).sheet_names
+        return [str(sheet) for sheet in pd.ExcelFile(ruta_excel).sheet_names]
     
     @staticmethod
     def _limpiar_numero(valor: Any) -> str:
@@ -50,7 +57,7 @@ class ExcelReaderService:
             especialidad=str(getattr(fila, "Especialidad", "")),
             actividades_admin=str(getattr(fila, "Actividades_admin", "")),
             estado_docente=str(getattr(fila, "Estado_docente", "TERCERO")).strip().upper(),
-            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_contrato", "")),
+            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_Contrato", "")),
             idioma = str(getattr(fila, "Docente_idioma", "")),
             modalidad = str(getattr(fila, "Modalidad", ""))
         )
@@ -90,16 +97,25 @@ class ExcelReaderService:
     
     @staticmethod
     def _extraer_numero_contrato(valor: Any) -> str:
-        """Extrae y formatea el número de contrato."""
+        """Extrae y formatea el número de contrato preservando ceros iniciales."""
         if pd.isna(valor) or valor == "" or valor == "N/A":
             return "001"  # Valor por defecto si no hay número
-        try:
-            # Intentar convertir a entero para limpiar decimales
-            return str(int(float(valor)))
-        except (ValueError, TypeError):
-            # Si no se puede convertir, retornar como string limpio
-            valor_str = str(valor).strip()
-            return valor_str if valor_str else "001"
+        
+        valor_str = str(valor).strip()
+        
+        # Si contiene punto decimal (ej: "50.0" de Excel), removerlo
+        if '.' in valor_str:
+            try:
+                # Convertir a float y luego a int para remover decimales
+                valor_num = int(float(valor_str))
+                # Preservar ceros iniciales usando el largo original
+                largo_original = len(valor_str.split('.')[0])
+                return str(valor_num).zfill(largo_original)
+            except (ValueError, TypeError):
+                pass
+        
+        # Retornar como string limpio si no hay decimales
+        return valor_str if valor_str else "001"
     
     @staticmethod
     def leer_cursos_detallados_por_docente(
