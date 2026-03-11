@@ -31,16 +31,9 @@ def cargar_archivo(ruta):
         raise ValueError(f"Formato no soportado: {extension}")
 
 def parsear_csv_comillas_dobles(ruta):
-    """Parsea CSV con formato de comillas dobles anidadas"""
-    
-    print(f"🔍 Parseando CSV: {ruta}")
     
     with open(ruta, 'r', encoding='utf-8') as f:
         lineas = f.readlines()
-    
-    print(f"📄 Total de líneas en archivo: {len(lineas)}")
-    if lineas:
-        print(f"📝 Primera línea (raw): {repr(lineas[0][:200])}")  # Mostrar primeros 200 caracteres
     
     datos_parseados = []
     
@@ -95,10 +88,6 @@ def parsear_csv_comillas_dobles(ruta):
         if campo_actual:
             campos.append(campo_actual.strip())
         
-        # Debug: mostrar info de la primera línea (headers)
-        if idx == 0:
-            print(f"🔤 Headers detectados ({len(campos)} columnas): {campos}")
-        
         # Limitar a 13 columnas
         if len(campos) > 13:
             campos = campos[:13]
@@ -108,10 +97,6 @@ def parsear_csv_comillas_dobles(ruta):
     if datos_parseados:
         headers = datos_parseados[0]
         filas = datos_parseados[1:]
-        
-        # Debug: verificar consistencia
-        if filas:
-            print(f"📊 Primera fila de datos ({len(filas[0])} columnas): {filas[0][:3]}...")
         
         # Verificar que todas las filas tengan el mismo número de columnas que el header
         max_cols = len(headers)
@@ -505,6 +490,7 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
 def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos_docentes=None):
     if not os.path.exists(ruta_coordinacion):
         df['Servicio Actualización'] = 0
+        df['Horas_Total'] = 0
         return df
     
     try:
@@ -515,7 +501,6 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
         columna_docente = None
         columna_horas = None
         
-        print(f"🔍 Columnas disponibles en archivo: {list(coordinacion_df.columns)}")
         
         # Buscar columna de docente de manera más flexible
         for col in coordinacion_df.columns:
@@ -527,8 +512,8 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
         
         if columna_docente is None:
             print("⚠️ No se encontró columna de docente en archivo de coordinación")
-            print(f"Columnas disponibles: {list(coordinacion_df.columns)}")
             df['Servicio Actualización'] = 0
+            df['Horas_Total'] = 0
             return df
         
         # Buscar columna de horas de manera más flexible - PRIORIDAD A HORAS TOTALES
@@ -544,7 +529,6 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
                 col_lower = str(col).lower().strip()
                 if patron in col_lower:
                     columna_horas = col
-                    print(f"✅ Columna de horas encontrada: '{col}'")
                     break
             if columna_horas:  # Si encontró una columna, salir del loop externo
                 break
@@ -553,6 +537,7 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
             print("⚠️ No se encontró columna de horas en archivo de coordinación")
             print(f"Columnas disponibles: {list(coordinacion_df.columns)}")
             df['Servicio Actualización'] = 0
+            df['Horas_Total'] = 0
             return df
         
         
@@ -575,9 +560,7 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
         coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
         
         # Agrupar por docente (sumar horas si aparece múltiples veces)
-        print(f"📊 Antes de agrupar - columnas: {coordinacion_df.columns.tolist()}")
         coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
-        print(f"📊 Después de agrupar - columnas: {coordinacion_agrupado.columns.tolist()}, shape: {coordinacion_agrupado.shape}")
         coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
         
         # Aplicar normalización para matching
@@ -667,9 +650,14 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
         # Finalizar el procesamiento
         df = merge_result
         df['Servicio Actualización'] = df['Monto_Coordinacion'].fillna(0)
+        # Preservar Horas_Total con valor por defecto 0
+        if 'Horas_Total' in df.columns:
+            df['Horas_Total'] = df['Horas_Total'].fillna(0)
+        else:
+            df['Horas_Total'] = 0
         
-        # Limpiar columnas temporales
-        columnas_a_eliminar = ['docente_norm', 'Monto_Coordinacion', 'Horas_Total', 'Docente_Correcto']
+        # Limpiar columnas temporales (MANTENER Horas_Total para la hoja expandida)
+        columnas_a_eliminar = ['docente_norm', 'Monto_Coordinacion', 'Docente_Correcto']
         for col in columnas_a_eliminar:
             if col in df.columns:
                 df.drop(columns=[col], inplace=True)
@@ -679,6 +667,7 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
     except Exception as e:
         print(f"⚠️ Error al procesar archivo de coordinación: {e}")
         df['Servicio Actualización'] = 0
+        df['Horas_Total'] = 0
     
     return df
 
@@ -694,7 +683,6 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos
                 # Buscar columnas similares
                 posibles_docentes = [col for col in clasif_df.columns if 'docente' in str(col).lower()]
                 if posibles_docentes:
-                    print(f"Posibles columnas de docente: {posibles_docentes}")
                     clasif_df = clasif_df.rename(columns={posibles_docentes[0]: 'Docente'})
                 else:
                     df['Examen Clasif.'] = 0
@@ -934,9 +922,7 @@ def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_doce
         coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
         
         # Agrupar por docente (sumar horas si aparece múltiples veces)
-        print(f"📊 Antes de agrupar (tabla) - columnas: {coordinacion_df.columns.tolist()}")
         coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
-        print(f"📊 Después de agrupar (tabla) - columnas: {coordinacion_agrupado.columns.tolist()}, shape: {coordinacion_agrupado.shape}")
         coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
         
         # Aplicar normalización para matching
@@ -1232,7 +1218,11 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
             fila_servicio['Modalidad_Curso'] = 'VIRTUAL'
             fila_servicio['Tipo_Servicio'] = 'SERVICIO_ACTUALIZACION'
             # Usar las horas reales del archivo de coordinación, NO calcularlas
-            horas_servicio = int(row_docente['Horas_Total']) if 'Horas_Total' in row_docente and not pd.isna(row_docente['Horas_Total']) else 0
+            horas_total = row_docente.get('Horas_Total', 0)
+            try:
+                horas_servicio = int(horas_total) if not pd.isna(horas_total) and horas_total != '' else 0
+            except (ValueError, TypeError):
+                horas_servicio = 0
             fila_servicio['Horas_Servicio'] = horas_servicio
             fila_servicio['Monto_Individual'] = servicio_act
             filas_expandidas.append(fila_servicio)
@@ -1247,9 +1237,86 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
     
     df_expandido = pd.DataFrame(filas_expandidas)
     
-    # Reordenar columnas para que las nuevas estén al principio
-    columnas_nuevas = ['Curso_Individual', 'Modalidad_Curso', 'Tipo_Servicio', 'Horas_Servicio', 'Monto_Individual']
-    columnas_resto = [col for col in df_expandido.columns if col not in columnas_nuevas]
-    df_expandido = df_expandido[columnas_nuevas + columnas_resto]
+    # ============= MEJORAS DE ORGANIZACIÓN =============
+    
+    # 1. Definir orden lógico para tipos de servicio
+    orden_tipo_servicio = {
+        'CURSO_DICTADO': 1,
+        'DISENO_EXAMENES': 2,
+        'EXAMEN_CLASIF': 3,
+        'SERVICIO_ACTUALIZACION': 4
+    }
+    df_expandido['_orden_servicio'] = df_expandido['Tipo_Servicio'].map(orden_tipo_servicio).fillna(99)
+    
+    # Mapeo a nombres descriptivos en español
+    nombres_servicio = {
+        'CURSO_DICTADO': 'Curso Académico',
+        'DISENO_EXAMENES': 'Diseño de Exámenes',
+        'EXAMEN_CLASIF': 'Examen de Clasificación',
+        'SERVICIO_ACTUALIZACION': 'Servicio de Actualización'
+    }
+    df_expandido['Tipo_Servicio_Desc'] = df_expandido['Tipo_Servicio'].map(nombres_servicio)
+    
+    # 2. Ordenar por: Docente (alfabético) -> Tipo de Servicio (orden lógico) -> Curso Individual
+    df_expandido = df_expandido.sort_values(
+        by=['Docente', '_orden_servicio', 'Curso_Individual'],
+        ascending=[True, True, True]
+    ).reset_index(drop=True)
+    
+    # 3. Agregar numeración global y por docente
+    df_expandido.insert(0, 'N°', range(1, len(df_expandido) + 1))
+    
+    # Agregar contador de servicio por docente (1, 2, 3, etc. para cada docente)
+    df_expandido['Servicio_Nro'] = df_expandido.groupby('Docente').cumcount() + 1
+    
+    # 4. Reorganizar columnas de forma más lógica
+    # Primero: Identificación y servicio, luego detalles, al final datos administrativos repetidos
+    columnas_principales = [
+        'N°',
+        'Docente',
+        'Servicio_Nro',
+        'Tipo_Servicio_Desc',
+        'Curso_Individual',
+        'Modalidad_Curso',
+        'Horas_Servicio',
+        'Monto_Individual'
+    ]
+    
+    columnas_resumen = [
+        'cantidad_cursos',
+        'Curso Dictado',
+        'Disenio_examenes',
+        'Examen_clasif',
+        'Servicio_actualizacion'
+    ]
+    
+    columnas_administrativas = [
+        'Sede',
+        'Categoria_letra',
+        'Categoria_monto',
+        'N_Ruc',
+        'Estado_docente',
+        'Docente_idioma',
+        'Numero_dni',
+        'Numero_celular',
+        'Domicilio_docente',
+        'Correo_personal',
+        'Nro_contrato'
+    ]
+    
+    # Construir orden final de columnas
+    columnas_ordenadas = columnas_principales + columnas_resumen + columnas_administrativas
+    
+    # Agregar cualquier columna que falte al final
+    columnas_restantes = [col for col in df_expandido.columns 
+                          if col not in columnas_ordenadas and col not in ['_orden_servicio', 'docente', 'curso', 'Tipo_Servicio']]
+    
+    columnas_finales = [col for col in columnas_ordenadas if col in df_expandido.columns] + columnas_restantes
+    
+    # Eliminar columnas temporales y redundantes
+    df_expandido = df_expandido.drop(columns=['_orden_servicio', 'Tipo_Servicio'], errors='ignore')
+    
+    # Aplicar orden final
+    df_expandido = df_expandido[columnas_finales]
     
     return df_expandido
