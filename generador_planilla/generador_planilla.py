@@ -93,7 +93,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Celular': 'Numero_celular',
                 'Dirección': 'Domicilio_docente',
                 'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_contrato',
+                'N° Contrato': 'Nro_Contrato',
                 'Servicio Actualización': 'Servicio_actualizacion'
             })
             
@@ -112,7 +112,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Celular': 'Numero_celular',
                 'Dirección': 'Domicilio_docente',
                 'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_contrato',
+                'N° Contrato': 'Nro_Contrato',
                 'Servicio Actualización': 'Servicio_actualizacion'
             })
             

@@ -68,13 +68,24 @@ class ExcelReaderService:
         if pd.isna(categoria_valor):
             categoria_valor = 1.0
         
+        # Leer valores con manejo robusto
+        total_pago = float(getattr(fila, "Total_pago", 0))
+        servicio_act = float(getattr(fila, "Servicio_actualizacion", 0))
+        bono = float(getattr(fila, "Bono", 0))
+        disenio = float(getattr(fila, "Disenio_examenes", 0))
+        examen_clasif = float(getattr(fila, "Examen_clasif", 0))
+        
+        # Debug para casos problemáticos
+        if total_pago == 0 and (servicio_act > 0 or disenio > 0 or examen_clasif > 0):
+            print(f"⚠️ Total_pago es 0 pero hay otros montos: Servicio={servicio_act}, Diseño={disenio}, Examen={examen_clasif}")
+        
         return PaymentData(
             categoria_monto=float(categoria_valor),
-            total_pago=float(getattr(fila, "Total_pago", 0)),
-            servicio_actualizacion=float(getattr(fila, "Servicio_actualizacion", 0)),
-            bono=float(getattr(fila, "Bono", 0)),
-            disenio_examenes=float(getattr(fila, "Disenio_examenes", 0)),
-            examen_clasificacion=float(getattr(fila, "Examen_clasif", 0))
+            total_pago=total_pago,
+            servicio_actualizacion=servicio_act,
+            bono=bono,
+            disenio_examenes=disenio,
+            examen_clasificacion=examen_clasif
         )
     
     @staticmethod

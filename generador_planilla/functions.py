@@ -1301,7 +1301,7 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
         'Numero_celular',
         'Domicilio_docente',
         'Correo_personal',
-        'Nro_contrato'
+        'Nro_Contrato'
     ]
     
     # Construir orden final de columnas
