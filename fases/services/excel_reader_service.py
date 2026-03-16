@@ -8,16 +8,14 @@ class ExcelReaderService:
     @staticmethod
     def leer_planilla(ruta_excel: str, nombre_hoja: str) -> pd.DataFrame:
         try:
-            # Forzar que columnas de números de contrato se lean como texto (string)
-            # para preservar ceros adelante (ej: 0057, 0130)
-            dtype_dict = {
-                'Nro_Contrato': str,
-                'Nro_contrato': str,
-                'N° Contrato': str,
-                'Numero de contrato': str,
-                'Número de contrato': str
-            }
-            df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja, dtype=dtype_dict)
+            # Especificar dtype para preservar ceros iniciales en número de contrato
+            dtype_specs = {'Nro_Contrato': str}
+            df = pd.read_excel(
+                ruta_excel, 
+                sheet_name=nombre_hoja,
+                dtype=dtype_specs,
+                converters={'Nro_Contrato': lambda x: str(x).strip() if pd.notna(x) else ''}
+            )
             df.columns = df.columns.str.strip()
             return df
         except FileNotFoundError:
@@ -41,7 +39,7 @@ class ExcelReaderService:
     
     @staticmethod
     def obtener_hojas_disponibles(ruta_excel: str) -> List[str]:
-        return pd.ExcelFile(ruta_excel).sheet_names
+        return [str(sheet) for sheet in pd.ExcelFile(ruta_excel).sheet_names]
     
     @staticmethod
     def _limpiar_numero(valor: Any) -> str:
@@ -77,7 +75,7 @@ class ExcelReaderService:
             especialidad=str(getattr(fila, "Especialidad", "")),
             actividades_admin=str(getattr(fila, "Actividades_admin", "")),
             estado_docente=str(getattr(fila, "Estado_docente", "TERCERO")).strip().upper(),
-            numero_contrato=ExcelReaderService._extraer_numero_contrato(numero_contrato),
+            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_Contrato", "")),
             idioma = str(getattr(fila, "Docente_idioma", "")),
             modalidad = str(getattr(fila, "Modalidad", ""))
         )
@@ -88,13 +86,24 @@ class ExcelReaderService:
         if pd.isna(categoria_valor):
             categoria_valor = 1.0
         
+        # Leer valores con manejo robusto
+        total_pago = float(getattr(fila, "Total_pago", 0))
+        servicio_act = float(getattr(fila, "Servicio_actualizacion", 0))
+        bono = float(getattr(fila, "Bono", 0))
+        disenio = float(getattr(fila, "Disenio_examenes", 0))
+        examen_clasif = float(getattr(fila, "Examen_clasif", 0))
+        
+        # Debug para casos problemáticos
+        if total_pago == 0 and (servicio_act > 0 or disenio > 0 or examen_clasif > 0):
+            print(f"⚠️ Total_pago es 0 pero hay otros montos: Servicio={servicio_act}, Diseño={disenio}, Examen={examen_clasif}")
+        
         return PaymentData(
             categoria_monto=float(categoria_valor),
-            total_pago=float(getattr(fila, "Total_pago", 0)),
-            servicio_actualizacion=float(getattr(fila, "Servicio_actualizacion", 0)),
-            bono=float(getattr(fila, "Bono", 0)),
-            disenio_examenes=float(getattr(fila, "Disenio_examenes", 0)),
-            examen_clasificacion=float(getattr(fila, "Examen_clasif", 0))
+            total_pago=total_pago,
+            servicio_actualizacion=servicio_act,
+            bono=bono,
+            disenio_examenes=disenio,
+            examen_clasificacion=examen_clasif
         )
     
     @staticmethod
@@ -125,18 +134,25 @@ class ExcelReaderService:
     
     @staticmethod
     def _extraer_numero_contrato(valor: Any) -> str:
-        """Extrae y formatea el número de contrato preservando ceros adelante."""
+        """Extrae y formatea el número de contrato preservando ceros iniciales."""
         if pd.isna(valor) or valor == "" or valor == "N/A":
-            return ""  # Retornar string vacío si no hay valor
+            return "001"  # Valor por defecto si no hay número
         
-        # Convertir a string y limpiar espacios
         valor_str = str(valor).strip()
         
-        # Eliminar ".0" si pandas lo agregó (ej: "0057.0" -> "0057")
-        if valor_str.endswith('.0'):
-            valor_str = valor_str[:-2]
+        # Si contiene punto decimal (ej: "50.0" de Excel), removerlo
+        if '.' in valor_str:
+            try:
+                # Convertir a float y luego a int para remover decimales
+                valor_num = int(float(valor_str))
+                # Preservar ceros iniciales usando el largo original
+                largo_original = len(valor_str.split('.')[0])
+                return str(valor_num).zfill(largo_original)
+            except (ValueError, TypeError):
+                pass
         
-        return valor_str if valor_str else ""
+        # Retornar como string limpio si no hay decimales
+        return valor_str if valor_str else "001"
     
     @staticmethod
     def leer_cursos_detallados_por_docente(

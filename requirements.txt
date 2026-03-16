@@ -1,5 +1,5 @@
 altgraph==0.17.4
-auto-py-to-exe==2.48.1
+auto-py-to-exe==2.50.0
 bottle==0.13.4
 bottle-websocket==0.2.9
 cachetools==5.5.2
@@ -43,8 +43,8 @@ protobuf==6.33.1
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pycparser==2.22
-pyinstaller==6.17.0
-pyinstaller-hooks-contrib==2025.10
+pyinstaller==6.19.0
+pyinstaller-hooks-contrib==2026.2
 pyparsing==3.2.3
 PyPDF2==3.0.1
 pypdfium2==4.30.0

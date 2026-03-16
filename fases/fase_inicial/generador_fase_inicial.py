@@ -139,6 +139,39 @@ def procesar_planilla_fase_inicial(
     excel_service = ExcelReaderService()
     df = excel_service.leer_planilla(planilla_path, hoja_seleccionada)
     
+    # Detectar si es una hoja expandida (tiene Monto_Individual y Servicio_Nro)
+    es_hoja_expandida = 'Monto_Individual' in df.columns and 'Servicio_Nro' in df.columns
+    
+    if es_hoja_expandida:
+        print("⚠️ Detectada hoja expandida (Planilla_Generador). Procesando solo la primera fila de cada docente.")
+        print("   Recomendación: Use la hoja resumida (ej: 'Planilla Enero') para mejores resultados.")
+        
+        # Calcular totales por tipo de servicio para cada docente
+        # Agrupar por Docente y Tipo_Servicio, sumar Monto_Individual
+        df['Total_pago_calculado'] = df.groupby('Docente')['Monto_Individual'].transform('sum')
+        
+        # Verificar que existe la columna Tipo_Servicio
+        if 'Tipo_Servicio' in df.columns:
+            # Calcular montos específicos por tipo de servicio
+            for tipo_servicio, columna_destino in [
+                ('SERVICIO_ACTUALIZACION', 'Servicio_actualizacion'),
+                ('DISENO_EXAMENES', 'Disenio_examenes'),
+                ('EXAMEN_CLASIF', 'Examen_clasif'),
+                ('CURSO_DICTADO', 'Curso_Dictado')
+            ]:
+                # Sumar montos de este tipo de servicio por docente
+                monto_tipo = df[df['Tipo_Servicio'] == tipo_servicio].groupby('Docente')['Monto_Individual'].sum()
+                # Asignar a todos los registros del docente
+                df[columna_destino] = df['Docente'].map(monto_tipo).fillna(0)
+        else:
+            print("⚠️ La hoja expandida no tiene columna 'Tipo_Servicio'. Los montos específicos podrían ser incorrectos.")
+        
+        # Sobrescribir Total_pago con el calculado
+        df['Total_pago'] = df['Total_pago_calculado']
+        
+        # Mantener solo la primera fila por docente
+        df = df.drop_duplicates(subset=['Docente'], keep='first')
+    
     # Procesar cada fila
     for i, fila in enumerate(df.itertuples(index=False), start=1):
         try:
