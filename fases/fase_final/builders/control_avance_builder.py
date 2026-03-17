@@ -33,7 +33,7 @@ class ControlAvanceBuilder:
         
         return {
             "Nombre_Docente": docente.nombre,
-            "Nro_Contrato": numero_contrato,
+            "numero_contrato": numero_contrato,
             "Idioma_Docente": idioma_docente,
             "Monto_Total": saldos['Monto_Total'],
             "Total_Primera": saldos['Total_Primera'],

@@ -36,7 +36,7 @@ class ConformidadBuilder:
             "descripcion_cursos": descripcion_completa,
             "monto_subtotal": montos['monto_total_formato'],
             "monto_hora": montos['categoria_formato'],
-            "Nro_Contrato": numero_contrato,
+            "numero_contrato": numero_contrato,
             "numero_armada": self.config.numero_armada,
             "modalidad_servicio": docente.modalidad_texto
         }
