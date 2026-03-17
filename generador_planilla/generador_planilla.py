@@ -35,6 +35,13 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         datos_docentes = pd.read_excel(excel_docentes, sheet_name="list", dtype=dtype_contrato)
         print(f"✅ Docentes cargados: {len(datos_docentes)} registros")
 
+        for columna_contrato in ['N° Contrato', 'Nro_Contrato', 'Nro_contrato', 'Numero de contrato', 'Número de contrato']:
+            if columna_contrato in datos_docentes.columns:
+                datos_docentes['N° Contrato'] = datos_docentes[columna_contrato].apply(formatear_numero_contrato)
+                break
+        else:
+            datos_docentes['N° Contrato'] = ''
+
         datos = limpiar_docentes(datos, 'docente')
         datos_docentes = limpiar_docentes(datos_docentes, 'Docente')
 
@@ -105,26 +112,12 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Servicio Actualización': 'Servicio_actualizacion'
             })
             
-            # NUEVA ESTRUCTURA: Expandir filas por curso con modalidad
-            TABLA_GENERADOR_EXPANDIDA = expandir_filas_por_curso(agrupar_gen, datos_csv_original_procesados)
-            TABLA_GENERADOR_EXPANDIDA = TABLA_GENERADOR_EXPANDIDA.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
-                'Categoria (Letra)': 'Categoria_letra',
-                'Categoria (Monto)': 'Categoria_monto',
-                'Diseño de Examenes': 'Disenio_examenes',
-                'Examen Clasif.': 'Examen_clasif',
-                'Total Pago S/.': 'Total_pago',
-                'Estado': 'Estado_docente',
-                'Idioma': 'Docente_idioma',
-                'N_Ruc': 'N_Ruc',
-                'Nro. Documento': 'Numero_dni',
-                'Celular': 'Numero_celular',
-                'Dirección': 'Domicilio_docente',
-                'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_Contrato',
-                'Servicio Actualización': 'Servicio_actualizacion'
-            })
-            
-            TABLA_GENERADOR_EXPANDIDA.to_excel(writer, sheet_name="Planilla_Generador", index=False)
+            TABLA_GENERADOR_RESUMIDA = construir_tabla_planilla_generador_resumida(
+                agrupar_gen,
+                TABLA_GENERADOR,
+                datos_csv_original_procesados
+            )
+            TABLA_GENERADOR_RESUMIDA.to_excel(writer, sheet_name="Planilla_Generador", index=False)
 
             df_carga = construir_tabla_carga_academica(datos_csv_original_procesados, 'Planilla')
             df_carga.to_excel(writer, sheet_name="Carga académica", index=False)

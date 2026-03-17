@@ -47,7 +47,7 @@ class CursoDetalle:
         """Indica si el servicio no requiere especificar modalidad"""
         return self.tipo_servicio in ["DISENO_EXAMENES", "BONO"]
     
-    def generar_descripcion_individual(self) -> str:
+    def generar_descripcion_individual(self, incluir_modalidad: bool = True) -> str:
         """
         Genera la descripción textual de este curso/servicio.
         
@@ -55,16 +55,22 @@ class CursoDetalle:
             str: Descripción formateada del curso/servicio
         """
         if self.tipo_servicio == "CURSO_DICTADO":
-            # "28 horas de clases de Inglés Avanzado 2 bajo la modalidad presencial"
-            return f"{self.horas} horas de clases de {self.nombre} bajo la modalidad {self.modalidad_texto}"
+            # "28 horas de clases de Inglés Avanzado 2" o con modalidad por ítem
+            if incluir_modalidad:
+                return f"{self.horas} horas de clases de {self.nombre} bajo la modalidad {self.modalidad_texto}"
+            return f"{self.horas} horas de clases de {self.nombre}"
         
         elif self.tipo_servicio == "EXAMEN_CLASIF":
-            # "10 horas de examen de clasificación bajo la modalidad virtual"
-            return f"{self.horas} horas de examen de clasificación bajo la modalidad {self.modalidad_texto}"
+            # "10 horas de examen de clasificación" o con modalidad por ítem
+            if incluir_modalidad:
+                return f"{self.horas} horas de examen de clasificación bajo la modalidad {self.modalidad_texto}"
+            return f"{self.horas} horas de examen de clasificación"
         
         elif self.tipo_servicio == "SERVICIO_ACTUALIZACION":
-            # "Servicio de actualización de materiales de enseñanza bajo la modalidad virtual"
-            return f"Servicio de actualización de materiales de enseñanza bajo la modalidad {self.modalidad_texto}"
+            # "Servicio de actualización de materiales de enseñanza" o con modalidad por ítem
+            if incluir_modalidad:
+                return f"Servicio de actualización de materiales de enseñanza bajo la modalidad {self.modalidad_texto}"
+            return "Servicio de actualización de materiales de enseñanza"
         
         elif self.tipo_servicio == "DISENO_EXAMENES":
             # "8 horas de diseño de exámenes" (sin modalidad)

@@ -25,11 +25,16 @@ class ControlAvanceBuilder:
         if not numero_contrato:
             print(f"⚠️  Advertencia: {docente.nombre} no tiene número de contrato asignado")
             numero_contrato = "[SIN_CONTRATO]"
+
+        idioma_docente = docente.idioma.strip() if docente.idioma else ""
+        if not idioma_docente:
+            # Fallback para no dejar el marcador vacío en casos no mapeados.
+            idioma_docente = docente.especialidad
         
         return {
             "Nombre_Docente": docente.nombre,
             "Nro_Contrato": numero_contrato,
-            "Idioma_Docente": docente.especialidad,
+            "Idioma_Docente": idioma_docente,
             "Monto_Total": saldos['Monto_Total'],
             "Total_Primera": saldos['Total_Primera'],
             "Total_Segunda": saldos['Total_Segunda'],

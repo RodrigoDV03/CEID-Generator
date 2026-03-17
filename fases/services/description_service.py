@@ -144,7 +144,10 @@ class DescriptionService:
     # ============= NUEVOS MÉTODOS CON MODALIDADES ============= 
     
     @staticmethod
-    def redactar_servicios_con_modalidad(cursos_detallados: List[CursoDetalle]) -> str:
+    def redactar_servicios_con_modalidad(
+        cursos_detallados: List[CursoDetalle],
+        incluir_modalidad_por_item: bool = True
+    ) -> str:
         """
         Genera descripción de servicios con modalidad específica para cada uno.
         Usado en OFICIO, COTIZACIÓN y CONFORMIDAD.
@@ -166,7 +169,11 @@ class DescriptionService:
         
         descripciones = []
         for curso in cursos_detallados:
-            descripciones.append(curso.generar_descripcion_individual())
+            descripciones.append(
+                curso.generar_descripcion_individual(
+                    incluir_modalidad=incluir_modalidad_por_item
+                )
+            )
         
         # Unir con el formato adecuado
         if len(descripciones) == 1:

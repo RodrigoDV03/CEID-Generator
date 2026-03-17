@@ -29,6 +29,8 @@ class OficioBuilder:
         # Debug: mostrar el número de contrato
         if not docente.numero_contrato:
             print(f"⚠️  {docente.nombre} - Número de contrato vacío, usando valor por defecto: {numero_contrato}")
+
+        modalidad_servicio = "híbrida" if docente.es_contrato else docente.modalidad_texto
         
         return {
             "Nro_Contrato": numero_contrato,
@@ -37,7 +39,7 @@ class OficioBuilder:
             "categoria": montos['categoria_formato'],
             "monto_subtotal": montos['monto_total_formato'],
             "numero_armada": self.config.numero_armada,
-            "modalidad_servicio": docente.modalidad_texto
+            "modalidad_servicio": modalidad_servicio
         }
     
     def generar(

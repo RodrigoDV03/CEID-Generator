@@ -283,6 +283,147 @@ def normalizar_texto(texto):
     return ''.join([c for c in texto if not unicodedata.combining(c)])
 
 
+def normalizar_clave_docente(texto):
+    if pd.isna(texto):
+        return ''
+    return str(texto).strip().upper()
+
+
+def formatear_numero_contrato(valor, ancho_minimo=4):
+    if pd.isna(valor):
+        return ''
+
+    valor_str = str(valor).strip()
+    if not valor_str or valor_str.lower() == 'nan':
+        return ''
+
+    if '.' in valor_str:
+        try:
+            valor_str = str(int(float(valor_str)))
+        except (ValueError, TypeError):
+            pass
+
+    if valor_str.isdigit():
+        return valor_str.zfill(max(ancho_minimo, len(valor_str)))
+
+    return valor_str
+
+
+def formatear_numero_dni(valor, ancho=8):
+    if pd.isna(valor):
+        return ''
+
+    valor_str = str(valor).strip()
+    if not valor_str or valor_str.lower() == 'nan':
+        return ''
+
+    if '.' in valor_str:
+        try:
+            valor_str = str(int(float(valor_str)))
+        except (ValueError, TypeError):
+            pass
+
+    if valor_str.isdigit():
+        return valor_str.zfill(ancho)
+
+    return valor_str
+
+
+def generar_siguiente_curso_intensivo(curso):
+    if pd.isna(curso):
+        return ''
+
+    curso_str = str(curso).strip()
+    if not curso_str or 'intensivo' not in curso_str.lower():
+        return ''
+
+    import re
+    match = re.search(r'^(.*?)(\d+)\s*$', curso_str)
+    if not match:
+        return ''
+
+    prefijo = match.group(1).rstrip()
+    ciclo_actual = int(match.group(2))
+    return f"{prefijo} {ciclo_actual + 1}"
+
+
+def expandir_texto_cursos_intensivos(cursos_texto):
+    if pd.isna(cursos_texto):
+        return ''
+
+    partes = [p.strip() for p in str(cursos_texto).split('/') if p and str(p).strip()]
+    if not partes:
+        return ''
+
+    # Preservar TODAS las partes originales (incluyendo repeticiones de un mismo curso)
+    resultado = list(partes)
+    cursos_ya_presentes = set(partes)
+
+    # Solo agregar el siguiente curso intensivo si no está ya en la lista
+    for curso in set(partes):
+        siguiente = generar_siguiente_curso_intensivo(curso)
+        if siguiente and siguiente not in cursos_ya_presentes:
+            resultado.append(siguiente)
+            cursos_ya_presentes.add(siguiente)
+
+    return ' / '.join(resultado)
+
+
+def expandir_filas_carga_intensivos(datos):
+    datos_base = datos.copy()
+    if datos_base.empty:
+        return datos_base
+
+    filas_adicionales = []
+    mask_intensivo = datos_base['modalidad'].astype(str).str.upper().str.contains('INTENSIVO', na=False)
+
+    for _, row in datos_base[mask_intensivo].iterrows():
+        try:
+            ciclo_actual = int(str(row.get('ciclo', '')).strip())
+        except (TypeError, ValueError):
+            continue
+
+        idioma = str(row.get('idioma', '')).strip()
+        nivel = str(row.get('nivel', '')).strip()
+        if not idioma or not nivel:
+            continue
+
+        fila_nueva = row.copy()
+        ciclo_siguiente = ciclo_actual + 1
+        fila_nueva['ciclo'] = str(ciclo_siguiente)
+        fila_nueva['Curso'] = f"{idioma} {nivel} {ciclo_siguiente}"
+        filas_adicionales.append(fila_nueva)
+
+    if filas_adicionales:
+        datos_extra = pd.DataFrame(filas_adicionales)
+        datos_base = pd.concat([datos_base, datos_extra], ignore_index=True)
+
+        columnas_dedupe = [c for c in ['docente', 'Curso', 'modalidad', 'dias', 'horainicio', 'horafin'] if c in datos_base.columns]
+        if columnas_dedupe:
+            datos_base = datos_base.drop_duplicates(subset=columnas_dedupe, keep='first')
+
+    return datos_base
+
+
+def generar_siguiente_curso_intensivo_desde_fila(row):
+    modalidad = str(row.get('modalidad', '')).strip().upper()
+    if 'INTENSIVO' not in modalidad:
+        return ''
+
+    try:
+        ciclo_actual = int(str(row.get('ciclo', '')).strip())
+    except (TypeError, ValueError):
+        # Fallback al parser por texto de curso si no hay ciclo numérico
+        return generar_siguiente_curso_intensivo(row.get('Curso', ''))
+
+    idioma = str(row.get('idioma', '')).strip()
+    nivel = str(row.get('nivel', '')).strip()
+    if not idioma or not nivel:
+        return generar_siguiente_curso_intensivo(row.get('Curso', ''))
+
+    return f"{idioma} {nivel} {ciclo_actual + 1}"
+
+
 def procesar_ediciones_idioma(datos):
     datos_procesados = datos.copy()
     
@@ -311,7 +452,17 @@ def aplicar_transformaciones_base(datos):
     datos_transformados['nivel_optimized'] = datos_transformados['nivel']
     
     # Caso específico para Inglés General
-    datos_transformados.loc[mask_general & mask_ingles, 'nivel_optimized'] = 'Posgrado Intermedio'
+    mask_ingles_general = mask_general & mask_ingles
+    if mask_ingles_general.any():
+        for idx in datos_transformados[mask_ingles_general].index:
+            try:
+                ciclo_num = int(str(datos_transformados.loc[idx, 'ciclo']).strip())
+                if 1 <= ciclo_num <= 8:
+                    datos_transformados.loc[idx, 'nivel_optimized'] = 'Posgrado Básico'
+                elif 9 <= ciclo_num <= 18:
+                    datos_transformados.loc[idx, 'nivel_optimized'] = 'Posgrado Intermedio'
+            except:
+                pass  # Mantener el valor original si hay error
     
     # Caso específico para Portugués General
     mask_portugues_general = mask_general & mask_portugues
@@ -359,7 +510,15 @@ def ajustar_nivel(row):
     ciclo = row['ciclo']
     if nivel == 'General':
         if idioma == 'Inglés':
-            return 'Posgrado Intermedio'
+            try:
+                ciclo_num = int(str(ciclo).strip())
+            except Exception:
+                ciclo_num = None
+            if ciclo_num is not None:
+                if 1 <= ciclo_num <= 8:
+                    return 'Posgrado Básico'
+                elif 9 <= ciclo_num <= 18:
+                    return 'Posgrado Intermedio'
         elif idioma == 'Portugués':
             try:
                 ciclo_num = int(str(ciclo).strip())
@@ -461,7 +620,7 @@ def procesar_cursos_intensivos(datos):
     
     return datos_procesados
 
-def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=85):
+def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=80):
     mapeo = {}
     for nombre in nombres_input:
         if nombre not in mapeo:  # Evitar recálculos
@@ -472,15 +631,20 @@ def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=85):
 # ------------- CÁLCULO DE MONTOS -------------
 
 def agrupar_y_calcular(df, datos_docentes, col_curso):
-    agrupado = (df.groupby('docente').agg(curso=(col_curso, lambda x: ' / '.join(x)), cantidad_cursos=(col_curso, 'count')).reset_index())
+    # Agrupar por docente: una fila por docente con todos sus cursos concatenados
+    agrupado = (df.groupby('docente').agg(
+        curso=(col_curso, lambda x: ' / '.join(str(v).strip() for v in x if str(v).strip() and str(v).strip().lower() != 'nan')),
+        cantidad_cursos=(col_curso, 'count')
+    ).reset_index())
+
     nombres_base = datos_docentes['Docente'].tolist()
-    
-    # Crear mapeo fuzzy una sola vez
-    mapeo_docentes = crear_mapeo_fuzzy(agrupado['docente'].tolist(), nombres_base, umbral=85)
-    
+
+    # Crear mapeo fuzzy una sola vez (solo sobre docentes únicos)
+    mapeo_docentes = crear_mapeo_fuzzy(agrupado['docente'].tolist(), nombres_base, umbral=80)
+
     # Aplicar mapeo usando el diccionario
     agrupado['Docente'] = agrupado['docente'].map(mapeo_docentes)
-    
+
     agrupado = agrupado.merge(datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N_Ruc', 'Estado']], on='Docente', how='left')
     agrupado['Curso Dictado'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 28
     agrupado['Diseño de Examenes'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 4
@@ -822,6 +986,7 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
     })
     
     tabla = pd.DataFrame(columnas_tabla)
+    tabla['Curso'] = tabla['Curso'].apply(expandir_texto_cursos_intensivos)
     
     # AGREGAR SERVICIO DE ACTUALIZACIÓN A LA COLUMNA CURSO CUANDO CORRESPONDA
     def agregar_servicio_a_curso(row):
@@ -973,7 +1138,7 @@ def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_doce
         return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
 
 def construir_tabla_carga_academica(datos, estado_planilla):
-    datos = datos.copy()
+    datos = expandir_filas_carga_intensivos(datos)
 
     if 'nivel' not in datos.columns:
         datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
@@ -1320,3 +1485,181 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
     df_expandido = df_expandido[columnas_finales]
     
     return df_expandido
+
+
+def _primer_valor_no_vacio(series):
+    for valor in series:
+        if pd.isna(valor):
+            continue
+        valor_str = str(valor).strip()
+        if valor_str and valor_str.lower() != 'nan':
+            return valor
+    return ''
+
+
+def _unir_valores_unicos(series):
+    valores = []
+    for valor in series:
+        if pd.isna(valor):
+            continue
+        valor_str = str(valor).strip()
+        if not valor_str or valor_str.lower() == 'nan':
+            continue
+        if valor_str not in valores:
+            valores.append(valor_str)
+    return ' / '.join(valores)
+
+
+def _unir_todos_valores(series):
+    """Concatena TODOS los valores incluyendo repetidos (ej: Inglés B2 / Inglés B2 / Inglés B2)."""
+    valores = []
+    for valor in series:
+        if pd.isna(valor):
+            continue
+        valor_str = str(valor).strip()
+        if not valor_str or valor_str.lower() == 'nan':
+            continue
+        valores.append(valor_str)
+    return ' / '.join(valores)
+
+
+def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, datos_csv_procesados):
+    tabla_base = tabla_generador.copy()
+
+    if 'cantidad_cursos' not in tabla_base.columns and 'Cantidad Cursos' in tabla_base.columns:
+        tabla_base['cantidad_cursos'] = tabla_base['Cantidad Cursos']
+
+    if tabla_base.empty:
+        columnas = [
+            'N°', 'Docente', 'N_Ruc', 'Categoria_letra', 'Categoria_monto', 'Sede',
+            'Curso_Virtual', 'Curso_Presencial', 'cantidad_cursos', 'Curso Dictado',
+            'Disenio_examenes', 'Examen_clasif', 'Horas_Total', 'Servicio_actualizacion',
+            'Total_pago', 'Estado_docente', 'Docente_idioma', 'Numero_dni', 'Numero_celular',
+            'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
+        ]
+        return pd.DataFrame(columns=columnas)
+
+    columnas_texto = [
+        'N_Ruc', 'Categoria_letra', 'Sede', 'Estado_docente', 'Docente_idioma',
+        'Numero_dni', 'Numero_celular', 'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
+    ]
+    columnas_numericas = [
+        'Categoria_monto', 'cantidad_cursos', 'Curso Dictado', 'Disenio_examenes',
+        'Examen_clasif', 'Horas_Total', 'Servicio_actualizacion', 'Total_pago'
+    ]
+
+    for columna in columnas_texto:
+        if columna not in tabla_base.columns:
+            tabla_base[columna] = ''
+
+    for columna in columnas_numericas:
+        if columna not in tabla_base.columns:
+            tabla_base[columna] = 0
+        tabla_base[columna] = pd.to_numeric(tabla_base[columna], errors='coerce').fillna(0)
+
+    # Agrupar por Docente: una fila por docente con montos sumados
+    agrupado_resumen = tabla_base.groupby('Docente', as_index=False).agg({
+        'N_Ruc': _primer_valor_no_vacio,
+        'Categoria_letra': _primer_valor_no_vacio,
+        'Categoria_monto': 'max',
+        'Sede': _unir_valores_unicos,
+        'cantidad_cursos': 'sum',
+        'Curso Dictado': 'sum',
+        'Disenio_examenes': 'sum',
+        'Examen_clasif': 'sum',
+        'Horas_Total': 'sum',
+        'Servicio_actualizacion': 'sum',
+        'Total_pago': 'sum',
+        'Estado_docente': _primer_valor_no_vacio,
+        'Docente_idioma': _unir_valores_unicos,
+        'Numero_dni': _primer_valor_no_vacio,
+        'Numero_celular': _primer_valor_no_vacio,
+        'Domicilio_docente': _primer_valor_no_vacio,
+        'Correo_personal': _primer_valor_no_vacio,
+        'Nro_Contrato': _primer_valor_no_vacio
+    })
+
+    mapeo_docentes = (
+        agrupar_df[['docente', 'Docente']]
+        .dropna(subset=['Docente'])
+        .assign(docente_key=lambda df: df['docente'].apply(normalizar_clave_docente))
+        .drop_duplicates(subset=['docente_key'], keep='last')
+    )
+
+    cursos_df = datos_csv_procesados.copy()
+    cursos_df['docente_key'] = cursos_df['docente'].apply(normalizar_clave_docente)
+    cursos_df = cursos_df.merge(
+        mapeo_docentes[['docente_key', 'Docente']],
+        on='docente_key',
+        how='left'
+    )
+
+    # Si el DataFrame ya traía columna "Docente", pandas puede renombrar a
+    # Docente_x / Docente_y después del merge. Unificamos para evitar fallos.
+    # Priorizamos el docente mapeado (Docente_y) para asegurar match con tabla resumen.
+    columnas_docente = [col for col in ['Docente_y', 'Docente', 'Docente_x'] if col in cursos_df.columns]
+    if columnas_docente:
+        cursos_df['Docente'] = (
+            cursos_df[columnas_docente]
+            .replace(r'^\s*$', pd.NA, regex=True)
+            .bfill(axis=1)
+            .iloc[:, 0]
+        )
+    elif 'docente' in cursos_df.columns:
+        cursos_df['Docente'] = cursos_df['docente']
+    else:
+        cursos_df['Docente'] = pd.NA
+
+    if 'Curso' not in cursos_df.columns:
+        cursos_df['Curso'] = (
+            cursos_df['idioma'].astype(str) + ' ' +
+            cursos_df['nivel'].astype(str) + ' ' +
+            cursos_df['ciclo'].astype(str)
+        )
+
+    cursos_df['modalidad'] = cursos_df.get('modalidad', '').fillna('').astype(str)
+    cursos_df = cursos_df.dropna(subset=['Docente'])
+
+    # Para cursos intensivos, agregar también el siguiente curso (ej: Básico 1 -> Básico 2).
+    cursos_df['Curso_Siguiente_Intensivo'] = cursos_df.apply(generar_siguiente_curso_intensivo_desde_fila, axis=1)
+    cursos_intensivos_adicionales = cursos_df[cursos_df['Curso_Siguiente_Intensivo'] != ''].copy()
+    if not cursos_intensivos_adicionales.empty:
+        cursos_intensivos_adicionales['Curso'] = cursos_intensivos_adicionales['Curso_Siguiente_Intensivo']
+        cursos_df = pd.concat([cursos_df, cursos_intensivos_adicionales], ignore_index=True)
+
+    es_virtual = cursos_df['modalidad'].str.upper().str.contains('VIRTUAL', na=False)
+    cursos_df['Curso_Virtual_tmp'] = cursos_df['Curso'].where(es_virtual, '')
+    cursos_df['Curso_Presencial_tmp'] = cursos_df['Curso'].where(~es_virtual, '')
+
+    # Agrupar por Docente: concatenar TODOS los cursos incluyendo repetidos
+    cursos_por_docente = cursos_df.groupby('Docente', as_index=False).agg({
+        'Curso_Virtual_tmp': _unir_todos_valores,
+        'Curso_Presencial_tmp': _unir_todos_valores
+    }).rename(columns={
+        'Curso_Virtual_tmp': 'Curso_Virtual',
+        'Curso_Presencial_tmp': 'Curso_Presencial'
+    })
+
+    agrupado_resumen = agrupado_resumen.merge(cursos_por_docente, on='Docente', how='left')
+    agrupado_resumen['Curso_Virtual'] = agrupado_resumen['Curso_Virtual'].fillna('')
+    agrupado_resumen['Curso_Presencial'] = agrupado_resumen['Curso_Presencial'].fillna('')
+    agrupado_resumen['Numero_dni'] = agrupado_resumen['Numero_dni'].apply(formatear_numero_dni)
+    agrupado_resumen['Nro_Contrato'] = agrupado_resumen['Nro_Contrato'].apply(formatear_numero_contrato)
+
+    agrupado_resumen = agrupado_resumen.sort_values('Docente').reset_index(drop=True)
+    agrupado_resumen = agrupado_resumen.drop(columns=['N°'], errors='ignore')
+    agrupado_resumen.insert(0, 'N°', range(1, len(agrupado_resumen) + 1))
+
+    columnas_finales = [
+        'N°', 'Docente', 'N_Ruc', 'Categoria_letra', 'Categoria_monto', 'Sede',
+        'Curso_Virtual', 'Curso_Presencial', 'cantidad_cursos', 'Curso Dictado',
+        'Disenio_examenes', 'Examen_clasif', 'Horas_Total', 'Servicio_actualizacion',
+        'Total_pago', 'Estado_docente', 'Docente_idioma', 'Numero_dni', 'Numero_celular',
+        'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
+    ]
+
+    for columna in columnas_finales:
+        if columna not in agrupado_resumen.columns:
+            agrupado_resumen[columna] = '' if columna not in columnas_numericas else 0
+
+    return agrupado_resumen[columnas_finales]

@@ -61,8 +61,13 @@ class FaseInicialGenerator:
                 es_administrativo=self.config.es_administrativo
             )
         
-        # NUEVO: Usar descripción con modalidades
-        return self.description_service.redactar_servicios_con_modalidad(cursos_detallados)
+        # En docentes con contrato, la modalidad va al final del oficio (global),
+        # no en cada curso/servicio individual.
+        incluir_modalidad_por_item = not docente.es_contrato
+        return self.description_service.redactar_servicios_con_modalidad(
+            cursos_detallados,
+            incluir_modalidad_por_item=incluir_modalidad_por_item
+        )
     
     def generar_documentos_docente(
         self,

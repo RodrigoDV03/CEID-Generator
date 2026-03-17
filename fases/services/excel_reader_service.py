@@ -4,17 +4,70 @@ from fases.models import DocenteData, PaymentData, CursoDetalle
 
 
 class ExcelReaderService:
+
+    @staticmethod
+    def _normalizar_texto(valor: Any) -> str:
+        if pd.isna(valor):
+            return ""
+        return " ".join(str(valor).strip().upper().split())
+
+    @staticmethod
+    def _buscar_columna(fila: Any, aliases: List[str], default: Any = "") -> Any:
+        for col_name in aliases:
+            try:
+                valor = getattr(fila, col_name)
+                if pd.notna(valor):
+                    valor_str = str(valor).strip()
+                    if valor_str and valor_str.lower() != 'nan':
+                        return valor
+            except AttributeError:
+                continue
+        return default
+
+    @staticmethod
+    def _parse_float_safe(valor: Any) -> float:
+        if pd.isna(valor):
+            return 0.0
+        if isinstance(valor, (int, float)):
+            return float(valor)
+
+        valor_str = str(valor).strip()
+        if not valor_str:
+            return 0.0
+
+        # Soportar formatos tipo "1,234.56" y "1234,56"
+        valor_str = valor_str.replace(" ", "")
+        if "," in valor_str and "." in valor_str:
+            valor_str = valor_str.replace(",", "")
+        elif "," in valor_str and "." not in valor_str:
+            valor_str = valor_str.replace(",", ".")
+
+        try:
+            return float(valor_str)
+        except ValueError:
+            return 0.0
     
     @staticmethod
     def leer_planilla(ruta_excel: str, nombre_hoja: str) -> pd.DataFrame:
         try:
             # Especificar dtype para preservar ceros iniciales en número de contrato
-            dtype_specs = {'Nro_Contrato': str}
+            columnas_contrato = [
+                'Nro_Contrato',
+                'Nro_contrato',
+                'N° Contrato',
+                'Numero de contrato',
+                'Número de contrato'
+            ]
+            dtype_specs = {col: str for col in columnas_contrato}
+            converters = {
+                col: (lambda x: str(x).strip() if pd.notna(x) else '')
+                for col in columnas_contrato
+            }
             df = pd.read_excel(
                 ruta_excel, 
                 sheet_name=nombre_hoja,
                 dtype=dtype_specs,
-                converters={'Nro_Contrato': lambda x: str(x).strip() if pd.notna(x) else ''}
+                converters=converters
             )
             df.columns = df.columns.str.strip()
             return df
@@ -25,6 +78,29 @@ class ExcelReaderService:
     
     @staticmethod
     def leer_control_pagos(ruta_excel: str) -> pd.DataFrame:
+        # Detectar automáticamente la fila de encabezados para tolerar plantillas
+        # con títulos en la primera o segunda fila.
+        df_preview = pd.read_excel(ruta_excel, sheet_name=0, header=None)
+
+        posibles_encabezados = {
+            'APELLIDOS Y NOMBRES',
+            'DOCENTE',
+            'MONTO TOTAL PARA CONTRATO S/',
+            'TOTAL',
+            'PRIMERA ARMADA'
+        }
+
+        header_idx = 0
+        max_scan = min(len(df_preview), 10)
+        for i in range(max_scan):
+            row_vals = {
+                ExcelReaderService._normalizar_texto(v)
+                for v in df_preview.iloc[i].tolist()
+            }
+            if row_vals & posibles_encabezados:
+                header_idx = i
+                break
+
         # Forzar que columnas de números de contrato se lean como texto
         dtype_dict = {
             'Numero de contrato': str,
@@ -33,7 +109,7 @@ class ExcelReaderService:
             'Nro_Contrato': str,
             'Nro_contrato': str
         }
-        df = pd.read_excel(ruta_excel, sheet_name=0, header=1, dtype=dtype_dict)
+        df = pd.read_excel(ruta_excel, sheet_name=0, header=header_idx, dtype=dtype_dict)
         df.columns = df.columns.str.strip()
         return df
     
@@ -46,6 +122,18 @@ class ExcelReaderService:
         if pd.isna(valor):
             return ""
         return str(valor).split('.')[0]
+
+    @staticmethod
+    def _construir_curso_resumido(fila: Any) -> str:
+        cursos = []
+        for col_name in ["Curso", "Curso_Virtual", "Curso_Presencial"]:
+            valor = getattr(fila, col_name, "")
+            if pd.isna(valor):
+                continue
+            valor_str = str(valor).strip()
+            if valor_str and valor_str.lower() != 'nan':
+                cursos.append(valor_str)
+        return " / ".join(cursos)
     
     @staticmethod
     def extraer_docente_data(fila: Any) -> DocenteData:
@@ -59,6 +147,10 @@ class ExcelReaderService:
             except AttributeError:
                 continue
         
+        curso = str(getattr(fila, "Curso", "")).strip()
+        if not curso:
+            curso = ExcelReaderService._construir_curso_resumido(fila)
+
         return DocenteData(
             nombre=str(getattr(fila, "Docente", "N/A")),
             dni=ExcelReaderService._limpiar_numero(getattr(fila, "Numero_dni", "")),
@@ -66,7 +158,7 @@ class ExcelReaderService:
             direccion=str(getattr(fila, "Domicilio_docente", "")).strip(),
             correo=str(getattr(fila, "Correo_personal", "")),
             celular=ExcelReaderService._limpiar_numero(getattr(fila, "Numero_celular", "")),
-            curso=str(getattr(fila, "Curso", "")),
+            curso=curso,
             categoria_letra=str(getattr(fila, "Categoria_letra", "")).strip().upper(),
             formacion_academica=str(getattr(fila, "Formacion_academica", "")),
             experiencia_laboral=str(getattr(fila, "Experiencia_laboral", "")),
@@ -75,7 +167,7 @@ class ExcelReaderService:
             especialidad=str(getattr(fila, "Especialidad", "")),
             actividades_admin=str(getattr(fila, "Actividades_admin", "")),
             estado_docente=str(getattr(fila, "Estado_docente", "TERCERO")).strip().upper(),
-            numero_contrato=ExcelReaderService._extraer_numero_contrato(getattr(fila, "Nro_Contrato", "")),
+            numero_contrato=ExcelReaderService._extraer_numero_contrato(numero_contrato),
             idioma = str(getattr(fila, "Docente_idioma", "")),
             modalidad = str(getattr(fila, "Modalidad", ""))
         )
@@ -87,7 +179,7 @@ class ExcelReaderService:
             categoria_valor = 1.0
         
         # Leer valores con manejo robusto
-        total_pago = float(getattr(fila, "Total_pago", 0))
+        total_pago = float(getattr(fila, "Total_pago", getattr(fila, "Monto_total_pagar", 0)))
         servicio_act = float(getattr(fila, "Servicio_actualizacion", 0))
         bono = float(getattr(fila, "Bono", 0))
         disenio = float(getattr(fila, "Disenio_examenes", 0))
@@ -108,16 +200,30 @@ class ExcelReaderService:
     
     @staticmethod
     def extraer_payment_data_control(fila: Any) -> PaymentData:
+        monto_total = ExcelReaderService._buscar_columna(
+            fila,
+            ["MONTO TOTAL PARA CONTRATO S/", "TOTAL", "Monto total", "MONTO TOTAL"],
+            0
+        )
+        primera = ExcelReaderService._buscar_columna(fila, ["Primera armada", "PRIMERA ARMADA"], 0)
+        segunda = ExcelReaderService._buscar_columna(fila, ["Segunda armada", "SEGUNDA ARMADA"], 0)
+        tercera = ExcelReaderService._buscar_columna(fila, ["Tercera armada", "TERCERA ARMADA"], 0)
+
         return PaymentData(
-            monto_total_contrato=float(getattr(fila, "MONTO TOTAL PARA CONTRATO S/", 0)),
-            primera_armada=float(getattr(fila, "Primera armada", 0)),
-            segunda_armada=float(getattr(fila, "Segunda armada", 0)),
-            tercera_armada=float(getattr(fila, "Tercera armada", 0))
+            monto_total_contrato=ExcelReaderService._parse_float_safe(monto_total),
+            primera_armada=ExcelReaderService._parse_float_safe(primera),
+            segunda_armada=ExcelReaderService._parse_float_safe(segunda),
+            tercera_armada=ExcelReaderService._parse_float_safe(tercera)
         )
     
     @staticmethod
     def extraer_docente_nombre_control(fila: Any) -> str:
-        return str(getattr(fila, "APELLIDOS Y NOMBRES", "N/A")).strip()
+        nombre = ExcelReaderService._buscar_columna(
+            fila,
+            ["APELLIDOS Y NOMBRES", "DOCENTE", "Docente", "NOMBRES Y APELLIDOS"],
+            "N/A"
+        )
+        return str(nombre).strip()
     
     @staticmethod
     def extraer_numero_contrato_control(fila: Any) -> str:
@@ -145,11 +251,12 @@ class ExcelReaderService:
             try:
                 # Convertir a float y luego a int para remover decimales
                 valor_num = int(float(valor_str))
-                # Preservar ceros iniciales usando el largo original
-                largo_original = len(valor_str.split('.')[0])
-                return str(valor_num).zfill(largo_original)
+                return str(valor_num).zfill(max(4, len(str(valor_num))))
             except (ValueError, TypeError):
                 pass
+
+        if valor_str.isdigit():
+            return valor_str.zfill(max(4, len(valor_str)))
         
         # Retornar como string limpio si no hay decimales
         return valor_str if valor_str else "001"
@@ -161,8 +268,8 @@ class ExcelReaderService:
         nombre_docente: str
     ) -> List[CursoDetalle]:
         """
-        Lee la hoja Planilla_Generador expandida y extrae todos los cursos/servicios
-        de un docente específico con su modalidad.
+        Lee la hoja Planilla_Generador y extrae todos los cursos/servicios
+        de un docente específico, tanto desde formato expandido como resumido.
         
         Args:
             ruta_excel: Ruta al archivo Excel de la planilla
@@ -181,8 +288,71 @@ class ExcelReaderService:
             columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
             
             if columnas_faltantes:
-                # Silenciosamente retornar lista vacía si no tiene la estructura expandida
-                return []
+                filas_docente = df[df['Docente'].str.strip().str.upper() == nombre_docente.strip().upper()]
+                if filas_docente.empty:
+                    return []
+
+                fila = filas_docente.iloc[0]
+                cursos = []
+                categoria_monto = float(fila.get('Categoria_monto', 0) or 0)
+
+                for nombre_columna, modalidad in [('Curso_Virtual', 'VIRTUAL'), ('Curso_Presencial', 'INPERSON')]:
+                    cursos_raw = fila.get(nombre_columna, '')
+                    if pd.isna(cursos_raw):
+                        continue
+                    for curso_nombre in [c.strip() for c in str(cursos_raw).split('/') if c.strip()]:
+                        cursos.append(CursoDetalle(
+                            nombre=curso_nombre,
+                            modalidad=modalidad,
+                            tipo_servicio='CURSO_DICTADO',
+                            horas=28,
+                            monto=float(categoria_monto * 28)
+                        ))
+
+                examen_clasif = float(fila.get('Examen_clasif', 0) or 0)
+                if examen_clasif > 0:
+                    horas = int(round(examen_clasif / categoria_monto)) if categoria_monto > 0 else 0
+                    cursos.append(CursoDetalle(
+                        nombre='Examen de clasificación',
+                        modalidad='VIRTUAL',
+                        tipo_servicio='EXAMEN_CLASIF',
+                        horas=horas,
+                        monto=examen_clasif
+                    ))
+
+                disenio_examenes = float(fila.get('Disenio_examenes', 0) or 0)
+                if disenio_examenes > 0:
+                    horas = int(round(disenio_examenes / categoria_monto)) if categoria_monto > 0 else 0
+                    cursos.append(CursoDetalle(
+                        nombre='Diseño de exámenes',
+                        modalidad='N/A',
+                        tipo_servicio='DISENO_EXAMENES',
+                        horas=horas,
+                        monto=disenio_examenes
+                    ))
+
+                servicio_actualizacion = float(fila.get('Servicio_actualizacion', 0) or 0)
+                if servicio_actualizacion > 0:
+                    horas_total = int(float(fila.get('Horas_Total', 0) or 0))
+                    cursos.append(CursoDetalle(
+                        nombre='Servicio de actualización de materiales de enseñanza',
+                        modalidad='VIRTUAL',
+                        tipo_servicio='SERVICIO_ACTUALIZACION',
+                        horas=horas_total,
+                        monto=servicio_actualizacion
+                    ))
+
+                bono = float(fila.get('Bono', 0) or 0)
+                if bono > 0:
+                    cursos.append(CursoDetalle(
+                        nombre='Servicio de diseño y evaluación del examen anual',
+                        modalidad='N/A',
+                        tipo_servicio='BONO',
+                        horas=0,
+                        monto=bono
+                    ))
+
+                return cursos
             
             # Filtrar solo las filas de este docente
             filas_docente = df[df['Docente'].str.strip().str.upper() == nombre_docente.strip().upper()]

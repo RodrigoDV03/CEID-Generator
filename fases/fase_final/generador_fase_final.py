@@ -1,6 +1,6 @@
 import datetime
 import pandas as pd
-from typing import Optional
+from typing import Optional, Dict
 from fases.models import DocenteData, PaymentData, DocumentConfig, CursoDetalle
 from fases.services import (
     ExcelReaderService, 
@@ -62,8 +62,13 @@ class FaseFinalGenerator:
                 es_administrativo=self.config.es_administrativo
             )
         
-        # NUEVO: Usar descripción con modalidades
-        return self.description_service.redactar_servicios_con_modalidad(cursos_detallados)
+        # En docentes con contrato, la modalidad va al final del documento (global),
+        # no en cada curso/servicio individual.
+        incluir_modalidad_por_item = not docente.es_contrato
+        return self.description_service.redactar_servicios_con_modalidad(
+            cursos_detallados,
+            incluir_modalidad_por_item=incluir_modalidad_por_item
+        )
     
     def generar_conformidad(
         self,
@@ -142,22 +147,33 @@ class FaseFinalGenerator:
     
     def procesar_control_pagos(
         self,
-        df_control: 'pd.DataFrame'
+        df_control: 'pd.DataFrame',
+        idiomas_por_docente: Optional[Dict[str, str]] = None,
+        contratos_por_docente: Optional[Dict[str, str]] = None
     ) -> None:
+        idiomas_por_docente = idiomas_por_docente or {}
+        contratos_por_docente = contratos_por_docente or {}
+
         for _, fila in df_control.iterrows():
+            nombre = "N/A"
             try:
                 # Extraer nombre del docente
                 nombre = self.excel_service.extraer_docente_nombre_control(fila)
                 if nombre == "N/A":
                     continue
+
+                nombre_key = nombre.strip().upper()
+                idioma_docente = idiomas_por_docente.get(nombre_key, "")
+                numero_contrato = contratos_por_docente.get(nombre_key, "")
                 
                 # Crear objeto DocenteData básico
                 docente = DocenteData(
                     nombre=nombre,
                     dni="",
                     ruc="",
+                    idioma=idioma_docente,
                     especialidad=str(getattr(fila, "Especialidad", "")),
-                    numero_contrato=self.excel_service.extraer_numero_contrato_control(fila),
+                    numero_contrato=numero_contrato,
                     estado_docente="CONTRATO"
                 )
                 
@@ -199,6 +215,10 @@ def procesar_planilla_fase_final(
     # Leer planilla principal
     excel_service = ExcelReaderService()
     df = excel_service.leer_planilla(planilla_path, hoja)
+
+    # Mapa de idioma por docente desde la planilla principal
+    idiomas_por_docente: Dict[str, str] = {}
+    contratos_por_docente: Dict[str, str] = {}
     
     # Procesar cada docente (conformidad)
     for _, fila in df.iterrows():
@@ -206,6 +226,9 @@ def procesar_planilla_fase_final(
             # Extraer datos
             docente = excel_service.extraer_docente_data(fila)
             payment = excel_service.extraer_payment_data(fila)
+
+            idiomas_por_docente[docente.nombre.strip().upper()] = docente.idioma.strip()
+            contratos_por_docente[docente.nombre.strip().upper()] = docente.numero_contrato.strip()
             
             # Procesar docente (pasar planilla_path para leer cursos detallados)
             generador.procesar_docente(docente, payment, planilla_path)
@@ -221,6 +244,6 @@ def procesar_planilla_fase_final(
     if tipo_fase_final == "planilla docente (con contrato)" and excel_control_pagos:
         try:
             df_control = excel_service.leer_control_pagos(excel_control_pagos)
-            generador.procesar_control_pagos(df_control)
+            generador.procesar_control_pagos(df_control, idiomas_por_docente, contratos_por_docente)
         except Exception as e:
             print(f"Error procesando control de pagos: {e}")
