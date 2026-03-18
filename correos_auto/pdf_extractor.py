@@ -1,5 +1,6 @@
 import re
 import logging
+import unicodedata
 from typing import Optional, List
 from PyPDF2 import PdfReader
 
@@ -139,6 +140,44 @@ class ServicioExtractor:
             return servicios[0]
 
 
+class ModalidadExtractor:
+    """Extractor de modalidad (PRESENCIAL/VIRTUAL/HIBRIDA) desde la orden."""
+
+    def __init__(self):
+        self.patron_modalidad = re.compile(
+            r"BAJO\s+LA\s+MODALIDAD\s*:?\s*([A-ZÁÉÍÓÚÜÑ]+)",
+            re.IGNORECASE
+        )
+
+    def extraer(self, texto: str, debug: bool = False) -> Optional[str]:
+        match = self.patron_modalidad.search(texto)
+        if not match:
+            if debug:
+                logger.warning("No se encontró modalidad en el PDF")
+            return None
+
+        modalidad_cruda = match.group(1).strip().upper()
+        modalidad_normalizada = self._normalizar_ascii(modalidad_cruda)
+
+        if "HIBRIDA" in modalidad_normalizada or "HIBRIDO" in modalidad_normalizada:
+            return "HÍBRIDA"
+        if "VIRTUAL" in modalidad_normalizada:
+            return "VIRTUAL"
+        if "PRESENCIAL" in modalidad_normalizada:
+            return "PRESENCIAL"
+
+        if debug:
+            logger.warning(f"Modalidad detectada pero no reconocida: {modalidad_cruda}")
+        return None
+
+    @staticmethod
+    def _normalizar_ascii(texto: str) -> str:
+        return "".join(
+            ch for ch in unicodedata.normalize("NFD", texto)
+            if unicodedata.category(ch) != "Mn"
+        )
+
+
 class PDFExtractor:
     """Extractor de datos desde PDFs de órdenes de servicio."""
     
@@ -147,6 +186,7 @@ class PDFExtractor:
         self._texto: Optional[str] = None
         self.servicio_extractor = ServicioExtractor()
         self.ruc_extractor = RUCExtractor()
+        self.modalidad_extractor = ModalidadExtractor()
     
     @property
     def texto(self) -> str:
@@ -172,6 +212,10 @@ class PDFExtractor:
     def extraer_servicios(self, debug: bool = False) -> Optional[str]:
         """Extrae los servicios del PDF."""
         return self.servicio_extractor.extraer(self.texto, debug)
+
+    def extraer_modalidad(self, debug: bool = False) -> Optional[str]:
+        """Extrae la modalidad desde el PDF."""
+        return self.modalidad_extractor.extraer(self.texto, debug)
 
 
 # Funciones de compatibilidad con código legacy

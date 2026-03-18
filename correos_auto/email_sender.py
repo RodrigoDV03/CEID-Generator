@@ -155,6 +155,7 @@ class EmailPersonalizado:
         mes: str,
         tipo: TipoCorreo,
         servicio: Optional[str] = None,
+        modalidad: Optional[str] = None,
         anio: Optional[int] = None
     ) -> bool:
         if anio is None:
@@ -164,6 +165,10 @@ class EmailPersonalizado:
         if tipo == TipoCorreo.DOCENTE and not servicio:
             print(f"⚠ No se puede enviar correo a {nombre}: servicio no especificado")
             return False
+
+        if tipo == TipoCorreo.DOCENTE and not modalidad:
+            print(f"⚠ No se puede enviar correo a {nombre}: modalidad no especificada")
+            return False
         
         try:
             # Construir el correo según el tipo
@@ -171,7 +176,7 @@ class EmailPersonalizado:
             builder.con_mes(mes).con_anio(anio).con_firma(self.firma_html).con_nombre(nombre)
             
             if tipo == TipoCorreo.DOCENTE:
-                builder.con_servicio(servicio)
+                builder.con_servicio(servicio).con_modalidad(modalidad)
             
             asunto = builder.construir_asunto()
             cuerpo_html = builder.construir_cuerpo()
@@ -207,6 +212,7 @@ class LoteEmailSender:
         
         for datos in data_para_envio:
             servicio = datos.get("servicio") if tipo == TipoCorreo.DOCENTE else None
+            modalidad = datos.get("modalidad") if tipo == TipoCorreo.DOCENTE else None
             
             resultado = self.email_personalizado.enviar(
                 nombre=datos["nombre"],
@@ -215,6 +221,7 @@ class LoteEmailSender:
                 mes=mes,
                 tipo=tipo,
                 servicio=servicio,
+                modalidad=modalidad,
                 anio=anio
             )
             
@@ -274,7 +281,8 @@ def enviar_correo_personalizado(
     destinatario: str,
     mes: str,
     tipo: str,
-    servicio: Optional[str] = None
+    servicio: Optional[str] = None,
+    modalidad: Optional[str] = None
 ) -> None:
     logger.debug("enviar_correo_personalizado() está deprecated. Usar EmailPersonalizado.")
     
@@ -285,7 +293,15 @@ def enviar_correo_personalizado(
     tipo_enum = TipoCorreo.DOCENTE if tipo == "docente" else TipoCorreo.ADMINISTRATIVO
     
     email_personalizado = EmailPersonalizado(gmail_service)
-    email_personalizado.enviar(nombre, pdf_path, destinatario, mes, tipo_enum, servicio)
+    email_personalizado.enviar(
+        nombre,
+        pdf_path,
+        destinatario,
+        mes,
+        tipo_enum,
+        servicio,
+        modalidad
+    )
 
 
 def enviar_lote_desde_gui(data_para_envio: list, mes: str, tipo: str, anio: Optional[int] = None) -> None:

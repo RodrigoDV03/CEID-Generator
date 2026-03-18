@@ -64,15 +64,22 @@ class EmailDocenteBuilder(EmailBuilder):
     def __init__(self):
         super().__init__()
         self._servicio: Optional[str] = None
+        self._modalidad: Optional[str] = None
     
     def con_servicio(self, servicio: str) -> 'EmailDocenteBuilder':
         self._servicio = servicio
+        return self
+
+    def con_modalidad(self, modalidad: str) -> 'EmailDocenteBuilder':
+        self._modalidad = modalidad
         return self
     
     def _validar_datos(self) -> None:
         super()._validar_datos()
         if not self._servicio:
             raise ValueError("Servicio es requerido para correos de docentes")
+        if not self._modalidad:
+            raise ValueError("Modalidad es requerida para correos de docentes")
         if not self._nombre:
             raise ValueError("Nombre es requerido para construir el asunto")
     
@@ -91,7 +98,7 @@ class EmailDocenteBuilder(EmailBuilder):
         self._validar_datos()
         
         concepto_destacado = self._crear_texto_destacado(
-            f"Servicio de dictado de {self._servicio}, BAJO LA MODALIDAD {EmailConfig.MODALIDAD}."
+            f"Servicio de dictado de {self._servicio}, BAJO LA MODALIDAD {self._modalidad}."
         )
         
         plazo_destacado = self._crear_texto_destacado(
@@ -176,13 +183,15 @@ def generar_cuerpo_correo_docente_html(
     mes: str, 
     anio: str, 
     servicio: str, 
-    firma_html: str = ""
+    firma_html: str = "",
+    modalidad: str = "HÍBRIDA"
 ) -> str:
     builder = EmailDocenteBuilder()
     return (builder
             .con_mes(mes)
             .con_anio(int(anio))
             .con_servicio(servicio)
+            .con_modalidad(modalidad)
             .con_firma(firma_html)
             .construir_cuerpo())
 

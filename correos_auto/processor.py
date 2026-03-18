@@ -23,6 +23,7 @@ class DatosEnvio:
     correo: str
     pdf_path: str
     servicio: Optional[str] = None
+    modalidad: Optional[str] = None
     
     def to_dict(self) -> Dict:
         """Convierte a diccionario para compatibilidad."""
@@ -30,7 +31,8 @@ class DatosEnvio:
             "nombre": self.nombre,
             "correo": self.correo,
             "pdf_path": self.pdf_path,
-            "servicio": self.servicio
+            "servicio": self.servicio,
+            "modalidad": self.modalidad
         }
 
 
@@ -117,10 +119,12 @@ class PDFProcessor:
         self,
         excel_reader: ExcelReader,
         incluir_servicio: bool = True,
+        incluir_modalidad: bool = True,
         debug: bool = False
     ):
         self.excel_reader = excel_reader
         self.incluir_servicio = incluir_servicio
+        self.incluir_modalidad = incluir_modalidad
         self.debug = debug
     
     def procesar_pdf(self, pdf_path: str) -> Optional[DatosEnvio]:
@@ -153,18 +157,28 @@ class PDFProcessor:
                 logger.warning(f"No se encontró servicio para {nombre_excel}")
                 print(f"⚠ No se encontró servicio para {nombre_excel}.")
                 return None
+
+        modalidad = None
+        if self.incluir_modalidad:
+            modalidad = extractor.extraer_modalidad(debug=self.debug)
+            if not modalidad:
+                logger.warning(f"No se encontró modalidad para {nombre_excel}")
+                print(f"⚠ No se encontró modalidad para {nombre_excel}.")
+                return None
         
         # Crear datos de envío
         datos = DatosEnvio(
             nombre=nombre_excel,
             correo=correo,
             pdf_path=pdf_path,
-            servicio=servicio
+            servicio=servicio,
+            modalidad=modalidad
         )
         
         # Log de información
         servicio_info = f" - {servicio}" if servicio else ""
-        print(f"✓ RUC {ruc_extraido}: {nombre_excel} - {correo}{servicio_info}")
+        modalidad_info = f" - modalidad: {modalidad}" if modalidad else ""
+        print(f"✓ RUC {ruc_extraido}: {nombre_excel} - {correo}{servicio_info}{modalidad_info}")
         
         return datos
     
@@ -208,7 +222,8 @@ class CorreosProcessor:
         
         # Procesar PDFs
         incluir_servicio = (tipo == TipoCorreo.DOCENTE)
-        processor = PDFProcessor(excel_reader, incluir_servicio, debug)
+        incluir_modalidad = (tipo == TipoCorreo.DOCENTE)
+        processor = PDFProcessor(excel_reader, incluir_servicio, incluir_modalidad, debug)
         resultados = processor.procesar_lote(lista_pdfs)
         
         # Convertir a diccionarios para compatibilidad
