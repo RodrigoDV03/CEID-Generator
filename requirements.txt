@@ -28,6 +28,7 @@ greenlet==3.2.4
 httplib2==0.31.0
 idna==3.10
 importlib_resources==6.5.2
+Levenshtein==0.27.3
 lxml==6.0.1
 num2words==0.5.14
 numpy==2.3.2
@@ -50,9 +51,11 @@ PyPDF2==3.0.1
 pypdfium2==4.30.0
 python-dateutil==2.9.0.post0
 python-docx==1.2.0
+python-Levenshtein==0.27.3
 pytz==2025.2
 pywin32==311
 pywin32-ctypes==0.2.3
+RapidFuzz==3.14.3
 requests==2.32.5
 requests-oauthlib==2.0.0
 rsa==4.9.1
