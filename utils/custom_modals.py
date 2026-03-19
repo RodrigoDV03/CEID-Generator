@@ -6,11 +6,14 @@ class BaseModal:
     def __init__(self, parent, title, message, modal_type="info"):
         self.result = None
         self.modal_type = modal_type
+        self._base_width = 560
+        self._base_height = 290
+        self._modal_height = self._calcular_altura_modal(message)
         
         # Crear ventana modal
         self.window = ctk.CTkToplevel(parent)
         self.window.title(title)
-        self.window.geometry("450x250")
+        self.window.geometry(f"{self._base_width}x{self._modal_height}")
         self.window.resizable(False, False)
         
         # Configurar modal
@@ -23,12 +26,21 @@ class BaseModal:
         
         # Crear contenido
         self.create_content(title, message)
+
+    def _calcular_altura_modal(self, message):
+        lineas_estimadas = 0
+        for linea in message.splitlines() or [message]:
+            ancho_estandar = max(1, len(linea) // 58)
+            lineas_estimadas += 1 + ancho_estandar
+
+        extra = max(0, lineas_estimadas - 6) * 14
+        return min(self._base_height + extra, 520)
         
     def center_window(self):
         self.window.update_idletasks()
-        x = (self.window.winfo_screenwidth() // 2) - (450 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (250 // 2)
-        self.window.geometry(f"450x250+{x}+{y}")
+        x = (self.window.winfo_screenwidth() // 2) - (self._base_width // 2)
+        y = (self.window.winfo_screenheight() // 2) - (self._modal_height // 2)
+        self.window.geometry(f"{self._base_width}x{self._modal_height}+{x}+{y}")
     
     def create_content(self, title, message):
         # Frame principal
@@ -51,7 +63,15 @@ class BaseModal:
         title_label.pack()
         
         # Mensaje
-        message_label = ctk.CTkLabel(main_frame, fg_color=BG_COLOR, text=message, font=("Segoe UI", 12, "bold"), text_color=WHITE_COLOR, wraplength=400)
+        message_label = ctk.CTkLabel(
+            main_frame,
+            fg_color=BG_COLOR,
+            text=message,
+            font=("Segoe UI", 13),
+            text_color=WHITE_COLOR,
+            wraplength=500,
+            justify="left"
+        )
         message_label.pack(pady=(0, 20))
         
         # Frame de botones

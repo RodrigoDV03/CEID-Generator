@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-from typing import Optional
+from typing import Optional, List
 
 from googleapiclient.discovery import Resource
 from googleapiclient.errors import HttpError
@@ -54,6 +54,11 @@ class GmailMessageBuilder:
             raise EmailSendError(f"No se pudo adjuntar el archivo PDF: {e}")
         
         return self
+
+    def agregar_adjuntos_pdf(self, pdf_paths: List[str]) -> 'GmailMessageBuilder':
+        for pdf_path in pdf_paths:
+            self.agregar_adjunto_pdf(pdf_path)
+        return self
     
     def codificar(self) -> str:
         return base64.urlsafe_b64encode(self.mensaje.as_bytes()).decode()
@@ -68,14 +73,20 @@ class GmailEmailSender:
         destinatario: str,
         asunto: str,
         cuerpo_html: str,
-        pdf_path: str
+        pdf_path: Optional[str] = None,
+        pdf_paths: Optional[List[str]] = None
     ) -> dict:
         try:
+            if pdf_paths is None:
+                if not pdf_path:
+                    raise EmailSendError("Debe especificar al menos un PDF adjunto")
+                pdf_paths = [pdf_path]
+
             # Crear mensaje MIME
             builder = GmailMessageBuilder(destinatario, asunto)
             raw_message = (builder
                           .agregar_cuerpo_html(cuerpo_html)
-                          .agregar_adjunto_pdf(pdf_path)
+                          .agregar_adjuntos_pdf(pdf_paths)
                           .codificar())
             
             # Crear draft (esto permite que Gmail añada la firma)
@@ -108,7 +119,7 @@ class GmailEmailSender:
         destinatario: str,
         asunto: str,
         cuerpo_html: str,
-        pdf_path: str,
+        pdf_path: Optional[str],
         nombre_destinatario: str
     ) -> bool:
         try:
@@ -187,6 +198,56 @@ class EmailPersonalizado:
         except Exception as e:
             print(f"❌ Error preparando correo para {nombre}: {e}")
             logger.error(f"Error en enviar correo personalizado para {nombre}: {e}")
+            return False
+
+    def enviar_contrato_primera_vez(
+        self,
+        nombre: str,
+        pdf_orden_path: str,
+        pdf_contrato_path: str,
+        destinatario: str,
+        mes: str,
+        tipo: TipoCorreo,
+        mes_inicio_contrato: str,
+        mes_fin_contrato: str,
+        servicio: Optional[str] = None,
+        modalidad: Optional[str] = None,
+        anio: Optional[int] = None
+    ) -> bool:
+        if anio is None:
+            anio = AÑO_ACTUAL
+
+        if tipo == TipoCorreo.DOCENTE and not servicio:
+            print(f"⚠ No se puede enviar correo a {nombre}: servicio no especificado")
+            return False
+
+        if tipo == TipoCorreo.DOCENTE and not modalidad:
+            print(f"⚠ No se puede enviar correo a {nombre}: modalidad no especificada")
+            return False
+
+        try:
+            builder = EmailBuilderFactory.crear_builder_contrato_primera_vez(tipo)
+            builder.con_mes(mes).con_anio(anio).con_firma(self.firma_html).con_nombre(nombre)
+            builder.con_periodo_contrato(mes_inicio_contrato, mes_fin_contrato)
+
+            if tipo == TipoCorreo.DOCENTE:
+                builder.con_servicio(servicio).con_modalidad(modalidad)
+
+            asunto = builder.construir_asunto()
+            cuerpo_html = builder.construir_cuerpo()
+
+            self.sender.enviar_con_firma(
+                destinatario=destinatario,
+                asunto=asunto,
+                cuerpo_html=cuerpo_html,
+                pdf_paths=[pdf_orden_path, pdf_contrato_path]
+            )
+            print(f"Correo de primera vez con contrato enviado a {nombre}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Error preparando correo de primera vez para {nombre}: {e}")
+            logger.error(f"Error en enviar contrato primera vez para {nombre}: {e}")
             return False
 
 
@@ -327,3 +388,36 @@ def enviar_lote_desde_gui_docentes(data_para_envio: list, mes: str, anio: Option
 def enviar_lote_desde_gui_administrativos(data_para_envio: list, mes: str, anio: Optional[int] = None) -> None:
     """Wrapper para mantener compatibilidad con código existente."""
     enviar_lote_desde_gui(data_para_envio, mes, "administrativo", anio)
+
+
+def enviar_correo_contrato_primera_vez_desde_gui(
+    datos_envio: dict,
+    pdf_contrato_path: str,
+    mes: str,
+    mes_inicio_contrato: str,
+    mes_fin_contrato: str,
+    tipo: str,
+    anio: Optional[int] = None
+) -> bool:
+    """Envio individual para primera vez de contratados con orden + contrato."""
+    service = autenticar_gmail()
+
+    gmail_service = GmailService()
+    gmail_service._service = service
+
+    tipo_enum = TipoCorreo.DOCENTE if tipo == "docente" else TipoCorreo.ADMINISTRATIVO
+
+    email_personalizado = EmailPersonalizado(gmail_service)
+    return email_personalizado.enviar_contrato_primera_vez(
+        nombre=datos_envio["nombre"],
+        pdf_orden_path=datos_envio["pdf_path"],
+        pdf_contrato_path=pdf_contrato_path,
+        destinatario=datos_envio["correo"],
+        mes=mes,
+        tipo=tipo_enum,
+        mes_inicio_contrato=mes_inicio_contrato,
+        mes_fin_contrato=mes_fin_contrato,
+        servicio=datos_envio.get("servicio"),
+        modalidad=datos_envio.get("modalidad"),
+        anio=anio
+    )

@@ -178,6 +178,27 @@ class ModalidadExtractor:
         )
 
 
+class ContratoExtractor:
+    """Detector de la frase que indica contrato de locacion de servicios."""
+
+    def __init__(self):
+        self.patron_contrato = re.compile(
+            r"CONTRATO\s+DE\s+LOCACION\s+DE\s+SERVICIOS",
+            re.IGNORECASE
+        )
+
+    def tiene_contrato(self, texto: str) -> bool:
+        texto_normalizado = self._normalizar_ascii(texto).upper()
+        return bool(self.patron_contrato.search(texto_normalizado))
+
+    @staticmethod
+    def _normalizar_ascii(texto: str) -> str:
+        return "".join(
+            ch for ch in unicodedata.normalize("NFD", texto)
+            if unicodedata.category(ch) != "Mn"
+        )
+
+
 class PDFExtractor:
     """Extractor de datos desde PDFs de órdenes de servicio."""
     
@@ -187,6 +208,7 @@ class PDFExtractor:
         self.servicio_extractor = ServicioExtractor()
         self.ruc_extractor = RUCExtractor()
         self.modalidad_extractor = ModalidadExtractor()
+        self.contrato_extractor = ContratoExtractor()
     
     @property
     def texto(self) -> str:
@@ -217,6 +239,10 @@ class PDFExtractor:
         """Extrae la modalidad desde el PDF."""
         return self.modalidad_extractor.extraer(self.texto, debug)
 
+    def tiene_contrato_locacion(self) -> bool:
+        """Valida si la orden incluye la frase de contrato de locacion de servicios."""
+        return self.contrato_extractor.tiene_contrato(self.texto)
+
 
 # Funciones de compatibilidad con código legacy
 def extraer_ruc(pdf_path: str, debug: bool = False) -> Optional[str]:
@@ -227,3 +253,8 @@ def extraer_ruc(pdf_path: str, debug: bool = False) -> Optional[str]:
 def extraer_servicios(pdf_path: str, debug: bool = False) -> Optional[str]:
     extractor = PDFExtractor(pdf_path)
     return extractor.extraer_servicios(debug)
+
+
+def tiene_contrato_locacion(pdf_path: str) -> bool:
+    extractor = PDFExtractor(pdf_path)
+    return extractor.tiene_contrato_locacion()

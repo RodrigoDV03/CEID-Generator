@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from typing import Optional
 from .config import TipoCorreo, EmailConfig, AÑO_ACTUAL
@@ -11,6 +12,8 @@ class EmailBuilder(ABC):
         self._anio: int = AÑO_ACTUAL
         self._firma_html: str = ""
         self._nombre: Optional[str] = None
+        self._mes_inicio_contrato: Optional[str] = None
+        self._mes_fin_contrato: Optional[str] = None
     
     def con_mes(self, mes: str) -> 'EmailBuilder':
         self._mes = mes
@@ -26,6 +29,11 @@ class EmailBuilder(ABC):
     
     def con_nombre(self, nombre: str) -> 'EmailBuilder':
         self._nombre = nombre
+        return self
+
+    def con_periodo_contrato(self, mes_inicio: str, mes_fin: str) -> 'EmailBuilder':
+        self._mes_inicio_contrato = mes_inicio
+        self._mes_fin_contrato = mes_fin
         return self
     
     @abstractmethod
@@ -82,6 +90,12 @@ class EmailDocenteBuilder(EmailBuilder):
             raise ValueError("Modalidad es requerida para correos de docentes")
         if not self._nombre:
             raise ValueError("Nombre es requerido para construir el asunto")
+
+    def _construir_concepto_servicio(self) -> str:
+        servicio_limpio = self._servicio.strip()
+        if re.match(r'^\d', servicio_limpio):
+            return f"Servicio de dictado de {servicio_limpio}"
+        return servicio_limpio
     
     def construir_asunto(self) -> str:
         self._validar_datos()
@@ -96,9 +110,11 @@ class EmailDocenteBuilder(EmailBuilder):
     
     def construir_cuerpo(self) -> str:
         self._validar_datos()
+
+        concepto_servicio = self._construir_concepto_servicio()
         
         concepto_destacado = self._crear_texto_destacado(
-            f"Servicio de dictado de {self._servicio}, BAJO LA MODALIDAD {self._modalidad}."
+            f"{concepto_servicio}, BAJO LA MODALIDAD {self._modalidad}."
         )
         
         plazo_destacado = self._crear_texto_destacado(
@@ -167,6 +183,122 @@ class EmailAdministrativoBuilder(EmailBuilder):
         return self._crear_encabezado_html() + cuerpo_contenido + self._crear_pie_html()
 
 
+class EmailDocenteContratoBuilder(EmailDocenteBuilder):
+    def _validar_datos(self) -> None:
+        super()._validar_datos()
+        if not self._mes_inicio_contrato or not self._mes_fin_contrato:
+            raise ValueError("Periodo de contrato es requerido para primera vez")
+
+    def construir_asunto(self) -> str:
+        asunto_base = super().construir_asunto()
+        return f"{asunto_base} | Contrato de locacion de servicios"
+
+    def construir_cuerpo(self) -> str:
+        self._validar_datos()
+
+        concepto_servicio = self._construir_concepto_servicio()
+
+        concepto_destacado = self._crear_texto_destacado(
+            f"{concepto_servicio}, bajo la modalidad {self._modalidad}."
+        )
+
+        plazo_destacado = self._crear_texto_destacado(
+            f"{EmailConfig.DIAS_VENCIMIENTO} dias"
+        )
+
+        formato_destacado = self._crear_texto_destacado(
+            f"formato {EmailConfig.FORMATO_RECIBO}"
+        )
+
+        periodo_destacado = self._crear_texto_destacado(
+            f"{self._mes_inicio_contrato} - {self._mes_fin_contrato}"
+        )
+
+        cuerpo_contenido = f"""
+        <p>
+            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. 
+            Con este documento, ya puede proceder con la emision de su recibo por honorarios. 
+            Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+        </p>
+
+        <ul>
+            <li>
+                El concepto del recibo por honorarios es: {concepto_destacado}
+            </li>
+
+            <li>
+                El pago se realizara a credito, con un plazo de vencimiento de {plazo_destacado} 
+                desde la fecha de emision del recibo en la plataforma SUNAT.
+            </li>
+        </ul>
+
+        <p>
+            Una vez emitido, envie el recibo en {formato_destacado} como respuesta a este mismo correo, 
+            sin generar un nuevo hilo.
+        </p>
+
+        <p>
+            Asimismo, se adjunta su contrato de locacion de servicios correspondiente al periodo 
+            {periodo_destacado}, firmado por el decano.
+        </p>
+"""
+
+        return self._crear_encabezado_html() + cuerpo_contenido + self._crear_pie_html()
+
+
+class EmailAdministrativoContratoBuilder(EmailAdministrativoBuilder):
+    def _validar_datos(self) -> None:
+        super()._validar_datos()
+        if not self._mes_inicio_contrato or not self._mes_fin_contrato:
+            raise ValueError("Periodo de contrato es requerido para primera vez")
+
+    def construir_asunto(self) -> str:
+        asunto_base = super().construir_asunto()
+        return f"{asunto_base} | Contrato de locacion de servicios"
+
+    def construir_cuerpo(self) -> str:
+        self._validar_datos()
+
+        plazo_destacado = self._crear_texto_destacado(
+            f"{EmailConfig.DIAS_VENCIMIENTO} dias"
+        )
+
+        formato_destacado = self._crear_texto_destacado(
+            f"formato {EmailConfig.FORMATO_RECIBO}"
+        )
+
+        periodo_destacado = self._crear_texto_destacado(
+            f"{self._mes_inicio_contrato} - {self._mes_fin_contrato}"
+        )
+
+        cuerpo_contenido = f"""
+        <p>
+            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. 
+            Con este documento, ya puede proceder con la emision de su recibo por honorarios. 
+            Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+        </p>
+
+        <ul>
+            <li>
+                El pago se realizara a credito, con un plazo de vencimiento de {plazo_destacado} 
+                desde la fecha de emision del recibo en la plataforma SUNAT.
+            </li>
+        </ul>
+
+        <p>
+            Una vez emitido, envie el recibo en {formato_destacado} como respuesta a este mismo correo, 
+            sin generar un nuevo hilo.
+        </p>
+
+        <p>
+            Asimismo, se adjunta su contrato de locacion de servicios correspondiente al periodo 
+            {periodo_destacado}, firmado por el decano.
+        </p>
+"""
+
+        return self._crear_encabezado_html() + cuerpo_contenido + self._crear_pie_html()
+
+
 class EmailBuilderFactory:
     @staticmethod
     def crear_builder(tipo: TipoCorreo) -> EmailBuilder:
@@ -176,6 +308,15 @@ class EmailBuilderFactory:
             return EmailAdministrativoBuilder()
         else:
             raise ValueError(f"Tipo de correo no válido: {tipo}")
+
+    @staticmethod
+    def crear_builder_contrato_primera_vez(tipo: TipoCorreo) -> EmailBuilder:
+        if tipo == TipoCorreo.DOCENTE:
+            return EmailDocenteContratoBuilder()
+        elif tipo == TipoCorreo.ADMINISTRATIVO:
+            return EmailAdministrativoContratoBuilder()
+        else:
+            raise ValueError(f"Tipo de correo no valido: {tipo}")
 
 
 # Funciones de compatibilidad con código legacy

@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 import pandas as pd
@@ -22,8 +23,10 @@ class DatosEnvio:
     nombre: str
     correo: str
     pdf_path: str
+    ruc: Optional[str] = None
     servicio: Optional[str] = None
     modalidad: Optional[str] = None
+    tiene_contrato: bool = False
     
     def to_dict(self) -> Dict:
         """Convierte a diccionario para compatibilidad."""
@@ -31,8 +34,10 @@ class DatosEnvio:
             "nombre": self.nombre,
             "correo": self.correo,
             "pdf_path": self.pdf_path,
+            "ruc": self.ruc,
             "servicio": self.servicio,
-            "modalidad": self.modalidad
+            "modalidad": self.modalidad,
+            "tiene_contrato": self.tiene_contrato
         }
 
 
@@ -126,6 +131,13 @@ class PDFProcessor:
         self.incluir_servicio = incluir_servicio
         self.incluir_modalidad = incluir_modalidad
         self.debug = debug
+
+    @staticmethod
+    def _normalizar_servicio_para_correo(servicio: str) -> str:
+        servicio_limpio = servicio.strip()
+        if re.match(r'^\d', servicio_limpio):
+            return f"Servicio de dictado de {servicio_limpio}"
+        return servicio_limpio
     
     def procesar_pdf(self, pdf_path: str) -> Optional[DatosEnvio]:
         # Extraer RUC del PDF (identificador único)
@@ -157,6 +169,7 @@ class PDFProcessor:
                 logger.warning(f"No se encontró servicio para {nombre_excel}")
                 print(f"⚠ No se encontró servicio para {nombre_excel}.")
                 return None
+            servicio = self._normalizar_servicio_para_correo(servicio)
 
         modalidad = None
         if self.incluir_modalidad:
@@ -171,8 +184,10 @@ class PDFProcessor:
             nombre=nombre_excel,
             correo=correo,
             pdf_path=pdf_path,
+            ruc=ruc_extraido,
             servicio=servicio,
-            modalidad=modalidad
+            modalidad=modalidad,
+            tiene_contrato=extractor.tiene_contrato_locacion()
         )
         
         # Log de información
@@ -194,6 +209,19 @@ class PDFProcessor:
         
         logger.info(f"Procesamiento completado: {len(resultados)}/{len(lista_pdfs)} PDFs procesados")
         return resultados
+
+    def procesar_orden_individual_contrato_primera_vez(self, pdf_orden_path: str) -> Optional[DatosEnvio]:
+        """Procesa una sola orden y valida que indique contrato de locacion."""
+        extractor = PDFExtractor(pdf_orden_path)
+
+        if not extractor.tiene_contrato_locacion():
+            logger.warning(
+                f"La orden no contiene la frase de contrato de locacion: {os.path.basename(pdf_orden_path)}"
+            )
+            print("⚠ La orden seleccionada no contiene 'CONTRATO DE LOCACION DE SERVICIOS'.")
+            return None
+
+        return self.procesar_pdf(pdf_orden_path)
 
 
 class CorreosProcessor:
@@ -270,3 +298,21 @@ def enviar_lote_administrativos_gmail(ruta_excel: str, hoja: str, lista_pdfs: Li
     
     resultados = procesar_correos_administrativos_gmail(ruta_excel, hoja, lista_pdfs)
     enviar_lote_desde_gui_administrativos(resultados, mes)
+
+
+def procesar_correo_individual_contrato_primera_vez(
+    ruta_excel: str,
+    hoja: str,
+    pdf_orden_path: str,
+    tipo: TipoCorreo,
+    debug: bool = False
+) -> Optional[Dict]:
+    excel_reader = ExcelReader(ruta_excel, hoja)
+    incluir_servicio = (tipo == TipoCorreo.DOCENTE)
+    incluir_modalidad = (tipo == TipoCorreo.DOCENTE)
+    processor = PDFProcessor(excel_reader, incluir_servicio, incluir_modalidad, debug)
+    datos = processor.procesar_orden_individual_contrato_primera_vez(pdf_orden_path)
+
+    if datos is None:
+        return None
+    return datos.to_dict()

@@ -21,6 +21,8 @@ from .email_builder import (
     EmailBuilder,
     EmailDocenteBuilder,
     EmailAdministrativoBuilder,
+    EmailDocenteContratoBuilder,
+    EmailAdministrativoContratoBuilder,
     EmailBuilderFactory,
     generar_cuerpo_correo_docente_html,  # Legacy
     generar_cuerpo_correo_administrativo_html  # Legacy
@@ -31,7 +33,8 @@ from .pdf_extractor import (
     ServicioExtractor,
     RUCExtractor,
     extraer_ruc,  # Legacy
-    extraer_servicios  # Legacy
+    extraer_servicios,  # Legacy
+    tiene_contrato_locacion
 )
 
 from .email_sender import (
@@ -44,7 +47,8 @@ from .email_sender import (
     enviar_correo_personalizado,  # Legacy
     enviar_lote_desde_gui,  # Legacy
     enviar_lote_desde_gui_docentes,  # Legacy
-    enviar_lote_desde_gui_administrativos  # Legacy
+    enviar_lote_desde_gui_administrativos,  # Legacy
+    enviar_correo_contrato_primera_vez_desde_gui
 )
 
 from .processor import (
@@ -56,7 +60,8 @@ from .processor import (
     procesar_correos_docente_gmail,  # Legacy
     procesar_correos_administrativos_gmail,  # Legacy
     enviar_lote_docentes_gmail,  # Legacy
-    enviar_lote_administrativos_gmail  # Legacy
+    enviar_lote_administrativos_gmail,  # Legacy
+    procesar_correo_individual_contrato_primera_vez
 )
 
 
@@ -97,6 +102,8 @@ __all__ = [
     'EmailBuilder',
     'EmailDocenteBuilder',
     'EmailAdministrativoBuilder',
+    'EmailDocenteContratoBuilder',
+    'EmailAdministrativoContratoBuilder',
     'EmailBuilderFactory',
     'generar_cuerpo_correo_docente_html',
     'generar_cuerpo_correo_administrativo_html',
@@ -107,6 +114,7 @@ __all__ = [
     'RUCExtractor',
     'extraer_ruc',
     'extraer_servicios',
+    'tiene_contrato_locacion',
     
     # Email Sender
     'GmailEmailSender',
@@ -119,6 +127,7 @@ __all__ = [
     'enviar_lote_desde_gui',
     'enviar_lote_desde_gui_docentes',
     'enviar_lote_desde_gui_administrativos',
+    'enviar_correo_contrato_primera_vez_desde_gui',
     
     # Processor
     'CorreosProcessor',
@@ -130,6 +139,7 @@ __all__ = [
     'procesar_correos_administrativos_gmail',
     'enviar_lote_docentes_gmail',
     'enviar_lote_administrativos_gmail',
+    'procesar_correo_individual_contrato_primera_vez',
 ]
 
 if __name__ == '__main__':
