@@ -96,4 +96,4 @@ class PlantillaDocumento:
         }
         
         prefijo = prefijo_map.get(self.tipo_documento, "DOCUMENTO")
-        return f"{prefijo} - {nombre_docente} - {mes} {anio}.docx"
+        return f"{prefijo} - {mes} {anio} - {nombre_docente}.docx"
