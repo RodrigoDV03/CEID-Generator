@@ -631,11 +631,26 @@ def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=80):
 # ------------- CÁLCULO DE MONTOS -------------
 
 def agrupar_y_calcular(df, datos_docentes, col_curso):
+    df_trabajo = df.copy()
+
+    # Cada curso intensivo genera un curso adicional (siguiente ciclo) que también se paga.
+    df_trabajo['_intensivo_adicional'] = (
+        df_trabajo[col_curso]
+        .fillna('')
+        .astype(str)
+        .str.contains('intensivo', case=False, na=False)
+        .astype(int)
+    )
+
     # Agrupar por docente: una fila por docente con todos sus cursos concatenados
-    agrupado = (df.groupby('docente').agg(
+    agrupado = (df_trabajo.groupby('docente').agg(
         curso=(col_curso, lambda x: ' / '.join(str(v).strip() for v in x if str(v).strip() and str(v).strip().lower() != 'nan')),
-        cantidad_cursos=(col_curso, 'count')
+        cantidad_cursos_base=(col_curso, 'count'),
+        cursos_intensivos_adicionales=('_intensivo_adicional', 'sum')
     ).reset_index())
+
+    agrupado['cantidad_cursos'] = agrupado['cantidad_cursos_base'] + agrupado['cursos_intensivos_adicionales']
+    agrupado.drop(columns=['cantidad_cursos_base', 'cursos_intensivos_adicionales'], inplace=True)
 
     nombres_base = datos_docentes['Docente'].tolist()
 

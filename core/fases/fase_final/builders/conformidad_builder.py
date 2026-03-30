@@ -62,8 +62,8 @@ class ConformidadBuilder:
         # Construir reemplazos
         reemplazos = self.construir_reemplazos(docente, payment, descripcion_completa)
         
-        # Generar nombre de archivo
-        nombre_archivo = f"CONFORMIDAD - {docente.nombre_limpio} - {self.config.mes} {self.config.anio}.docx"
+        # Formato: {tipo documento} - {mes}{anio} - {nombre}
+        nombre_archivo = f"CONFORMIDAD - {self.config.mes} {self.config.anio} - {docente.nombre_limpio}.docx"
         ruta_salida = os.path.join(carpeta_docente, nombre_archivo)
         
         # Crear directorio si no existe

@@ -88,8 +88,8 @@ class TdrBuilder:
         # Construir reemplazos (pasar cursos_detallados)
         reemplazos = self.construir_reemplazos(docente, payment, descripcion_completa, cursos_detallados)
         
-        # Generar nombre de archivo
-        nombre_archivo = f"TDR - {docente.nombre_limpio} - {self.config.mes} {self.config.anio}.docx"
+        # Formato: {tipo documento} - {mes}{anio} - {nombre}
+        nombre_archivo = f"TDR - {self.config.mes} {self.config.anio} - {docente.nombre_limpio}.docx"
         ruta_salida = os.path.join(carpeta_docente, nombre_archivo)
         
         # Generar documento
