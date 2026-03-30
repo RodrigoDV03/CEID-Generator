@@ -33,7 +33,10 @@ class AppLayout:
     def __init__(self, titulo="Sistema CEID"):
         self.root = ctk.CTk()
         self.root.title(titulo)
+        # Apertura maximizada consistente en Windows.
+        self.root.geometry(f"{self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()}+0+0")
         self.root.state("zoomed")
+        self.root.minsize(1280, 720)
         self.root.configure(fg_color=BG_COLOR)
         self.botones_sidebar = []
 

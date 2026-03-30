@@ -27,7 +27,9 @@ def card_opcion(master, titulo, descripcion, comando):
         fg_color=CARD_COLOR,
         corner_radius=15
     )
-    card.pack(side="left", expand=True, fill="both", padx=15, pady=15)
+    card.pack(side="left", expand=True, fill="x", padx=15, pady=15)
+    card.configure(height=190)
+    card.pack_propagate(False)
 
     t = ctk.CTkLabel(
         card,

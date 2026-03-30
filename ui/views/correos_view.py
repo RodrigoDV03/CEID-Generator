@@ -55,6 +55,11 @@ def mostrar_correos(app):
     def set_estado(label, texto, color=TEXT_LIGHT):
         label.configure(text=texto, text_color=color)
 
+    def actualizar_estado_pdf(indicador, ruta):
+        texto = os.path.basename(ruta) if ruta else "No seleccionado"
+        color = "#4CAF50" if ruta else TEXT_LIGHT
+        set_estado(indicador, texto, color)
+
     def es_modo_contrato():
         return modo_var.get() == "Primera vez con contrato (individual)"
 
@@ -112,9 +117,6 @@ def mostrar_correos(app):
         menu_mes_inicio.configure(state=estado)
         menu_mes_fin.configure(state=estado)
 
-    modo_var.trace_add("write", actualizar_modo)
-    actualizar_modo()  # Llamar una vez para establecer estado inicial
-
     # =====================================================
     # ② ARCHIVOS
     # =====================================================
@@ -159,6 +161,65 @@ def mostrar_correos(app):
                              fg_color=PRIMARY_COLOR, hover_color=ACCENT_COLOR,
                              command=seleccionar_pdfs)
     btn_pdfs.pack(anchor="e", padx=20, pady=5)
+
+    frame_contrato = ctk.CTkFrame(frame_files, fg_color="transparent")
+
+    ctk.CTkLabel(frame_contrato, text="Orden de servicio (PDF)", text_color=TEXT_COLOR)\
+        .pack(anchor="w", padx=20, pady=(10, 0))
+    lbl_orden = ctk.CTkLabel(frame_contrato, text="No seleccionado", text_color=TEXT_LIGHT)
+    lbl_orden.pack(anchor="w", padx=20)
+
+    def seleccionar_pdf_orden():
+        nonlocal pdf_orden
+        ruta = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        if ruta:
+            pdf_orden = ruta
+            actualizar_estado_pdf(lbl_orden, pdf_orden)
+            validar_generar()
+
+    ctk.CTkButton(
+        frame_contrato,
+        text="Seleccionar orden",
+        fg_color=PRIMARY_COLOR,
+        hover_color=ACCENT_COLOR,
+        command=seleccionar_pdf_orden
+    ).pack(anchor="e", padx=20, pady=5)
+
+    ctk.CTkLabel(frame_contrato, text="Contrato firmado (PDF)", text_color=TEXT_COLOR)\
+        .pack(anchor="w", padx=20, pady=(10, 0))
+    lbl_contrato = ctk.CTkLabel(frame_contrato, text="No seleccionado", text_color=TEXT_LIGHT)
+    lbl_contrato.pack(anchor="w", padx=20)
+
+    def seleccionar_pdf_contrato():
+        nonlocal pdf_contrato
+        ruta = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        if ruta:
+            pdf_contrato = ruta
+            actualizar_estado_pdf(lbl_contrato, pdf_contrato)
+            validar_generar()
+
+    ctk.CTkButton(
+        frame_contrato,
+        text="Seleccionar contrato",
+        fg_color=PRIMARY_COLOR,
+        hover_color=ACCENT_COLOR,
+        command=seleccionar_pdf_contrato
+    ).pack(anchor="e", padx=20, pady=(5, 10))
+
+    def actualizar_campos_modo(*_):
+        es_contrato = es_modo_contrato()
+
+        if es_contrato:
+            frame_contrato.pack(fill="x", pady=(5, 0))
+            lbl_pdfs.configure(text_color=TEXT_LIGHT)
+            btn_pdfs.configure(state="disabled")
+        else:
+            frame_contrato.pack_forget()
+            lbl_pdfs.configure(text_color=TEXT_LIGHT)
+            btn_pdfs.configure(state="normal")
+
+    modo_var.trace_add("write", actualizar_modo)
+    modo_var.trace_add("write", actualizar_campos_modo)
 
     # =====================================================
     # VALIDACIÓN
@@ -215,6 +276,10 @@ def mostrar_correos(app):
                                 state="disabled",
                                 command=generar_data)
     btn_generar.pack(padx=20, pady=10)
+
+    actualizar_modo()
+    actualizar_campos_modo()
+    validar_generar()
 
     # =====================================================
     # CONSOLA
