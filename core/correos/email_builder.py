@@ -14,6 +14,7 @@ class EmailBuilder(ABC):
         self._nombre: Optional[str] = None
         self._mes_inicio_contrato: Optional[str] = None
         self._mes_fin_contrato: Optional[str] = None
+        self._es_reconocimiento_deuda: bool = False
     
     def con_mes(self, mes: str) -> 'EmailBuilder':
         self._mes = mes
@@ -34,6 +35,10 @@ class EmailBuilder(ABC):
     def con_periodo_contrato(self, mes_inicio: str, mes_fin: str) -> 'EmailBuilder':
         self._mes_inicio_contrato = mes_inicio
         self._mes_fin_contrato = mes_fin
+        return self
+
+    def con_reconocimiento_deuda(self, es_reconocimiento_deuda: bool) -> 'EmailBuilder':
+        self._es_reconocimiento_deuda = es_reconocimiento_deuda
         return self
     
     @abstractmethod
@@ -124,10 +129,16 @@ class EmailDocenteBuilder(EmailBuilder):
         formato_destacado = self._crear_texto_destacado(
             f"formato {EmailConfig.FORMATO_RECIBO}"
         )
+
+        texto_orden = (
+            f"correspondiente al reconocimiento de deuda de {self._mes} {self._anio}"
+            if self._es_reconocimiento_deuda
+            else f"correspondiente al mes de {self._mes} {self._anio}"
+        )
         
         cuerpo_contenido = f"""
         <p>
-            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. 
+            Adjunto su orden de servicio {texto_orden}. 
             Con este documento, ya puede proceder con la emisión de su recibo por honorarios. 
             Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
         </p>
@@ -167,10 +178,16 @@ class EmailAdministrativoBuilder(EmailBuilder):
         formato_destacado = self._crear_texto_destacado(
             f"formato {EmailConfig.FORMATO_RECIBO}"
         )
+
+        texto_orden = (
+            f"correspondiente al reconocimiento de deuda de {self._mes} {self._anio}"
+            if self._es_reconocimiento_deuda
+            else f"correspondiente al mes de {self._mes} {self._anio}"
+        )
         
         cuerpo_contenido = f"""
         <p>
-            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. 
+            Adjunto su orden de servicio {texto_orden}. 
             Con este documento, ya puede proceder con la emisión de su recibo por honorarios.
         </p>
 

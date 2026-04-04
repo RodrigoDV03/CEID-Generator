@@ -63,6 +63,9 @@ def mostrar_correos(app):
     def es_modo_contrato():
         return modo_var.get() == "Primera vez con contrato (individual)"
 
+    def es_modo_reconocimiento_deuda():
+        return modo_var.get() == "Reconocimiento de deuda (solo orden)"
+
     def obtener_tipo_correo():
         return TipoCorreo.DOCENTE if tipo_var.get() == "Docente" else TipoCorreo.ADMINISTRATIVO
 
@@ -81,7 +84,11 @@ def mostrar_correos(app):
     ctk.CTkLabel(frame_conf, text="Modo de envío", text_color=TEXT_COLOR)\
         .pack(anchor="w", padx=20, pady=(10, 0))
     menu_modo = ctk.CTkOptionMenu(frame_conf, variable=modo_var,
-                                 values=["Masivo (solo orden)", "Primera vez con contrato (individual)"])
+                                 values=[
+                                     "Masivo (solo orden)",
+                                     "Reconocimiento de deuda (solo orden)",
+                                     "Primera vez con contrato (individual)"
+                                 ])
     menu_modo.pack(anchor="w", padx=20, pady=(0, 10))
 
     ctk.CTkLabel(frame_conf, text="Tipo de destinatario", text_color=TEXT_COLOR)\
@@ -112,7 +119,7 @@ def mostrar_correos(app):
     menu_mes_fin.pack(anchor="w", padx=20, pady=(0, 10))
     # Función para actualizar estado de menús según modo
     def actualizar_modo(*_):
-        es_masivo = modo_var.get() == "Masivo (solo orden)"
+        es_masivo = not es_modo_contrato()
         estado = "disabled" if es_masivo else "normal"
         menu_mes_inicio.configure(state=estado)
         menu_mes_fin.configure(state=estado)
@@ -320,9 +327,19 @@ def mostrar_correos(app):
                     )
                 else:
                     if tipo_var.get() == "Docente":
-                        enviar_lote_desde_gui_docentes(data_envio, mes_var.get(), int(año_var.get()))
+                        enviar_lote_desde_gui_docentes(
+                            data_envio,
+                            mes_var.get(),
+                            int(año_var.get()),
+                            es_modo_reconocimiento_deuda()
+                        )
                     else:
-                        enviar_lote_desde_gui_administrativos(data_envio, mes_var.get(), int(año_var.get()))
+                        enviar_lote_desde_gui_administrativos(
+                            data_envio,
+                            mes_var.get(),
+                            int(año_var.get()),
+                            es_modo_reconocimiento_deuda()
+                        )
 
                 messagebox.showinfo("Éxito", "Correos enviados correctamente")
 

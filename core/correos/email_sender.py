@@ -167,7 +167,8 @@ class EmailPersonalizado:
         tipo: TipoCorreo,
         servicio: Optional[str] = None,
         modalidad: Optional[str] = None,
-        anio: Optional[int] = None
+        anio: Optional[int] = None,
+        es_reconocimiento_deuda: bool = False
     ) -> bool:
         if anio is None:
             anio = AÑO_ACTUAL
@@ -185,6 +186,7 @@ class EmailPersonalizado:
             # Construir el correo según el tipo
             builder = EmailBuilderFactory.crear_builder(tipo)
             builder.con_mes(mes).con_anio(anio).con_firma(self.firma_html).con_nombre(nombre)
+            builder.con_reconocimiento_deuda(es_reconocimiento_deuda)
             
             if tipo == TipoCorreo.DOCENTE:
                 builder.con_servicio(servicio).con_modalidad(modalidad)
@@ -260,7 +262,8 @@ class LoteEmailSender:
         data_para_envio: list,
         mes: str,
         tipo: TipoCorreo,
-        anio: Optional[int] = None
+        anio: Optional[int] = None,
+        es_reconocimiento_deuda: bool = False
     ) -> dict:
         if anio is None:
             anio = AÑO_ACTUAL
@@ -283,7 +286,8 @@ class LoteEmailSender:
                 tipo=tipo,
                 servicio=servicio,
                 modalidad=modalidad,
-                anio=anio
+                anio=anio,
+                es_reconocimiento_deuda=es_reconocimiento_deuda
             )
             
             if resultado:
@@ -365,7 +369,13 @@ def enviar_correo_personalizado(
     )
 
 
-def enviar_lote_desde_gui(data_para_envio: list, mes: str, tipo: str, anio: Optional[int] = None) -> None:
+def enviar_lote_desde_gui(
+    data_para_envio: list,
+    mes: str,
+    tipo: str,
+    anio: Optional[int] = None,
+    es_reconocimiento_deuda: bool = False
+) -> None:
     logger.debug("enviar_lote_desde_gui() está deprecated. Usar LoteEmailSender.")
     
     service = autenticar_gmail()
@@ -377,17 +387,33 @@ def enviar_lote_desde_gui(data_para_envio: list, mes: str, tipo: str, anio: Opti
     tipo_enum = TipoCorreo.DOCENTE if tipo == "docente" else TipoCorreo.ADMINISTRATIVO
     
     lote_sender = LoteEmailSender(gmail_service)
-    lote_sender.enviar_lote(data_para_envio, mes, tipo_enum)
+    lote_sender.enviar_lote(
+        data_para_envio,
+        mes,
+        tipo_enum,
+        anio,
+        es_reconocimiento_deuda
+    )
 
 
-def enviar_lote_desde_gui_docentes(data_para_envio: list, mes: str, anio: Optional[int] = None) -> None:
+def enviar_lote_desde_gui_docentes(
+    data_para_envio: list,
+    mes: str,
+    anio: Optional[int] = None,
+    es_reconocimiento_deuda: bool = False
+) -> None:
     """Wrapper para mantener compatibilidad con código existente."""
-    enviar_lote_desde_gui(data_para_envio, mes, "docente", anio)
+    enviar_lote_desde_gui(data_para_envio, mes, "docente", anio, es_reconocimiento_deuda)
 
 
-def enviar_lote_desde_gui_administrativos(data_para_envio: list, mes: str, anio: Optional[int] = None) -> None:
+def enviar_lote_desde_gui_administrativos(
+    data_para_envio: list,
+    mes: str,
+    anio: Optional[int] = None,
+    es_reconocimiento_deuda: bool = False
+) -> None:
     """Wrapper para mantener compatibilidad con código existente."""
-    enviar_lote_desde_gui(data_para_envio, mes, "administrativo", anio)
+    enviar_lote_desde_gui(data_para_envio, mes, "administrativo", anio, es_reconocimiento_deuda)
 
 
 def enviar_correo_contrato_primera_vez_desde_gui(

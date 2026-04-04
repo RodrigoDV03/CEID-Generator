@@ -135,11 +135,17 @@ class DocumentGeneratorService:
             'oficio_admin_tercero': './data/modelos/oficio_admin_tercero.docx',
             # TDR
             'tdr_administrativo': './data/modelos/tdr_administrativo.docx',
+            'tdr_tipoa': './data/modelos/tdr_tipoA_.docx',
+            'tdr_tipob': './data/modelos/tdr_tipoB_.docx',
+            'tdr_tipoc': './data/modelos/tdr_tipoC_.docx',
             # Cotización
-            'cotizacion': './data/modelos/modelo_cotizacion.docx',
+            'cotizacion_admin': './data/modelos/cotizacion_admin.docx',
+            'cotizacion_docente': './data/modelos/cotizacion_docente.docx',
             # Conformidades
-            'conformidad_contrato': './data/modelos/conformidad_contrato.docx',
-            'conformidad_tercero': './data/modelos/conformidad_tercero.docx',
+            'conformidad_admin_contrato': './data/modelos/conformidad_admin_contrato.docx',
+            'conformidad_admin_tercero': './data/modelos/conformidad_admin_tercero.docx',
+            'conformidad_docente_contrato': './data/modelos/conformidad_docente_contrato.docx',
+            'conformidad_docente_tercero': './data/modelos/conformidad_docente_tercero.docx',
             # Control de pagos
             'control_primera': './data/modelos/control_pagos_primera.docx',
             'control_segunda': './data/modelos/control_pagos_segunda.docx',
@@ -153,8 +159,11 @@ class DocumentGeneratorService:
             clave = f'oficio_{tipo_persona}_{tipo_contrato.lower()}'
         elif tipo_documento == 'tdr' and config.es_administrativo:
             clave = 'tdr_administrativo'
+        elif tipo_documento == 'cotizacion':
+            clave = 'cotizacion_admin' if config.es_administrativo else 'cotizacion_docente'
         elif tipo_documento == 'conformidad':
-            clave = f'conformidad_{tipo_contrato.lower()}'
+            tipo_persona = 'admin' if config.es_administrativo else 'docente'
+            clave = f'conformidad_{tipo_persona}_{tipo_contrato.lower()}'
         elif tipo_documento == 'control':
             clave = f'control_{config.numero_armada}'
         else:

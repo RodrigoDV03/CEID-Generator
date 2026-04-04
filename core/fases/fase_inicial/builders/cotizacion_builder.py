@@ -70,8 +70,12 @@ class CotizacionBuilder:
         descripcion_completa: str,
         carpeta_docente: str
     ) -> str:
-        # Obtener plantilla
-        ruta_template = PathUtils.ruta_absoluta_relativa('./data/modelos/modelo_cotizacion.docx')
+        # Obtener plantilla según el tipo de destinatario
+        ruta_template = self.doc_service.obtener_ruta_plantilla(
+            'cotizacion',
+            '',
+            self.config
+        )
         
         # Construir reemplazos
         reemplazos = self.construir_reemplazos(docente, payment, descripcion_completa)

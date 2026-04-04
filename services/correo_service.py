@@ -23,7 +23,18 @@ def generar_data_correo_service(es_modo_contrato, tipo_var, ruta_excel, pdfs, pd
     return procesar_correos_administrativos_gmail(ruta_excel, "list", pdfs), None
 
 
-def enviar_correos_service(es_modo_contrato, tipo_var, data_envio, data_envio_individual, pdf_contrato, mes, mes_inicio, mes_fin, anio):
+def enviar_correos_service(
+    es_modo_contrato,
+    tipo_var,
+    data_envio,
+    data_envio_individual,
+    pdf_contrato,
+    mes,
+    mes_inicio,
+    mes_fin,
+    anio,
+    es_reconocimiento_deuda=False,
+):
     if es_modo_contrato:
         return enviar_correo_contrato_primera_vez_desde_gui(
             datos_envio=data_envio_individual,
@@ -36,8 +47,8 @@ def enviar_correos_service(es_modo_contrato, tipo_var, data_envio, data_envio_in
         )
 
     if tipo_var == "Docente":
-        enviar_lote_desde_gui_docentes(data_envio, mes, anio)
+        enviar_lote_desde_gui_docentes(data_envio, mes, anio, es_reconocimiento_deuda)
     else:
-        enviar_lote_desde_gui_administrativos(data_envio, mes, anio)
+        enviar_lote_desde_gui_administrativos(data_envio, mes, anio, es_reconocimiento_deuda)
 
     return True
