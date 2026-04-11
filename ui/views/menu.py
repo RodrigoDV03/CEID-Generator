@@ -6,6 +6,7 @@ from ui.views.correos_view import mostrar_correos
 from ui.views.planilla_view import mostrar_planilla
 from ui.views.fase_inicial_view import mostrar_fase_inicial
 from ui.views.fase_final_view import mostrar_fase_final
+from ui.views.control_pagos_view import mostrar_control_pagos
 
 def iniciar_interfaz_general():
 
@@ -16,6 +17,7 @@ def iniciar_interfaz_general():
     app.agregar_opcion_sidebar("📊 Planilla", lambda: mostrar_planilla(app))
     app.agregar_opcion_sidebar("📄 Fase Inicial", lambda: mostrar_fase_inicial(app))
     app.agregar_opcion_sidebar("✅ Fase Final", lambda: mostrar_fase_final(app))
+    app.agregar_opcion_sidebar("💰 Control de Pagos", lambda: mostrar_control_pagos(app))
     app.agregar_opcion_sidebar("✉️ Correos", lambda: mostrar_correos(app))
 
     mostrar_inicio(app)
@@ -53,6 +55,13 @@ def mostrar_inicio(app):
         "Fase Final",
         "Documentos finales",
         lambda: mostrar_fase_final(app)
+    )
+
+    card_opcion(
+        fila,
+        "Control de Pagos",
+        "Actualiza armadas y saldos",
+        lambda: mostrar_control_pagos(app)
     )
 
     card_opcion(

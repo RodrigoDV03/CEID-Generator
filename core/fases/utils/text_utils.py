@@ -1,4 +1,5 @@
 import re
+import unicodedata
 import pandas as pd
 from typing import Any
 
@@ -34,10 +35,17 @@ class TextUtils:
     
     @staticmethod
     def normalizar_texto(texto: str) -> str:
-        texto = TextUtils.limpiar_espacios(texto)
-        # Eliminar espacios múltiples
-        texto = re.sub(r'\s+', ' ', texto)
-        return texto
+        if texto is None or pd.isna(texto):
+            return ""
+
+        texto_limpio = TextUtils.limpiar_espacios(str(texto))
+        texto_limpio = re.sub(r'\s+', ' ', texto_limpio)
+        texto_limpio = unicodedata.normalize('NFKD', texto_limpio)
+        texto_limpio = ''.join(
+            ch for ch in texto_limpio
+            if not unicodedata.combining(ch)
+        )
+        return texto_limpio.upper()
     
     @staticmethod
     def capitalizar_primera(texto: str) -> str:
@@ -64,3 +72,17 @@ class TextUtils:
             return f"{elementos[0]} {ultimo_separador} {elementos[1]}"
         
         return f"{', '.join(elementos[:-1])}, {ultimo_separador} {elementos[-1]}"
+
+    @staticmethod
+    def modalidad_a_texto(modalidad: str, permitir_na_vacio: bool = False) -> str:
+        modalidad_upper = TextUtils.limpiar_espacios(modalidad).upper()
+
+        if modalidad_upper == "INPERSON":
+            return "presencial"
+        if modalidad_upper in ["VIRTUAL", "INTENSIVO VIRTUAL"]:
+            return "virtual"
+        if modalidad_upper == "MIXTA":
+            return "mixta"
+        if modalidad_upper == "N/A" and permitir_na_vacio:
+            return ""
+        return "híbrida"

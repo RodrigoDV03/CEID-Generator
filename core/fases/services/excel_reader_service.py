@@ -1,15 +1,14 @@
 import pandas as pd
 from typing import List, Any
 from core.fases.models import DocenteData, PaymentData, CursoDetalle
+from core.fases.utils import TextUtils
 
 
 class ExcelReaderService:
 
     @staticmethod
     def _normalizar_texto(valor: Any) -> str:
-        if pd.isna(valor):
-            return ""
-        return " ".join(str(valor).strip().upper().split())
+        return TextUtils.normalizar_texto(valor)
 
     @staticmethod
     def _buscar_columna(fila: Any, aliases: List[str], default: Any = "") -> Any:
@@ -116,12 +115,6 @@ class ExcelReaderService:
     @staticmethod
     def obtener_hojas_disponibles(ruta_excel: str) -> List[str]:
         return [str(sheet) for sheet in pd.ExcelFile(ruta_excel).sheet_names]
-    
-    @staticmethod
-    def _limpiar_numero(valor: Any) -> str:
-        if pd.isna(valor):
-            return ""
-        return str(valor).split('.')[0]
 
     @staticmethod
     def _construir_curso_resumido(fila: Any) -> str:
@@ -153,11 +146,11 @@ class ExcelReaderService:
 
         return DocenteData(
             nombre=str(getattr(fila, "Docente", "N/A")),
-            dni=ExcelReaderService._limpiar_numero(getattr(fila, "Numero_dni", "")),
-            ruc=ExcelReaderService._limpiar_numero(getattr(fila, "N_Ruc", "")),
+            dni=TextUtils.limpiar_numero(getattr(fila, "Numero_dni", "")),
+            ruc=TextUtils.limpiar_numero(getattr(fila, "N_Ruc", "")),
             direccion=str(getattr(fila, "Domicilio_docente", "")).strip(),
             correo=str(getattr(fila, "Correo_personal", "")),
-            celular=ExcelReaderService._limpiar_numero(getattr(fila, "Numero_celular", "")),
+            celular=TextUtils.limpiar_numero(getattr(fila, "Numero_celular", "")),
             curso=curso,
             categoria_letra=str(getattr(fila, "Categoria_letra", "")).strip().upper(),
             formacion_academica=str(getattr(fila, "Formacion_academica", "")),

@@ -1,274 +1,29 @@
 import pandas as pd
 import os
+import re
 from fuzzywuzzy import process, fuzz
-import unicodedata
+from core.fases.utils import TextUtils
+from core.planillas.csv_processing import (
+    cargar_archivo as _cargar_archivo,
+    parsear_csv_comillas_dobles as _parsear_csv_comillas_dobles,
+    limpiar_docentes as _limpiar_docentes,
+    procesar_csv_nuevo_formato as _procesar_csv_nuevo_formato,
+)
 
 # ----------------------- CARGAR ARCHIVO -----------------------
 
 def cargar_archivo(ruta):
-    extension = os.path.splitext(ruta)[-1].lower()
-    if extension == ".csv":
-        # Intentar lectura normal primero con detección automática de delimitador
-        try:
-            # Primero intentar con punto y coma (;)
-            df = pd.read_csv(ruta, sep=';', encoding='utf-8-sig')
-            if len(df.columns) > 1:
-                return df
-            
-            # Si solo tiene una columna, intentar con coma
-            df = pd.read_csv(ruta, sep=',', encoding='utf-8-sig')
-            if len(df.columns) > 1:
-                return df
-            
-            # Si todavía no funciona, usar el parser personalizado
-            return parsear_csv_comillas_dobles(ruta)
-        except Exception as e:
-            print(f"⚠️ Error al leer CSV con pandas: {e}")
-            return parsear_csv_comillas_dobles(ruta)
-    elif extension in [".xls", ".xlsx"]:
-        return pd.read_excel(ruta)
-    else:
-        raise ValueError(f"Formato no soportado: {extension}")
+    return _cargar_archivo(ruta)
 
 def parsear_csv_comillas_dobles(ruta):
-    
-    with open(ruta, 'r', encoding='utf-8') as f:
-        lineas = f.readlines()
-    
-    datos_parseados = []
-    
-    for idx, linea in enumerate(lineas):
-        linea = linea.strip()
-        if not linea:
-            continue
-            
-        # Remover comillas externas si existen
-        if linea.startswith('"') and linea.endswith('"'):
-            linea = linea[1:-1]
-        
-        # Dividir la línea considerando el formato especial
-        campos = []
-        campo_actual = ""
-        dentro_comillas = False
-        dentro_llaves = 0
-        i = 0
-        
-        while i < len(linea):
-            char = linea[i]
-            
-            # Manejar comillas dobles ""
-            if i < len(linea) - 1 and linea[i:i+2] == '""':
-                if not dentro_comillas:
-                    dentro_comillas = True
-                    i += 2
-                    continue
-                else:
-                    dentro_comillas = False
-                    i += 2
-                    continue
-            
-            # Manejar llaves para días
-            elif char == '{':
-                dentro_llaves += 1
-                campo_actual += char
-            elif char == '}':
-                dentro_llaves -= 1
-                campo_actual += char
-            
-            # Manejar comas separadoras
-            elif char == ',' and not dentro_comillas and dentro_llaves == 0:
-                campos.append(campo_actual.strip())
-                campo_actual = ""
-            else:
-                campo_actual += char
-            
-            i += 1
-        
-        # Agregar el último campo
-        if campo_actual:
-            campos.append(campo_actual.strip())
-        
-        # Limitar a 13 columnas
-        if len(campos) > 13:
-            campos = campos[:13]
-            
-        datos_parseados.append(campos)
-    
-    if datos_parseados:
-        headers = datos_parseados[0]
-        filas = datos_parseados[1:]
-        
-        # Verificar que todas las filas tengan el mismo número de columnas que el header
-        max_cols = len(headers)
-        filas_ajustadas = []
-        for fila in filas:
-            if len(fila) < max_cols:
-                # Rellenar con valores vacíos si faltan columnas
-                fila = fila + [''] * (max_cols - len(fila))
-            elif len(fila) > max_cols:
-                # Truncar si hay más columnas
-                fila = fila[:max_cols]
-            filas_ajustadas.append(fila)
-        
-        print(f"✅ Creando DataFrame con {len(headers)} columnas y {len(filas_ajustadas)} filas")
-        return pd.DataFrame(filas_ajustadas, columns=headers)
-    
-    return pd.DataFrame()
+    return _parsear_csv_comillas_dobles(ruta)
 
 def limpiar_docentes(df, col):
-    df[col] = df[col].astype(str).str.strip()
-    return df
+    return _limpiar_docentes(df, col)
 
 def procesar_csv_nuevo_formato(df):
-    """
-    Procesa el DataFrame con el nuevo formato de columnas del CSV y lo convierte
-    al formato interno esperado por el sistema.
-    
-    Nuevas columnas esperadas:
-    - Programa Educativo
-    - Detalle Curso
-    - Modalidad
-    - Sede
-    - Horario Completo
-    - Docente
-    - Fecha Inicio Clases
-    - Fecha Fin Clases
-    - Total Matriculados
-    """
-    import re
-    
-    df_procesado = df.copy()
-    
-    # Mapeo directo de columnas
-    mapeo_columnas = {
-        'Modalidad': 'modalidad',
-        'Sede': 'sede',
-        'Docente': 'docente',
-        'Total Matriculados': 'matriculados'
-    }
-    
-    # Renombrar columnas directas
-    for col_origen, col_destino in mapeo_columnas.items():
-        if col_origen in df_procesado.columns:
-            df_procesado[col_destino] = df_procesado[col_origen]
-    
-    # Procesar "Detalle Curso" para extraer idioma, nivel y ciclo
-    if 'Detalle Curso' in df_procesado.columns:
-        def extraer_info_curso(detalle):
-            if pd.isna(detalle):
-                return pd.Series({'idioma': '', 'nivel': '', 'ciclo': ''})
-            
-            detalle_str = str(detalle).strip()
-            # Patrón: "Idioma Nivel Número"
-            # Ejemplos: "Alemán Básico 2", "Francés Básico 1", "Inglés Avanzado 3"
-            patron = r'^([A-Za-zÀ-ÿ]+)\s+([A-Za-zÀ-ÿ]+)\s+(\d+)$'
-            match = re.match(patron, detalle_str)
-            
-            if match:
-                idioma = match.group(1)
-                nivel = match.group(2)
-                ciclo = match.group(3)
-                return pd.Series({'idioma': idioma, 'nivel': nivel, 'ciclo': ciclo})
-            else:
-                # Si no coincide con el patrón, intentar una extracción más flexible
-                partes = detalle_str.split()
-                if len(partes) >= 3:
-                    # Último elemento debe ser número (ciclo)
-                    ciclo = partes[-1]
-                    # Penúltimo elemento es el nivel
-                    nivel = partes[-2]
-                    # Todo lo demás es el idioma
-                    idioma = ' '.join(partes[:-2])
-                    return pd.Series({'idioma': idioma, 'nivel': nivel, 'ciclo': ciclo})
-                else:
-                    return pd.Series({'idioma': detalle_str, 'nivel': '', 'ciclo': ''})
-        
-        df_info = df_procesado['Detalle Curso'].apply(extraer_info_curso)
-        df_procesado['idioma'] = df_info['idioma']
-        df_procesado['nivel'] = df_info['nivel']
-        df_procesado['ciclo'] = df_info['ciclo']
-    
-    # Procesar "Horario Completo" para extraer dias, horainicio y horafin
-    if 'Horario Completo' in df_procesado.columns:
-        def extraer_info_horario(horario):
-            if pd.isna(horario):
-                return pd.Series({'dias': '', 'horainicio': '', 'horafin': ''})
-            
-            horario_str = str(horario).strip()
-            
-            # Mapeo de días en español a inglés
-            dias_map = {
-                'Lun': 'MONDAY',
-                'Mar': 'TUESDAY',
-                'Mie': 'WEDNESDAY',
-                'Mié': 'WEDNESDAY',
-                'Jue': 'THURSDAY',
-                'Vie': 'FRIDAY',
-                'Sab': 'SATURDAY',
-                'Sáb': 'SATURDAY',
-                'Dom': 'SUNDAY'
-            }
-            
-            # Patrón: "Día1,Día2,Día3 HH:MM am/pm - HH:MM am/pm"
-            # Ejemplo: "Lun,Mar,Mie,Jue 07:30 pm - 09:30 pm"
-            try:
-                # Separar días del rango de horas
-                if ' ' in horario_str:
-                    partes = horario_str.split(' ', 1)
-                    dias_str = partes[0]
-                    horas_str = partes[1] if len(partes) > 1 else ''
-                    
-                    # Procesar días
-                    dias_lista = [d.strip() for d in dias_str.split(',')]
-                    dias_ingles = [dias_map.get(d, d.upper()) for d in dias_lista]
-                    dias_formateado = '{' + ','.join(dias_ingles) + '}'
-                    
-                    # Procesar horas
-                    if '-' in horas_str:
-                        horas_partes = horas_str.split('-')
-                        hora_inicio_str = horas_partes[0].strip()
-                        hora_fin_str = horas_partes[1].strip() if len(horas_partes) > 1 else ''
-                        
-                        # Convertir de 12h a 24h
-                        def convertir_12h_a_24h(hora_str):
-                            # Patrón: "07:30 pm" o "08:00 am"
-                            patron = r'(\d{1,2}):(\d{2})\s*(am|pm)'
-                            match = re.search(patron, hora_str, re.IGNORECASE)
-                            if match:
-                                hora = int(match.group(1))
-                                minuto = match.group(2)
-                                periodo = match.group(3).lower()
-                                
-                                if periodo == 'pm' and hora != 12:
-                                    hora += 12
-                                elif periodo == 'am' and hora == 12:
-                                    hora = 0
-                                
-                                return f"{hora:02d}:{minuto}:00"
-                            return hora_str
-                        
-                        hora_inicio = convertir_12h_a_24h(hora_inicio_str)
-                        hora_fin = convertir_12h_a_24h(hora_fin_str)
-                        
-                        return pd.Series({
-                            'dias': dias_formateado,
-                            'horainicio': hora_inicio,
-                            'horafin': hora_fin
-                        })
-                
-                return pd.Series({'dias': '', 'horainicio': '', 'horafin': ''})
-            except Exception as e:
-                print(f"Error al procesar horario '{horario_str}': {e}")
-                return pd.Series({'dias': '', 'horainicio': '', 'horafin': ''})
-        
-        df_horario = df_procesado['Horario Completo'].apply(extraer_info_horario)
-        df_procesado['dias'] = df_horario['dias']
-        df_procesado['horainicio'] = df_horario['horainicio']
-        df_procesado['horafin'] = df_horario['horafin']
-    
-    return df_procesado
+    return _procesar_csv_nuevo_formato(df)
 
-# ---------------- TRANSFORMACIONES DE DATOS ----------------
 
 def traducir_dias(dias_raw: str) -> str:
     dias_dict = {'MONDAY': 'Lun', 'TUESDAY': 'Mar', 'WEDNESDAY': 'Mié', 'THURSDAY': 'Jue', 'FRIDAY': 'Vie', 'SATURDAY': 'Sáb', 'SUNDAY': 'Dom'}
@@ -276,17 +31,74 @@ def traducir_dias(dias_raw: str) -> str:
     return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
 
 def normalizar_texto(texto):
-    if pd.isna(texto):
-        return ''
-    texto = str(texto).lower().strip()
-    texto = unicodedata.normalize('NFKD', texto)
-    return ''.join([c for c in texto if not unicodedata.combining(c)])
+    return TextUtils.normalizar_texto(texto)
 
 
 def normalizar_clave_docente(texto):
     if pd.isna(texto):
         return ''
     return str(texto).strip().upper()
+
+
+def extraer_numero_horas(texto):
+    if pd.isna(texto):
+        return 0
+    numeros = re.findall(r'\d+', str(texto))
+    return int(numeros[0]) if numeros else 0
+
+
+def preparar_coordinacion_agrupada(coordinacion_df, normalizar_texto, mostrar_columna_docente=False, mostrar_columnas_disponibles=False):
+    # Detectar automáticamente las columnas importantes.
+    columna_docente = None
+    columna_horas = None
+
+    for col in coordinacion_df.columns:
+        col_lower = str(col).lower().strip()
+        if any(patron in col_lower for patron in ['docente', 'profesor', 'teacher', 'instructor']):
+            columna_docente = col
+            if mostrar_columna_docente:
+                print(f"✅ Columna de docente encontrada: '{col}'")
+            break
+
+    if columna_docente is None:
+        print("⚠️ No se encontró columna de docente en archivo de coordinación")
+        return None
+
+    prioridad_horas = [
+        'horas totales', 'horas_totales', 'total', 'totales',
+        'hora total', 'total horas', 'total_horas',
+        'horas', 'hora', 'hour', 'tiempo', 'time',
+        'horas semanales', 'horas_semanales', 'semanal'
+    ]
+
+    for patron in prioridad_horas:
+        for col in coordinacion_df.columns:
+            col_lower = str(col).lower().strip()
+            if patron in col_lower:
+                columna_horas = col
+                break
+        if columna_horas:
+            break
+
+    if columna_horas is None:
+        print("⚠️ No se encontró columna de horas en archivo de coordinación")
+        if mostrar_columnas_disponibles:
+            print(f"Columnas disponibles: {list(coordinacion_df.columns)}")
+        return None
+
+    # Limpiar y procesar datos.
+    coordinacion_df = coordinacion_df.dropna(subset=[columna_docente, columna_horas])
+    coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.strip() != '']
+    coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.lower() != 'nan']
+    coordinacion_df[columna_docente] = coordinacion_df[columna_docente].astype(str).str.strip()
+    coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
+
+    # Agrupar por docente (sumar horas si aparece múltiples veces).
+    coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
+    coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
+    coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
+
+    return coordinacion_agrupado
 
 
 def formatear_numero(valor, ancho_minimo):
@@ -616,75 +428,17 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
     try:
         # Leer el archivo Excel
         coordinacion_df = cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
-        
-        # Detectar automáticamente las columnas importantes
-        columna_docente = None
-        columna_horas = None
-        
-        
-        # Buscar columna de docente de manera más flexible
-        for col in coordinacion_df.columns:
-            col_lower = str(col).lower().strip()
-            if any(patron in col_lower for patron in ['docente', 'profesor', 'teacher', 'instructor']):
-                columna_docente = col
-                print(f"✅ Columna de docente encontrada: '{col}'")
-                break
-        
-        if columna_docente is None:
-            print("⚠️ No se encontró columna de docente en archivo de coordinación")
+
+        coordinacion_agrupado = preparar_coordinacion_agrupada(
+            coordinacion_df,
+            normalizar_texto,
+            mostrar_columna_docente=True,
+            mostrar_columnas_disponibles=True
+        )
+        if coordinacion_agrupado is None:
             df['Servicio Actualización'] = 0
             df['Horas_Total'] = 0
             return df
-        
-        # Buscar columna de horas de manera más flexible - PRIORIDAD A HORAS TOTALES
-        prioridad_horas = [
-            'horas totales', 'horas_totales', 'total', 'totales',  # Máxima prioridad
-            'hora total', 'total horas', 'total_horas',
-            'horas', 'hora', 'hour', 'tiempo', 'time',  # Prioridad media
-            'horas semanales', 'horas_semanales', 'semanal'  # Menor prioridad
-        ]
-        
-        for patron in prioridad_horas:
-            for col in coordinacion_df.columns:
-                col_lower = str(col).lower().strip()
-                if patron in col_lower:
-                    columna_horas = col
-                    break
-            if columna_horas:  # Si encontró una columna, salir del loop externo
-                break
-        
-        if columna_horas is None:
-            print("⚠️ No se encontró columna de horas en archivo de coordinación")
-            print(f"Columnas disponibles: {list(coordinacion_df.columns)}")
-            df['Servicio Actualización'] = 0
-            df['Horas_Total'] = 0
-            return df
-        
-        
-        # Limpiar y procesar datos - REMOVER NaN Y VALORES VACÍOS
-        coordinacion_df = coordinacion_df.dropna(subset=[columna_docente, columna_horas])
-        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.strip() != '']
-        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.lower() != 'nan']
-        
-        coordinacion_df[columna_docente] = coordinacion_df[columna_docente].astype(str).str.strip()
-        
-        # EXTRAER SOLO LOS NÚMEROS DE LA COLUMNA DE HORAS (ej: "32 horas" -> 32)
-        def extraer_numero_horas(texto):
-            import re
-            if pd.isna(texto):
-                return 0
-            # Buscar el primer número en el texto
-            numeros = re.findall(r'\d+', str(texto))
-            return int(numeros[0]) if numeros else 0
-        
-        coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
-        
-        # Agrupar por docente (sumar horas si aparece múltiples veces)
-        coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
-        coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
-        
-        # Aplicar normalización para matching
-        coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
         
         # Si datos_docentes está disponible, calcular montos por categoría
         if datos_docentes is not None:
@@ -988,66 +742,10 @@ def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_doce
     try:
         # Leer el archivo Excel
         coordinacion_df = cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
-        
-        # Detectar automáticamente las columnas importantes (misma lógica que en agregar_servicio_coordinacion)
-        columna_docente = None
-        columna_horas = None
-        
-        # Buscar columna de docente de manera más flexible
-        for col in coordinacion_df.columns:
-            col_lower = str(col).lower().strip()
-            if any(patron in col_lower for patron in ['docente', 'profesor', 'teacher', 'instructor']):
-                columna_docente = col
-                break
-        
-        if columna_docente is None:
-            print("⚠️ No se encontró columna de docente en archivo de coordinación")
+
+        coordinacion_agrupado = preparar_coordinacion_agrupada(coordinacion_df, normalizar_texto)
+        if coordinacion_agrupado is None:
             return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
-        
-        # Buscar columna de horas de manera más flexible - PRIORIDAD A HORAS TOTALES
-        prioridad_horas = [
-            'horas totales', 'horas_totales', 'total', 'totales',  # Máxima prioridad
-            'hora total', 'total horas', 'total_horas',
-            'horas', 'hora', 'hour', 'tiempo', 'time',  # Prioridad media
-            'horas semanales', 'horas_semanales', 'semanal'  # Menor prioridad
-        ]
-        
-        for patron in prioridad_horas:
-            for col in coordinacion_df.columns:
-                col_lower = str(col).lower().strip()
-                if patron in col_lower:
-                    columna_horas = col
-                    break
-            if columna_horas:  # Si encontró una columna, salir del loop externo
-                break
-        
-        if columna_horas is None:
-            print("⚠️ No se encontró columna de horas en archivo de coordinación")
-            return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
-        
-        # Limpiar y procesar datos - REMOVER NaN Y VALORES VACÍOS
-        coordinacion_df = coordinacion_df.dropna(subset=[columna_docente, columna_horas])
-        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.strip() != '']
-        coordinacion_df = coordinacion_df[coordinacion_df[columna_docente].astype(str).str.lower() != 'nan']
-        coordinacion_df[columna_docente] = coordinacion_df[columna_docente].astype(str).str.strip()
-        
-        # EXTRAER SOLO LOS NÚMEROS DE LA COLUMNA DE HORAS (ej: "32 horas" -> 32)
-        def extraer_numero_horas(texto):
-            import re
-            if pd.isna(texto):
-                return 0
-            # Buscar el primer número en el texto
-            numeros = re.findall(r'\d+', str(texto))
-            return int(numeros[0]) if numeros else 0
-        
-        coordinacion_df[columna_horas] = coordinacion_df[columna_horas].apply(extraer_numero_horas)
-        
-        # Agrupar por docente (sumar horas si aparece múltiples veces)
-        coordinacion_agrupado = coordinacion_df[[columna_docente, columna_horas]].groupby(columna_docente, as_index=False)[columna_horas].sum()
-        coordinacion_agrupado = coordinacion_agrupado.rename(columns={columna_docente: 'Docente_Original', columna_horas: 'Horas_Total'})
-        
-        # Aplicar normalización para matching
-        coordinacion_agrupado['docente_norm'] = coordinacion_agrupado['Docente_Original'].apply(normalizar_texto)
         
         # Normalizar nombres en datos_docentes
         datos_docentes_temp = datos_docentes.copy()

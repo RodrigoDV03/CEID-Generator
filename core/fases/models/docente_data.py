@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from core.fases.utils import TextUtils
 
 
 @dataclass
@@ -50,16 +51,7 @@ class DocenteData:
     @property
     def modalidad_texto(self) -> str:
         """Convierte el valor de la columna Modalidad al texto apropiado."""
-        modalidad_upper = self.modalidad.strip().upper()
-        if modalidad_upper == "INPERSON":
-            return "presencial"
-        elif modalidad_upper == "VIRTUAL":
-            return "virtual"
-        elif modalidad_upper == "MIXTA":
-            return "mixta"
-        else:
-            # Valor por defecto si no coincide
-            return "híbrida"
+        return TextUtils.modalidad_a_texto(self.modalidad)
     
     def __post_init__(self):
         # Limpiar espacios en blanco

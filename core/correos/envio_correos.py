@@ -2,7 +2,6 @@
 
 from .config import (
     AÑO_ACTUAL,
-    GmailConfig,
     TipoCorreo,
     PatronesRegex,
     ServiciosConfig,
@@ -28,7 +27,6 @@ from .pdf_extractor import (
     PDFExtractor,
     ServicioExtractor,
     RUCExtractor,
-    tiene_contrato_locacion
 )
 
 from .email_sender import (
@@ -46,28 +44,11 @@ from .processor import (
     ExcelValidationError,
 )
 
-
-# ===== VARIABLES GLOBALES (para compatibilidad) =====
-
-año_actual = AÑO_ACTUAL
-
-# Configuración de Gmail (para compatibilidad)
-GMAIL_CONFIG = {
-    "scopes": GmailConfig.default().scopes,
-    "credentials_file": GmailConfig.default().credentials_file,
-    "token_file": GmailConfig.default().token_file,
-    "remitente": GmailConfig.default().remitente
-}
-
-
 # ===== EXPORTS =====
 
 __all__ = [
     # Constantes y configuración
     'AÑO_ACTUAL',
-    'año_actual',
-    'GMAIL_CONFIG',
-    'GmailConfig',
     'TipoCorreo',
     'PatronesRegex',
     'ServiciosConfig',
@@ -90,7 +71,6 @@ __all__ = [
     'PDFExtractor',
     'ServicioExtractor',
     'RUCExtractor',
-    'tiene_contrato_locacion',
     
     # Email Sender
     'GmailEmailSender',

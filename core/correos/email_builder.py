@@ -334,34 +334,3 @@ class EmailBuilderFactory:
             return EmailAdministrativoContratoBuilder()
         else:
             raise ValueError(f"Tipo de correo no valido: {tipo}")
-
-
-# Funciones de compatibilidad con código legacy
-def generar_cuerpo_correo_docente_html(
-    mes: str, 
-    anio: str, 
-    servicio: str, 
-    firma_html: str = "",
-    modalidad: str = "HÍBRIDA"
-) -> str:
-    builder = EmailDocenteBuilder()
-    return (builder
-            .con_mes(mes)
-            .con_anio(int(anio))
-            .con_servicio(servicio)
-            .con_modalidad(modalidad)
-            .con_firma(firma_html)
-            .construir_cuerpo())
-
-
-def generar_cuerpo_correo_administrativo_html(
-    mes: str, 
-    anio: str, 
-    firma_html: str = ""
-) -> str:
-    builder = EmailAdministrativoBuilder()
-    return (builder
-            .con_mes(mes)
-            .con_anio(int(anio))
-            .con_firma(firma_html)
-            .construir_cuerpo())

@@ -6,7 +6,7 @@ import os
 from tkinter import filedialog
 from datetime import datetime
 
-from services.fase_service import procesar_fase_final_service
+from core.fases.fase_final.generador_fase_final import procesar_planilla_fase_final
 from ui.components import TextRedirector
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
@@ -195,7 +195,7 @@ def mostrar_fase_final(app):
     def generar():
         def tarea():
             try:
-                procesar_fase_final_service(
+                procesar_planilla_fase_final(
                     planilla_path,
                     excel_control_pagos if tipo_fase_final.get() == "planilla docente (con contrato)" else None,
                     hoja_var.get(),

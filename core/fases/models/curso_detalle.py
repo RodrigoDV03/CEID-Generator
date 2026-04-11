@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from core.fases.utils import TextUtils
 
 
 @dataclass
@@ -19,18 +20,7 @@ class CursoDetalle:
         Convierte la modalidad del curso a texto legible.
         INTENSIVO VIRTUAL se considera como "virtual" para la redacción.
         """
-        modalidad_upper = self.modalidad.strip().upper()
-        
-        if modalidad_upper == "INPERSON":
-            return "presencial"
-        elif modalidad_upper in ["VIRTUAL", "INTENSIVO VIRTUAL"]:
-            return "virtual"
-        elif modalidad_upper == "MIXTA":
-            return "mixta"
-        elif modalidad_upper == "N/A":
-            return ""  # Sin modalidad (para diseño de exámenes, bono)
-        else:
-            return "híbrida"  # Valor por defecto
+        return TextUtils.modalidad_a_texto(self.modalidad, permitir_na_vacio=True)
     
     @property
     def es_curso_academico(self) -> bool:

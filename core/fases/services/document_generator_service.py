@@ -2,6 +2,7 @@ import os
 from docx import Document
 from typing import Dict, Optional
 from core.fases.models import DocumentConfig
+from core.fases.functions import _iterar_parrafos, reemplazar_en_parrafos, reemplazar_en_tablas
 from core.fases.utils import PathUtils
 
 
@@ -45,47 +46,19 @@ class DocumentGeneratorService:
     
     @staticmethod
     def _reemplazar_en_parrafos(documento: Document, reemplazos: Dict[str, str]):
-        for parrafo in documento.paragraphs:
-            for marcador, valor in reemplazos.items():
-                if marcador in parrafo.text:
-                    texto_nuevo = parrafo.text.replace(marcador, valor)
-                    for run in parrafo.runs:
-                        run.text = ''
-                    if parrafo.runs:
-                        parrafo.runs[0].text = texto_nuevo
+        reemplazar_en_parrafos(documento, reemplazos)
     
     @staticmethod
     def _reemplazar_en_tablas(documento: Document, reemplazos: Dict[str, str]):
-        for tabla in documento.tables:
-            for fila in tabla.rows:
-                for celda in fila.cells:
-                    for parrafo in celda.paragraphs:
-                        for marcador, valor in reemplazos.items():
-                            if marcador in parrafo.text:
-                                texto_nuevo = parrafo.text.replace(marcador, valor)
-                                for run in parrafo.runs:
-                                    run.text = ''
-                                if parrafo.runs:
-                                    parrafo.runs[0].text = texto_nuevo
+        reemplazar_en_tablas(documento, reemplazos)
     
     @staticmethod
     def _insertar_firma(documento: Document, ruta_firma: str):
-        # Reemplazar en párrafos
-        for parrafo in documento.paragraphs:
+        for parrafo in _iterar_parrafos(documento):
             if "firma_docente" in parrafo.text:
                 parrafo.text = ""
                 run = parrafo.add_run()
                 run.add_picture(ruta_firma)
-        
-        # Reemplazar en tablas
-        for tabla in documento.tables:
-            for fila in tabla.rows:
-                for celda in fila.cells:
-                    for parrafo in celda.paragraphs:
-                        if "firma_docente" in parrafo.text:
-                            parrafo.text = ""
-                            run = parrafo.add_run()
-                            run.add_picture(ruta_firma)
     
     @staticmethod
     def eliminar_texto_administrativo(ruta_documento: str) -> bool:
