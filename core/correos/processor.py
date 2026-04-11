@@ -1,11 +1,10 @@
 import os
 import logging
-import re
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 import pandas as pd
 
-from .config import TipoCorreo
+from .config import TipoCorreo, normalizar_servicio_para_correo
 from .pdf_extractor import PDFExtractor
 from .gmail_service import GmailService
 
@@ -132,13 +131,6 @@ class PDFProcessor:
         self.incluir_modalidad = incluir_modalidad
         self.debug = debug
 
-    @staticmethod
-    def _normalizar_servicio_para_correo(servicio: str) -> str:
-        servicio_limpio = servicio.strip()
-        if re.match(r'^\d', servicio_limpio):
-            return f"Servicio de dictado de {servicio_limpio}"
-        return servicio_limpio
-    
     def procesar_pdf(self, pdf_path: str) -> Optional[DatosEnvio]:
         # Extraer RUC del PDF (identificador único)
         extractor = PDFExtractor(pdf_path)
@@ -169,7 +161,7 @@ class PDFProcessor:
                 logger.warning(f"No se encontró servicio para {nombre_excel}")
                 print(f"⚠ No se encontró servicio para {nombre_excel}.")
                 return None
-            servicio = self._normalizar_servicio_para_correo(servicio)
+            servicio = normalizar_servicio_para_correo(servicio)
 
         modalidad = None
         if self.incluir_modalidad:

@@ -2,7 +2,7 @@ import os
 from docx import Document
 from typing import Dict, Optional
 from core.fases.models import DocumentConfig
-from core.fases.functions import _iterar_parrafos, reemplazar_en_parrafos, reemplazar_en_tablas
+from core.fases.functions import _iterar_parrafos, reemplazar_en_documento
 from core.fases.utils import PathUtils
 
 
@@ -27,8 +27,7 @@ class DocumentGeneratorService:
                 if k != "firma_docente"
             }
             
-            DocumentGeneratorService._reemplazar_en_parrafos(doc, reemplazos_sin_firma)
-            DocumentGeneratorService._reemplazar_en_tablas(doc, reemplazos_sin_firma)
+            reemplazar_en_documento(doc, reemplazos_sin_firma)
             
             # Insertar firma si existe
             if ruta_firma and os.path.exists(ruta_firma):
@@ -43,14 +42,6 @@ class DocumentGeneratorService:
         except Exception as e:
             print(f"Error al generar documento: {e}")
             return False
-    
-    @staticmethod
-    def _reemplazar_en_parrafos(documento: Document, reemplazos: Dict[str, str]):
-        reemplazar_en_parrafos(documento, reemplazos)
-    
-    @staticmethod
-    def _reemplazar_en_tablas(documento: Document, reemplazos: Dict[str, str]):
-        reemplazar_en_tablas(documento, reemplazos)
     
     @staticmethod
     def _insertar_firma(documento: Document, ruta_firma: str):

@@ -3,6 +3,11 @@ import tkinter as tk
 from .gui_constants import *
 
 class BaseModal:
+    accept_button_text = "Aceptar"
+    accept_button_font = FONT_BUTTON
+    accept_button_fg_color = BUTTON_BG_COLOR
+    accept_button_hover_color = BUTTON_HOVER_BG_COLOR
+
     def __init__(self, parent, title, message, modal_type="info"):
         self.result = None
         self.modal_type = modal_type
@@ -101,7 +106,16 @@ class BaseModal:
         return colors.get(self.modal_type, "#2196F3")
     
     def create_buttons(self, parent):
-        pass
+        accept_btn = ctk.CTkButton(
+            parent,
+            text=self.accept_button_text,
+            font=self.accept_button_font,
+            text_color=WHITE_COLOR,
+            fg_color=self.accept_button_fg_color,
+            hover_color=self.accept_button_hover_color,
+            command=lambda: self.close_modal(True)
+        )
+        accept_btn.pack(pady=10)
     
     def close_modal(self, result=None):
         self.result = result
@@ -109,50 +123,25 @@ class BaseModal:
         self.window.destroy()
 
 class InfoModal(BaseModal):
+    accept_button_fg_color = BUTTON_BG_COLOR
+    accept_button_hover_color = BUTTON_HOVER_BG_COLOR
+
     def __init__(self, parent, title, message):
         super().__init__(parent, title, message, "success")
-    
-    def create_buttons(self, parent):
-        accept_btn = ctk.CTkButton(
-            parent,
-            text="Aceptar",
-            font=FONT_BUTTON,
-            text_color=WHITE_COLOR,
-            fg_color=BUTTON_BG_COLOR,
-            hover_color=BUTTON_HOVER_BG_COLOR,
-            command=lambda: self.close_modal(True)
-        )
-        accept_btn.pack(pady=10)
 
 class ErrorModal(BaseModal):
+    accept_button_fg_color = "#F44336"
+    accept_button_hover_color = "#D32F2F"
+
     def __init__(self, parent, title, message):
         super().__init__(parent, title, message, "error")
-    
-    def create_buttons(self, parent):
-        accept_btn = ctk.CTkButton(
-            parent,
-            text="Aceptar",
-            font=("Segoe UI", 12, "bold"),
-            fg_color="#F44336",
-            hover_color="#D32F2F",
-            command=lambda: self.close_modal(True)
-        )
-        accept_btn.pack(pady=10)
 
 class WarningModal(BaseModal):
+    accept_button_fg_color = "#FF9800"
+    accept_button_hover_color = "#F57C00"
+
     def __init__(self, parent, title, message):
         super().__init__(parent, title, message, "warning")
-    
-    def create_buttons(self, parent):
-        accept_btn = ctk.CTkButton(
-            parent,
-            text="Aceptar", 
-            font=("Segoe UI", 12, "bold"),
-            fg_color="#FF9800",
-            hover_color="#F57C00",
-            command=lambda: self.close_modal(True)
-        )
-        accept_btn.pack(pady=10)
 
 class ConfirmModal(BaseModal):
     def __init__(self, parent, title, message):
@@ -184,31 +173,25 @@ class ConfirmModal(BaseModal):
         )
         yes_btn.pack(side="left")
 
-# Funciones wrapper para mantener compatibilidad
-def showinfo(title, message, parent=None):
+def _mostrar_modal(modal_cls, title, message, parent=None):
     if parent is None:
         parent = tk._default_root
-    modal = InfoModal(parent, title, message)
+    modal = modal_cls(parent, title, message)
     parent.wait_window(modal.window)
     return modal.result
+
+
+def showinfo(title, message, parent=None):
+    return _mostrar_modal(InfoModal, title, message, parent)
+
 
 def showerror(title, message, parent=None):
-    if parent is None:
-        parent = tk._default_root
-    modal = ErrorModal(parent, title, message)
-    parent.wait_window(modal.window)
-    return modal.result
+    return _mostrar_modal(ErrorModal, title, message, parent)
+
 
 def showwarning(title, message, parent=None):
-    if parent is None:
-        parent = tk._default_root
-    modal = WarningModal(parent, title, message)
-    parent.wait_window(modal.window)
-    return modal.result
+    return _mostrar_modal(WarningModal, title, message, parent)
+
 
 def askyesno(title, message, parent=None):
-    if parent is None:
-        parent = tk._default_root
-    modal = ConfirmModal(parent, title, message)
-    parent.wait_window(modal.window)
-    return modal.result
+    return _mostrar_modal(ConfirmModal, title, message, parent)

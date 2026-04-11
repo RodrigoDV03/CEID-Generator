@@ -13,9 +13,6 @@ def traducir_dias(dias_raw: str) -> str:
     dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
     return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
 
-def normalizar_texto(texto):
-    return TextUtils.normalizar_texto(texto)
-
 
 def normalizar_clave_docente(texto):
     if pd.isna(texto):
@@ -132,9 +129,6 @@ def ajustar_nivel(row):
 def ajustar_modalidad(row):
     return _transformations.ajustar_modalidad(row)
 
-def procesar_cursos_intensivos(datos):
-    return _transformations.procesar_cursos_intensivos(datos)
-
 def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=80):
     mapeo = {}
     for nombre in nombres_input:
@@ -228,6 +222,110 @@ def _agregar_docentes_faltantes_al_merge(
 
     filas_nuevas_df = pd.DataFrame(filas_nuevas)
     return pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
+
+
+def _procesar_archivo_docentes_con_monto(
+    df,
+    ruta_archivo,
+    normalizar_texto_fn,
+    datos_docentes,
+    patrones_columna_monto,
+    nombre_columna_resultado,
+    nombre_columna_monto_temp='_monto_temp',
+    nombre_columna_docente_temp='_docente_temp',
+    procesar_resultado_fn=None,
+):
+
+    if not os.path.exists(ruta_archivo):
+        df[nombre_columna_resultado] = 0
+        return df
+    
+    try:
+        # Leer el archivo Excel
+        datos_df = cargar_excel_con_cache(ruta_archivo, sheet_name=0, header=0)
+        
+        # Verificar que existe la columna Docente (con fallback a búsqueda de similares)
+        if 'Docente' not in datos_df.columns:
+            posibles_docentes = [col for col in datos_df.columns if 'docente' in str(col).lower()]
+            if posibles_docentes:
+                datos_df = datos_df.rename(columns={posibles_docentes[0]: 'Docente'})
+            else:
+                df[nombre_columna_resultado] = 0
+                return df
+        
+        # Limpiar valores NaN/VACÍOS en la columna Docente
+        datos_df = datos_df.dropna(subset=['Docente'])
+        datos_df = datos_df[datos_df['Docente'].astype(str).str.strip() != '']
+        datos_df = datos_df[datos_df['Docente'].astype(str).str.lower() != 'nan']
+        
+        # Buscar la columna de Monto (con patrones prioritarios)
+        columna_monto = None
+        for patron in patrones_columna_monto:
+            if patron in datos_df.columns:
+                columna_monto = patron
+                break
+            # Búsqueda case-insensitive si es string
+            if isinstance(patron, str):
+                for col in datos_df.columns:
+                    if str(col).lower().strip() == patron.lower().strip():
+                        columna_monto = col
+                        break
+                if columna_monto:
+                    break
+        
+        if columna_monto is None:
+            print(f"⚠️ No se encontró columna de monto en {ruta_archivo}")
+            df[nombre_columna_resultado] = 0
+            return df
+        
+        # Procesar y normalizar datos
+        datos_df['Docente'] = datos_df['Docente'].astype(str).str.strip()
+        datos_df['docente_norm'] = datos_df['Docente'].apply(normalizar_texto_fn)
+        
+        # Asegurar que df tiene docente_norm
+        if 'docente_norm' not in df.columns:
+            df['docente_norm'] = df['Docente'].apply(normalizar_texto_fn)
+        
+        # Hacer el merge (left para mantener todos los de df)
+        merge_result = df.merge(datos_df[['docente_norm', columna_monto]], on='docente_norm', how='left')
+        
+        # Agregar docentes que no están en df pero sí en datos_df
+        docentes_no_en_df = datos_df[~datos_df['docente_norm'].isin(df['docente_norm'])]
+        
+        if not docentes_no_en_df.empty and datos_docentes is not None:
+            print(f"📋 Agregando {len(docentes_no_en_df)} docentes del archivo {ruta_archivo}...")
+            
+            merge_result = _agregar_docentes_faltantes_al_merge(
+                merge_result,
+                docentes_no_en_df,
+                datos_docentes,
+                normalizar_texto_fn,
+                campo_nombre_validacion='Docente',
+                extra_builder=lambda row_faltante: {
+                    columna_monto: row_faltante[columna_monto],
+                },
+            )
+        
+        # Llenar la columna de resultado
+        df = merge_result
+        if procesar_resultado_fn:
+            # Si se proporciona función custom de post-procesamiento
+            df[nombre_columna_resultado] = procesar_resultado_fn(df, columna_monto)
+        else:
+            # Default: llenar directamente con el monto
+            df[nombre_columna_resultado] = df[columna_monto].fillna(0)
+        
+        # Limpiar columna temporal
+        if columna_monto in df.columns:
+            df.drop(columns=[columna_monto], inplace=True)
+        if 'docente_norm' in df.columns:
+            df.drop(columns=['docente_norm'], inplace=True)
+    
+    except Exception as e:
+        print(f"⚠️ Error al procesar {ruta_archivo}: {e}")
+        df[nombre_columna_resultado] = 0
+    
+    return df
 
 
 def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos_docentes=None):
@@ -332,82 +430,27 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
 
 
 def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos_docentes=None):
-    if os.path.exists(ruta_clasificacion):
-        try:
-            # Usar cache para evitar lecturas múltiples
-            clasif_df = cargar_excel_con_cache(ruta_clasificacion, sheet_name=0, header=1)
-            # Verificar que existe la columna Docente
-            if 'Docente' not in clasif_df.columns:
-                print("⚠️ No se encontró columna 'Docente' en el archivo de clasificación")
-                # Buscar columnas similares
-                posibles_docentes = [col for col in clasif_df.columns if 'docente' in str(col).lower()]
-                if posibles_docentes:
-                    clasif_df = clasif_df.rename(columns={posibles_docentes[0]: 'Docente'})
-                else:
-                    df['Examen Clasif.'] = 0
-                    return df
-            
-            # LIMPIAR VALORES NaN/VACÍOS EN LA COLUMNA DOCENTE ANTES DE PROCESAR
-            clasif_df = clasif_df.dropna(subset=['Docente'])
-            clasif_df = clasif_df[clasif_df['Docente'].astype(str).str.strip() != '']
-            clasif_df = clasif_df[clasif_df['Docente'].astype(str).str.lower() != 'nan']
-            
-            # Buscar la columna de Monto de manera más específica
-            columna_monto = None
-            
-            # Prioridad 1: Buscar exactamente 'Monto Total'
-            if 'Monto Total' in clasif_df.columns:
-                columna_monto = 'Monto Total'
-            else:
-                # Prioridad 2: Buscar variaciones de 'Monto'
-                for col in clasif_df.columns:
-                    if str(col).lower().strip() == 'monto':
-                        columna_monto = col
-                        break
-            
-            if columna_monto is None:
-                print("⚠️ No se encontró columna de monto en el archivo de clasificación")
-                df['Examen Clasif.'] = 0
-                return df
-            
-            # Procesar los datos
-            clasif_df['Docente'] = clasif_df['Docente'].astype(str).str.strip()
-            clasif_df['docente_norm'] = clasif_df['Docente'].apply(normalizar_texto)
-            
-            # Si ya existe la columna docente_norm en df, la usamos; sino la creamos
-            if 'docente_norm' not in df.columns:
-                df['docente_norm'] = df['Docente'].apply(normalizar_texto)
-            
-            # Hacer el merge con la columna correcta (left para mantener todos los de df)
-            merge_result = df.merge(clasif_df[['docente_norm', columna_monto]], on='docente_norm', how='left')
-            
-            # NUEVA FUNCIONALIDAD: Agregar docentes del examen de clasificación que NO están en df
-            docentes_clasif_no_en_df = clasif_df[~clasif_df['docente_norm'].isin(df['docente_norm'])]
-            
-            if not docentes_clasif_no_en_df.empty and datos_docentes is not None:
-                print(f"📋 Agregando {len(docentes_clasif_no_en_df)} docentes del examen de clasificación sin carga académica...")
-
-            merge_result = _agregar_docentes_faltantes_al_merge(
-                merge_result,
-                docentes_clasif_no_en_df,
-                datos_docentes,
-                normalizar_texto,
-                campo_nombre_validacion='Docente',
-                extra_builder=lambda row_clasif: {
-                    columna_monto: row_clasif[columna_monto],
-                },
-            )
-            
-            df = merge_result
-            df['Examen Clasif.'] = df[columna_monto].fillna(0)
-            df.drop(columns=['docente_norm', columna_monto], inplace=True)
-            
-        except Exception as e:
-            print(f"⚠️ Error al leer archivo de clasificación: {e}")
-            df['Examen Clasif.'] = 0
-    else:
-        df['Examen Clasif.'] = 0
-    return df
+    """
+    Agrega información de examen de clasificación al DataFrame principal.
+    
+    Args:
+        df: DataFrame principal
+        ruta_clasificacion: Ruta al archivo Excel de clasificación
+        normalizar_texto: Función para normalizar nombres
+        datos_docentes: DataFrame con datos de docentes (opcional, para agregar faltantes)
+    
+    Returns:
+        DataFrame con columna 'Examen Clasif.' completa
+    """
+    return _procesar_archivo_docentes_con_monto(
+        df,
+        ruta_clasificacion,
+        normalizar_texto,
+        datos_docentes,
+        patrones_columna_monto=['Monto Total', 'monto'],
+        nombre_columna_resultado='Examen Clasif.',
+        procesar_resultado_fn=None  # Default: llenar directo con monto
+    )
 
 # --------------------------- CONSTRUCCIÓN DE TABLAS ---------------------------
 
@@ -773,9 +816,7 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
         how='left'
     )
 
-    # Si el DataFrame ya traía columna "Docente", pandas puede renombrar a
-    # Docente_x / Docente_y después del merge. Unificamos para evitar fallos.
-    # Priorizamos el docente mapeado (Docente_y) para asegurar match con tabla resumen.
+
     columnas_docente = [col for col in ['Docente_y', 'Docente', 'Docente_x'] if col in cursos_df.columns]
     if columnas_docente:
         cursos_df['Docente'] = (

@@ -1,7 +1,6 @@
-import re
 from abc import ABC, abstractmethod
 from typing import Optional
-from .config import TipoCorreo, EmailConfig, AÑO_ACTUAL
+from .config import TipoCorreo, EmailConfig, AÑO_ACTUAL, normalizar_servicio_para_correo
 
 
 class EmailBuilder(ABC):
@@ -97,10 +96,7 @@ class EmailDocenteBuilder(EmailBuilder):
             raise ValueError("Nombre es requerido para construir el asunto")
 
     def _construir_concepto_servicio(self) -> str:
-        servicio_limpio = self._servicio.strip()
-        if re.match(r'^\d', servicio_limpio):
-            return f"Servicio de dictado de {servicio_limpio}"
-        return servicio_limpio
+        return normalizar_servicio_para_correo(self._servicio)
     
     def construir_asunto(self) -> str:
         self._validar_datos()

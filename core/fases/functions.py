@@ -19,13 +19,6 @@ def reemplazar_en_parrafo(parrafo, reemplazos):
                 parrafo.runs[0].text = texto_nuevo
 
 
-def reemplazar_en_parrafos(documento, reemplazos):
-    for parrafo in documento.paragraphs:
+def reemplazar_en_documento(documento, reemplazos):
+    for parrafo in _iterar_parrafos(documento):
         reemplazar_en_parrafo(parrafo, reemplazos)
-
-def reemplazar_en_tablas(documento, reemplazos):
-    for tabla in documento.tables:
-        for fila in tabla.rows:
-            for celda in fila.cells:
-                for parrafo in celda.paragraphs:
-                    reemplazar_en_parrafo(parrafo, reemplazos)

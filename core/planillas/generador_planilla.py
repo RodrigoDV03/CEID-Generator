@@ -5,6 +5,7 @@ from openpyxl import load_workbook
 from core.planillas.csv_processing import cargar_archivo, limpiar_docentes, procesar_csv_nuevo_formato
 from core.planillas.functions import *
 from core.planillas.excel_styles import *
+from core.fases.utils import TextUtils
 
 def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordinacion, month, monto_bono: float = 0, carpeta_destino: str = None):
     año_actual = datetime.datetime.now().year
@@ -57,11 +58,11 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
         print("✅ Agrupación completada")
         
-        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, normalizar_texto, datos_docentes)
+        agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, TextUtils.normalizar_texto, datos_docentes)
         print("✅ Examen de clasificación agregado")
         
         print("🔄 Procesando servicio de coordinación...")
-        agrupar = agregar_servicio_coordinacion(agrupar, excel_coordinacion, normalizar_texto, datos_docentes)
+        agrupar = agregar_servicio_coordinacion(agrupar, excel_coordinacion, TextUtils.normalizar_texto, datos_docentes)
         print("✅ Servicio de coordinación agregado")
 
         TABLA = construir_tabla_planilla_con_cache(agrupar, es_enero, monto_bono)
@@ -87,13 +88,13 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
             
             # Crear hoja de coordinación si existe el archivo
             if excel_coordinacion and os.path.exists(excel_coordinacion):
-                tabla_coordinacion = construir_tabla_coordinacion(excel_coordinacion, normalizar_texto, datos_docentes)
+                tabla_coordinacion = construir_tabla_coordinacion(excel_coordinacion, TextUtils.normalizar_texto, datos_docentes)
                 tabla_coordinacion.to_excel(writer, sheet_name="Servicio actualización", index=False)
             
             # Construir hoja Planilla_Generador usando datos ya procesados
             agrupar_gen = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
-            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, normalizar_texto, datos_docentes)
-            agrupar_gen = agregar_servicio_coordinacion(agrupar_gen, excel_coordinacion, normalizar_texto, datos_docentes)
+            agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, TextUtils.normalizar_texto, datos_docentes)
+            agrupar_gen = agregar_servicio_coordinacion(agrupar_gen, excel_coordinacion, TextUtils.normalizar_texto, datos_docentes)
 
             TABLA_GENERADOR = construir_tabla_planilla_con_cache(agrupar_gen, es_enero, monto_bono)
             TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={

@@ -4,8 +4,24 @@ from core.correos.gmail_service import GmailService
 from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
 
 
+_gmail_service_shared = None
+
+
+def _resolver_tipo_correo(tipo_var: str) -> TipoCorreo:
+    return TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO
+
+
+def _obtener_gmail_service() -> GmailService:
+    global _gmail_service_shared
+
+    if _gmail_service_shared is None:
+        _gmail_service_shared = GmailService()
+
+    return _gmail_service_shared
+
+
 def generar_data_correo_service(es_modo_contrato, tipo_var, ruta_excel, pdfs, pdf_orden):
-    gmail_service = GmailService()
+    gmail_service = _obtener_gmail_service()
     processor = CorreosProcessor(gmail_service)
 
     if es_modo_contrato:
@@ -18,7 +34,7 @@ def generar_data_correo_service(es_modo_contrato, tipo_var, ruta_excel, pdfs, pd
         datos = pdf_processor.procesar_orden_individual_contrato_primera_vez(pdf_orden)
         return [], datos.to_dict() if datos else None
 
-    tipo_correo = TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO
+    tipo_correo = _resolver_tipo_correo(tipo_var)
     return processor.procesar_correos(ruta_excel, "list", pdfs, tipo_correo), None
 
 
@@ -34,7 +50,7 @@ def enviar_correos_service(
     anio,
     es_reconocimiento_deuda=False,
 ):
-    gmail_service = GmailService()
+    gmail_service = _obtener_gmail_service()
     lote_sender = LoteEmailSender(gmail_service)
     correo_individual = EmailPersonalizado(gmail_service)
 
@@ -45,7 +61,7 @@ def enviar_correos_service(
             pdf_contrato_path=pdf_contrato,
             destinatario=data_envio_individual["correo"],
             mes=mes,
-            tipo=TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO,
+            tipo=_resolver_tipo_correo(tipo_var),
             mes_inicio_contrato=mes_inicio,
             mes_fin_contrato=mes_fin,
             servicio=data_envio_individual.get("servicio"),
@@ -56,7 +72,7 @@ def enviar_correos_service(
     lote_sender.enviar_lote(
         data_envio,
         mes,
-        TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO,
+        _resolver_tipo_correo(tipo_var),
         anio,
         es_reconocimiento_deuda,
     )

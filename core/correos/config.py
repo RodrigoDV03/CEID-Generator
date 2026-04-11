@@ -51,6 +51,13 @@ class TipoCorreo(Enum):
     ADMINISTRATIVO = "administrativo"
 
 
+def normalizar_servicio_para_correo(servicio: str) -> str:
+    servicio_limpio = servicio.strip()
+    if servicio_limpio[:1].isdigit():
+        return f"Servicio de dictado de {servicio_limpio}"
+    return servicio_limpio
+
+
 # ===== CONFIGURACIÓN DE PATRONES REGEX =====
 
 class PatronesRegex:
