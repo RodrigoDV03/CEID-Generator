@@ -7,10 +7,6 @@ from core.fases.utils import TextUtils
 class ExcelReaderService:
 
     @staticmethod
-    def _normalizar_texto(valor: Any) -> str:
-        return TextUtils.normalizar_texto(valor)
-
-    @staticmethod
     def _buscar_columna(fila: Any, aliases: List[str], default: Any = "") -> Any:
         for col_name in aliases:
             try:
@@ -93,7 +89,7 @@ class ExcelReaderService:
         max_scan = min(len(df_preview), 10)
         for i in range(max_scan):
             row_vals = {
-                ExcelReaderService._normalizar_texto(v)
+                TextUtils.normalizar_texto(v)
                 for v in df_preview.iloc[i].tolist()
             }
             if row_vals & posibles_encabezados:

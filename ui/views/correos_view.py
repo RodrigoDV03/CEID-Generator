@@ -5,10 +5,7 @@ import threading
 from tkinter import filedialog
 from datetime import datetime
 
-from core.correos.config import TipoCorreo
-from core.correos.email_sender import EmailPersonalizado, LoteEmailSender
-from core.correos.gmail_service import GmailService
-from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
+from services.correo_service import generar_data_correo_service, enviar_correos_service
 
 from ui.components import TextRedirector
 from utils.gui_constants import *
@@ -39,11 +36,6 @@ def mostrar_correos(app):
     data_envio = []
     data_envio_individual = None
 
-    gmail_service = GmailService()
-    correos_processor = CorreosProcessor(gmail_service)
-    lote_sender = LoteEmailSender(gmail_service)
-    correo_individual_sender = EmailPersonalizado(gmail_service)
-
     # =========================
     # CONTENEDOR
     # =========================
@@ -66,12 +58,6 @@ def mostrar_correos(app):
 
     def es_modo_reconocimiento_deuda():
         return modo_var.get() == "Reconocimiento de deuda (solo orden)"
-
-    def obtener_tipo_correo():
-        return TipoCorreo.DOCENTE if tipo_var.get() == "Docente" else TipoCorreo.ADMINISTRATIVO
-
-    def obtener_tipo_texto():
-        return "docente" if tipo_var.get() == "Docente" else "administrativo"
 
     # =====================================================
     # ① CONFIG
@@ -257,25 +243,20 @@ def mostrar_correos(app):
 
         def tarea():
             try:
+                data_envio_resultado, data_envio_individual_resultado = generar_data_correo_service(
+                    es_modo_contrato=es_modo_contrato(),
+                    tipo_var=tipo_var.get(),
+                    ruta_excel=ruta_excel,
+                    pdfs=pdfs,
+                    pdf_orden=pdf_orden,
+                )
+
                 if es_modo_contrato():
-                    excel_reader = ExcelReader(ruta_excel, "list")
-                    processor = PDFProcessor(
-                        excel_reader,
-                        incluir_servicio=tipo_var.get() == "Docente",
-                        incluir_modalidad=tipo_var.get() == "Docente",
-                    )
-                    datos = processor.procesar_orden_individual_contrato_primera_vez(pdf_orden)
-                    data_envio_individual = datos.to_dict() if datos else None
+                    data_envio_individual = data_envio_individual_resultado
                     if data_envio_individual:
                         set_estado(estado_lbl, "Correo individual listo", "#4CAF50")
                 else:
-                    tipo_correo = obtener_tipo_correo()
-                    data_envio[:] = correos_processor.procesar_correos(
-                        ruta_excel,
-                        "list",
-                        pdfs,
-                        tipo_correo,
-                    )
+                    data_envio[:] = data_envio_resultado
                     set_estado(estado_lbl, f"{len(data_envio)} correos listos", "#4CAF50")
 
                 validar_envio()
@@ -314,28 +295,18 @@ def mostrar_correos(app):
     def enviar():
         def tarea():
             try:
-                if es_modo_contrato():
-                    correo_individual_sender.enviar_contrato_primera_vez(
-                        nombre=data_envio_individual["nombre"],
-                        pdf_orden_path=data_envio_individual["pdf_path"],
-                        pdf_contrato_path=pdf_contrato,
-                        destinatario=data_envio_individual["correo"],
-                        mes=mes_var.get(),
-                        tipo=obtener_tipo_correo(),
-                        mes_inicio_contrato=mes_inicio_contrato_var.get(),
-                        mes_fin_contrato=mes_fin_contrato_var.get(),
-                        servicio=data_envio_individual.get("servicio"),
-                        modalidad=data_envio_individual.get("modalidad"),
-                        anio=int(año_var.get()),
-                    )
-                else:
-                    lote_sender.enviar_lote(
-                        data_envio,
-                        mes_var.get(),
-                        obtener_tipo_correo(),
-                        int(año_var.get()),
-                        es_modo_reconocimiento_deuda(),
-                    )
+                enviar_correos_service(
+                    es_modo_contrato=es_modo_contrato(),
+                    tipo_var=tipo_var.get(),
+                    data_envio=data_envio,
+                    data_envio_individual=data_envio_individual,
+                    pdf_contrato=pdf_contrato,
+                    mes=mes_var.get(),
+                    mes_inicio=mes_inicio_contrato_var.get(),
+                    mes_fin=mes_fin_contrato_var.get(),
+                    anio=int(año_var.get()),
+                    es_reconocimiento_deuda=es_modo_reconocimiento_deuda(),
+                )
 
                 messagebox.showinfo("Éxito", "Correos enviados correctamente")
 

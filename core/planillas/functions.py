@@ -3,26 +3,9 @@ import os
 import re
 from fuzzywuzzy import process, fuzz
 from core.fases.utils import TextUtils
-from core.planillas.csv_processing import (
-    cargar_archivo as _cargar_archivo,
-    parsear_csv_comillas_dobles as _parsear_csv_comillas_dobles,
-    limpiar_docentes as _limpiar_docentes,
-    procesar_csv_nuevo_formato as _procesar_csv_nuevo_formato,
-)
-
-# ----------------------- CARGAR ARCHIVO -----------------------
-
-def cargar_archivo(ruta):
-    return _cargar_archivo(ruta)
-
-def parsear_csv_comillas_dobles(ruta):
-    return _parsear_csv_comillas_dobles(ruta)
-
-def limpiar_docentes(df, col):
-    return _limpiar_docentes(df, col)
-
-def procesar_csv_nuevo_formato(df):
-    return _procesar_csv_nuevo_formato(df)
+from core.planillas import cache as _cache
+from core.planillas import table_builders as _table_builders
+from core.planillas import transformations as _transformations
 
 
 def traducir_dias(dias_raw: str) -> str:
@@ -122,256 +105,35 @@ def formatear_numero(valor, ancho_minimo):
 
 
 def generar_siguiente_curso_intensivo(curso):
-    if pd.isna(curso):
-        return ''
-
-    curso_str = str(curso).strip()
-    if not curso_str or 'intensivo' not in curso_str.lower():
-        return ''
-
-    import re
-    match = re.search(r'^(.*?)(\d+)\s*$', curso_str)
-    if not match:
-        return ''
-
-    prefijo = match.group(1).rstrip()
-    ciclo_actual = int(match.group(2))
-    return f"{prefijo} {ciclo_actual + 1}"
+    return _transformations.generar_siguiente_curso_intensivo(curso)
 
 
 def expandir_texto_cursos_intensivos(cursos_texto):
-    if pd.isna(cursos_texto):
-        return ''
-
-    partes = [p.strip() for p in str(cursos_texto).split('/') if p and str(p).strip()]
-    if not partes:
-        return ''
-
-    # Preservar TODAS las partes originales (incluyendo repeticiones de un mismo curso)
-    resultado = list(partes)
-    cursos_ya_presentes = set(partes)
-
-    # Solo agregar el siguiente curso intensivo si no está ya en la lista
-    for curso in set(partes):
-        siguiente = generar_siguiente_curso_intensivo(curso)
-        if siguiente and siguiente not in cursos_ya_presentes:
-            resultado.append(siguiente)
-            cursos_ya_presentes.add(siguiente)
-
-    return ' / '.join(resultado)
+    return _transformations.expandir_texto_cursos_intensivos(cursos_texto)
 
 
 def expandir_filas_carga_intensivos(datos):
-    datos_base = datos.copy()
-    if datos_base.empty:
-        return datos_base
-
-    filas_adicionales = []
-    mask_intensivo = datos_base['modalidad'].astype(str).str.upper().str.contains('INTENSIVO', na=False)
-
-    for _, row in datos_base[mask_intensivo].iterrows():
-        try:
-            ciclo_actual = int(str(row.get('ciclo', '')).strip())
-        except (TypeError, ValueError):
-            continue
-
-        idioma = str(row.get('idioma', '')).strip()
-        nivel = str(row.get('nivel', '')).strip()
-        if not idioma or not nivel:
-            continue
-
-        fila_nueva = row.copy()
-        ciclo_siguiente = ciclo_actual + 1
-        fila_nueva['ciclo'] = str(ciclo_siguiente)
-        fila_nueva['Curso'] = f"{idioma} {nivel} {ciclo_siguiente}"
-        filas_adicionales.append(fila_nueva)
-
-    if filas_adicionales:
-        datos_extra = pd.DataFrame(filas_adicionales)
-        datos_base = pd.concat([datos_base, datos_extra], ignore_index=True)
-
-        columnas_dedupe = [c for c in ['docente', 'Curso', 'modalidad', 'dias', 'horainicio', 'horafin'] if c in datos_base.columns]
-        if columnas_dedupe:
-            datos_base = datos_base.drop_duplicates(subset=columnas_dedupe, keep='first')
-
-    return datos_base
+    return _transformations.expandir_filas_carga_intensivos(datos)
 
 
 def generar_siguiente_curso_intensivo_desde_fila(row):
-    modalidad = str(row.get('modalidad', '')).strip().upper()
-    if 'INTENSIVO' not in modalidad:
-        return ''
-
-    try:
-        ciclo_actual = int(str(row.get('ciclo', '')).strip())
-    except (TypeError, ValueError):
-        # Fallback al parser por texto de curso si no hay ciclo numérico
-        return generar_siguiente_curso_intensivo(row.get('Curso', ''))
-
-    idioma = str(row.get('idioma', '')).strip()
-    nivel = str(row.get('nivel', '')).strip()
-    if not idioma or not nivel:
-        return generar_siguiente_curso_intensivo(row.get('Curso', ''))
-
-    return f"{idioma} {nivel} {ciclo_actual + 1}"
+    return _transformations.generar_siguiente_curso_intensivo_desde_fila(row)
 
 
 def procesar_ediciones_idioma(datos):
-    datos_procesados = datos.copy()
-    
-    # Identificar filas donde la columna idioma empieza con "Edición"
-    mask_edicion = datos_procesados['idioma'].astype(str).str.startswith('Edición', na=False)
-    
-    # Para las filas que empiecen con "Edición", agregar "Inglés" al final si no lo tienen
-    for idx in datos_procesados[mask_edicion].index:
-        idioma_actual = str(datos_procesados.loc[idx, 'idioma']).strip()
-        if not idioma_actual.endswith('Inglés'):
-            datos_procesados.loc[idx, 'idioma'] = idioma_actual + ' Inglés'
-    
-    return datos_procesados
+    return _transformations.procesar_ediciones_idioma(datos)
 
 def aplicar_transformaciones_base(datos):
-    datos_transformados = datos.copy()
-    
-    # NUEVO: Procesar celdas de "Edición" para agregar "Inglés"
-    datos_transformados = procesar_ediciones_idioma(datos_transformados)
-
-    # Ajustar el nivel en una sola pasada para todos los casos.
-    datos_transformados['nivel'] = datos_transformados.apply(ajustar_nivel, axis=1)
-    
-    # Aplicar modalidad (mantener apply por ahora ya que la lógica es compleja)
-    datos_transformados['modalidad'] = datos_transformados.apply(ajustar_modalidad, axis=1)
-    
-    # Agregar "Intensivo" al nivel para cursos intensivos (sin duplicar filas)
-    mask_intensivo = datos_transformados['modalidad'] == 'INTENSIVO VIRTUAL'
-    for idx in datos_transformados[mask_intensivo].index:
-        nivel_original = str(datos_transformados.loc[idx, 'nivel']).strip()
-        if not nivel_original.startswith('Intensivo'):
-            datos_transformados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
-    
-    # Construir curso de forma vectorizada
-    datos_transformados['Curso'] = (
-        datos_transformados['idioma'].astype(str) + ' ' + 
-        datos_transformados['nivel'].astype(str) + ' ' + 
-        datos_transformados['ciclo'].astype(str)
-    )
-    return datos_transformados
+    return _transformations.aplicar_transformaciones_base(datos)
     
 def ajustar_nivel(row):
-    nivel = row['nivel']
-    idioma = row['idioma']
-    ciclo = row['ciclo']
-    if nivel == 'General':
-        if idioma == 'Inglés':
-            try:
-                ciclo_num = int(str(ciclo).strip())
-            except Exception:
-                ciclo_num = None
-            if ciclo_num is not None:
-                if 1 <= ciclo_num <= 8:
-                    return 'Posgrado Básico'
-                elif 9 <= ciclo_num <= 18:
-                    return 'Posgrado Intermedio'
-        elif idioma == 'Portugués':
-            try:
-                ciclo_num = int(str(ciclo).strip())
-            except Exception:
-                ciclo_num = None
-            if ciclo_num is not None:
-                if 1 <= ciclo_num <= 4:
-                    return 'Posgrado Básico'
-                elif 5 <= ciclo_num <= 8:
-                    return 'Posgrado Intermedio'
-    return nivel
+    return _transformations.ajustar_nivel(row)
 
 def ajustar_modalidad(row):
-    dias = row['dias']
-    hora_fin = row['horafin']
-    modalidad = row['modalidad']
-
-    if (hora_fin == '22:30:00'or hora_fin == '15:00:00') and (dias == '{MONDAY,TUESDAY,WEDNESDAY,THURSDAY}' or dias == '{SATURDAY,SUNDAY}'):
-        modalidad = 'INTENSIVO VIRTUAL'
-
-    return modalidad
+    return _transformations.ajustar_modalidad(row)
 
 def procesar_cursos_intensivos(datos):
-    datos_procesados = datos.copy()
-    
-    # Identificar filas con modalidad INTENSIVO VIRTUAL
-    mask_intensivo = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
-    
-    if not mask_intensivo.any():
-        return datos_procesados
-    
-    filas_intensivas = datos_procesados[mask_intensivo].copy()
-    filas_adicionales = []
-    
-    # Procesar cada fila intensiva
-    for idx, row in filas_intensivas.iterrows():
-        nivel_original = str(row['nivel']).strip()
-        if not nivel_original.startswith('Intensivo'):
-            datos_procesados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
-        
-        fila_adicional = row.copy()
-        idioma = str(row['idioma']).strip()
-        
-        try:
-            ciclo_actual = int(str(row['ciclo']).strip())
-            
-            # Lógica específica para Portugués
-            if idioma == 'Portugués':
-                nivel_sin_intensivo = nivel_original.replace('Intensivo ', '').strip()
-                
-                if 'Básico' in nivel_sin_intensivo or 'Basico' in nivel_sin_intensivo:
-                    if ciclo_actual == 5:
-                        # Cambiar a Intermedio 1
-                        fila_adicional['nivel'] = 'Intensivo Intermedio'
-                        fila_adicional['ciclo'] = '1'
-                    else:
-                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
-                elif 'Intermedio' in nivel_sin_intensivo:
-                    if ciclo_actual == 4:
-                        # Cambiar a Avanzado 1
-                        fila_adicional['nivel'] = 'Intensivo Avanzado'
-                        fila_adicional['ciclo'] = '1'
-                    else:
-                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
-                elif 'Avanzado' in nivel_sin_intensivo:
-                    if ciclo_actual < 3:
-                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
-                    else:
-                        # Para Avanzado 3, mantener el mismo ciclo (o manejar según reglas de negocio)
-                        fila_adicional['ciclo'] = str(ciclo_actual + 1)
-                else:
-                    # Para otros niveles de portugués, incrementar normalmente
-                    fila_adicional['ciclo'] = str(ciclo_actual + 1)
-            else:
-                # Para otros idiomas, incrementar ciclo normalmente
-                fila_adicional['ciclo'] = str(ciclo_actual + 1)
-                
-        except (ValueError, TypeError):
-            fila_adicional['ciclo'] = str(row['ciclo']) + '+1'
-        
-        # Agregar "Intensivo" al nivel de la fila adicional si no lo tiene
-        if not str(fila_adicional['nivel']).startswith('Intensivo'):
-            fila_adicional['nivel'] = f'Intensivo {fila_adicional["nivel"]}'
-        
-        filas_adicionales.append(fila_adicional)
-    
-    # Agregar las filas adicionales al DataFrame
-    if filas_adicionales:
-        filas_adicionales_df = pd.DataFrame(filas_adicionales)
-        datos_procesados = pd.concat([datos_procesados, filas_adicionales_df], ignore_index=True)
-    
-    # Reconstruir la columna Curso para todas las filas afectadas
-    mask_todas_intensivas = datos_procesados['modalidad'] == 'INTENSIVO VIRTUAL'
-    datos_procesados.loc[mask_todas_intensivas, 'Curso'] = (
-        datos_procesados.loc[mask_todas_intensivas, 'idioma'].astype(str) + ' ' + 
-        datos_procesados.loc[mask_todas_intensivas, 'nivel'].astype(str) + ' ' + 
-        datos_procesados.loc[mask_todas_intensivas, 'ciclo'].astype(str)
-    )
-    
-    return datos_procesados
+    return _transformations.procesar_cursos_intensivos(datos)
 
 def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=80):
     mapeo = {}
@@ -417,6 +179,55 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     agrupado['Curso Dictado'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 28
     agrupado['Diseño de Examenes'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 4
     return agrupado
+
+
+def _agregar_docentes_faltantes_al_merge(
+    merge_result,
+    docentes_faltantes_df,
+    datos_docentes,
+    normalizar_texto,
+    campo_nombre_validacion,
+    extra_builder,
+):
+    if docentes_faltantes_df.empty or datos_docentes is None:
+        return merge_result
+
+    datos_docentes_temp = datos_docentes.copy()
+    datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
+
+    filas_nuevas = []
+    for _, row_faltante in docentes_faltantes_df.iterrows():
+        nombre_validacion = row_faltante.get(campo_nombre_validacion)
+        if pd.isna(nombre_validacion) or str(nombre_validacion).strip() == '' or str(nombre_validacion).lower() == 'nan':
+            continue
+
+        docente_info = datos_docentes_temp[datos_docentes_temp['docente_norm'] == row_faltante['docente_norm']]
+        if docente_info.empty:
+            continue
+
+        docente_info = docente_info.iloc[0]
+        nueva_fila = {
+            'Docente': docente_info['Docente'],
+            'Sede': docente_info['Sede'],
+            'Categoria (Letra)': docente_info['Categoria (Letra)'],
+            'Categoria (Monto)': docente_info['Categoria (Monto)'],
+            'N_Ruc': docente_info['N_Ruc'],
+            'Estado': docente_info['Estado'],
+            'curso': '',
+            'cantidad_cursos': 0,
+            'Curso Dictado': 0,
+            'Diseño de Examenes': 0,
+            'Examen Clasif.': 0,
+            'docente_norm': row_faltante['docente_norm'],
+        }
+        nueva_fila.update(extra_builder(row_faltante))
+        filas_nuevas.append(nueva_fila)
+
+    if not filas_nuevas:
+        return merge_result
+
+    filas_nuevas_df = pd.DataFrame(filas_nuevas)
+    return pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
 
 
 def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos_docentes=None):
@@ -482,44 +293,18 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
         # AGREGAR DOCENTES DE COORDINACIÓN QUE NO ESTÁN EN DF (similar a examen clasificación)
         docentes_coord_no_en_df = coordinacion_final[~coordinacion_final['docente_norm'].isin(df['docente_norm'])]
         
-        if not docentes_coord_no_en_df.empty and datos_docentes is not None:
-            
-            filas_nuevas = []
-            for _, row_coord in docentes_coord_no_en_df.iterrows():
-                # VALIDAR QUE EL DOCENTE NO SEA VACÍO O NaN
-                if pd.isna(row_coord['Docente_Correcto']) or str(row_coord['Docente_Correcto']).strip() == '' or str(row_coord['Docente_Correcto']).lower() == 'nan':
-                    continue
-                
-                # Buscar información del docente en datos_docentes
-                docente_info = datos_docentes[datos_docentes['Docente'].apply(normalizar_texto) == row_coord['docente_norm']]
-                
-                if not docente_info.empty:
-                    docente_info = docente_info.iloc[0]
-                    nueva_fila = {
-                        'Docente': docente_info['Docente'],
-                        'Sede': docente_info['Sede'],
-                        'Categoria (Letra)': docente_info['Categoria (Letra)'],
-                        'Categoria (Monto)': docente_info['Categoria (Monto)'],
-                        'N_Ruc': docente_info['N_Ruc'],
-                        'Estado': docente_info['Estado'],
-                        'curso': '',  # Sin carga académica
-                        'cantidad_cursos': 0,
-                        'Curso Dictado': 0,
-                        'Diseño de Examenes': 0,
-                        'Examen Clasif.': 0,
-                        'docente_norm': row_coord['docente_norm'],
-                        'Monto_Coordinacion': row_coord['Monto_Coordinacion'],
-                        'Horas_Total': row_coord['Horas_Total'],
-                        'Docente_Correcto': row_coord['Docente_Correcto']
-                    }
-                    filas_nuevas.append(nueva_fila)
-                else:
-                    pass
-            
-            # Agregar las nuevas filas al resultado
-            if filas_nuevas:
-                filas_nuevas_df = pd.DataFrame(filas_nuevas)
-                merge_result = pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
+        merge_result = _agregar_docentes_faltantes_al_merge(
+            merge_result,
+            docentes_coord_no_en_df,
+            datos_docentes,
+            normalizar_texto,
+            campo_nombre_validacion='Docente_Correcto',
+            extra_builder=lambda row_coord: {
+                'Monto_Coordinacion': row_coord['Monto_Coordinacion'],
+                'Horas_Total': row_coord['Horas_Total'],
+                'Docente_Correcto': row_coord['Docente_Correcto'],
+            },
+        )
         
         # Finalizar el procesamiento
         df = merge_result
@@ -601,41 +386,17 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos
             
             if not docentes_clasif_no_en_df.empty and datos_docentes is not None:
                 print(f"📋 Agregando {len(docentes_clasif_no_en_df)} docentes del examen de clasificación sin carga académica...")
-                
-                # Para cada docente del examen que no está en df, crear una fila nueva
-                filas_nuevas = []
-                for _, row_clasif in docentes_clasif_no_en_df.iterrows():
-                    # VALIDAR QUE EL DOCENTE NO SEA VACÍO O NaN
-                    if pd.isna(row_clasif['Docente']) or str(row_clasif['Docente']).strip() == '' or str(row_clasif['Docente']).lower() == 'nan':
-                        continue
-                    
-                    # Buscar información del docente en datos_docentes
-                    docente_info = datos_docentes[datos_docentes['Docente'].apply(normalizar_texto) == row_clasif['docente_norm']]
-                    
-                    if not docente_info.empty:
-                        docente_info = docente_info.iloc[0]
-                        nueva_fila = {
-                            'Docente': docente_info['Docente'],
-                            'Sede': docente_info['Sede'],
-                            'Categoria (Letra)': docente_info['Categoria (Letra)'],
-                            'Categoria (Monto)': docente_info['Categoria (Monto)'],
-                            'N_Ruc': docente_info['N_Ruc'],
-                            'Estado': docente_info['Estado'],
-                            'curso': '',  # Sin carga académica
-                            'cantidad_cursos': 0,
-                            'Curso Dictado': 0,
-                            'Diseño de Examenes': 0,
-                            'docente_norm': row_clasif['docente_norm'],
-                            columna_monto: row_clasif[columna_monto]
-                        }
-                        filas_nuevas.append(nueva_fila)
-                    else:
-                        pass
-                
-                # Agregar las nuevas filas al resultado
-                if filas_nuevas:
-                    filas_nuevas_df = pd.DataFrame(filas_nuevas)
-                    merge_result = pd.concat([merge_result, filas_nuevas_df], ignore_index=True)
+
+            merge_result = _agregar_docentes_faltantes_al_merge(
+                merge_result,
+                docentes_clasif_no_en_df,
+                datos_docentes,
+                normalizar_texto,
+                campo_nombre_validacion='Docente',
+                extra_builder=lambda row_clasif: {
+                    columna_monto: row_clasif[columna_monto],
+                },
+            )
             
             df = merge_result
             df['Examen Clasif.'] = df[columna_monto].fillna(0)
@@ -651,172 +412,19 @@ def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos
 # --------------------------- CONSTRUCCIÓN DE TABLAS ---------------------------
 
 def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
-    # Asegurar que los campos necesarios existen y tienen valores por defecto
-    df = df.copy()
-    campos_requeridos = {
-        'curso': '',
-        'Curso Dictado': 0,
-        'cantidad_cursos': 0,
-        'Diseño de Examenes': 0,
-        'Examen Clasif.': 0,
-        'Servicio Actualización': 0  # Nueva columna
-    }
-    
-    for campo, valor_default in campos_requeridos.items():
-        if campo not in df.columns:
-            df[campo] = valor_default
-        else:
-            df[campo] = df[campo].fillna(valor_default)
-    
-    # Construir diccionario base de columnas
-    columnas_tabla = {
-        'N°': range(1, len(df) + 1),
-        'Docente': df['Docente'],
-        'Sede': df['Sede'],
-        'Categoria (Letra)': df['Categoria (Letra)'],
-        'Categoria (Monto)': df['Categoria (Monto)'],
-        'N_Ruc': df['N_Ruc'],
-        'Curso': df['curso'],
-        'Curso Dictado': df['Curso Dictado']
-    }
-    
-    # Agregar columna Bono solo si es enero
-    if es_enero:
-        columnas_tabla['Bono'] = monto_bono
-    
-    # Continuar con el resto de columnas
-    columnas_tabla.update({
-        'Extra Curso': 0,
-        'Cantidad Cursos': df['cantidad_cursos'],
-        'Diseño de Examenes': df['Diseño de Examenes'],
-        'Examen Clasif.': df['Examen Clasif.'],
-        'Servicio Actualización': df['Servicio Actualización'],
-        'Total Pago S/.': 0,
-        'Estado': df['Estado']
-    })
-    
-    tabla = pd.DataFrame(columnas_tabla)
-    tabla['Curso'] = tabla['Curso'].apply(expandir_texto_cursos_intensivos)
-    
-    # AGREGAR SERVICIO DE ACTUALIZACIÓN A LA COLUMNA CURSO CUANDO CORRESPONDA
-    def agregar_servicio_a_curso(row):
-        curso_actual = str(row['Curso']).strip()
-        servicio_actualizacion = row['Servicio Actualización']
-        
-        # Si tiene servicio de actualización (mayor a 0)
-        if servicio_actualizacion > 0:
-            texto_servicio = "Servicio de actualización de materiales de enseñanza"
-            
-            # Si ya tiene cursos académicos, agregar el servicio separado por ' / '
-            if curso_actual and curso_actual != '' and curso_actual != 'nan':
-                return f"{curso_actual} / {texto_servicio}"
-            else:
-                # Si no tiene carga académica, solo el servicio
-                return texto_servicio
-        
-        # Si no tiene servicio de actualización, mantener el curso original
-        return curso_actual
-    
-    tabla['Curso'] = tabla.apply(agregar_servicio_a_curso, axis=1)
-    
-    # Calcular total incluyendo Bono si existe
-    if es_enero:
-        tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Bono'] + tabla['Extra Curso'] + 
-                                    tabla['Diseño de Examenes'] + tabla['Examen Clasif.'] + 
-                                    tabla['Servicio Actualización'])
-    else:
-        tabla['Total Pago S/.'] = (tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] + 
-                                    tabla['Examen Clasif.'] + tabla['Servicio Actualización'])
-    
-    # Ordenar alfabéticamente por nombre de docente
-    tabla = tabla.sort_values('Docente').reset_index(drop=True)
-    # Reajustar la numeración después del ordenamiento
-    tabla['N°'] = range(1, len(tabla) + 1)
-    
-    return tabla
+    return _table_builders.construir_tabla_planilla(df, es_enero, monto_bono)
 
 def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_docentes):
-    if not os.path.exists(ruta_coordinacion):
-        return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
-    
-    try:
-        # Leer el archivo Excel
-        coordinacion_df = cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
-
-        coordinacion_agrupado = preparar_coordinacion_agrupada(coordinacion_df, normalizar_texto)
-        if coordinacion_agrupado is None:
-            return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
-        
-        # Normalizar nombres en datos_docentes
-        datos_docentes_temp = datos_docentes.copy()
-        datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
-        
-        # Hacer merge con datos_docentes para obtener categoría
-        coordinacion_con_categoria = coordinacion_agrupado.merge(
-            datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Letra)', 'Categoria (Monto)']],
-            on='docente_norm', how='left'
-        )
-        
-        # Usar el nombre corregido del merge, fallback al original
-        coordinacion_con_categoria['Docente_Final'] = coordinacion_con_categoria['Docente'].fillna(
-            coordinacion_con_categoria['Docente_Original']
-        )
-        coordinacion_con_categoria['Categoria (Letra)'] = coordinacion_con_categoria['Categoria (Letra)'].fillna('N/A')
-        coordinacion_con_categoria['Categoria (Monto)'] = coordinacion_con_categoria['Categoria (Monto)'].fillna(0)
-        
-        # Calcular monto total
-        coordinacion_con_categoria['Monto_Total'] = (
-            coordinacion_con_categoria['Horas_Total'] * 
-            coordinacion_con_categoria['Categoria (Monto)']
-        )
-        
-        # Construir tabla final
-        tabla_coordinacion = pd.DataFrame({
-            'N°': range(1, len(coordinacion_con_categoria) + 1),
-            'Docente': coordinacion_con_categoria['Docente_Final'],
-            'Categoría (Letra)': coordinacion_con_categoria['Categoria (Letra)'],
-            'Categoría (Monto)': coordinacion_con_categoria['Categoria (Monto)'],
-            'Horas Totales': coordinacion_con_categoria['Horas_Total'],
-            'Monto Total': coordinacion_con_categoria['Monto_Total']
-        })
-        
-        # Ordenar alfabéticamente por docente
-        tabla_coordinacion = tabla_coordinacion.sort_values('Docente').reset_index(drop=True)
-        tabla_coordinacion['N°'] = range(1, len(tabla_coordinacion) + 1)
-        
-        print(f"✅ Tabla de coordinación creada con {len(tabla_coordinacion)} docentes")
-        return tabla_coordinacion
-        
-    except Exception as e:
-        print(f"⚠️ Error al crear tabla de coordinación: {e}")
-        return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+    return _table_builders.construir_tabla_coordinacion(
+        ruta_coordinacion,
+        normalizar_texto,
+        datos_docentes,
+        cargar_excel_con_cache,
+        preparar_coordinacion_agrupada,
+    )
 
 def construir_tabla_carga_academica(datos, estado_planilla):
-    datos = expandir_filas_carga_intensivos(datos)
-
-    if 'nivel' not in datos.columns:
-        datos['nivel'] = datos.apply(ajustar_nivel, axis=1)
-    if 'Curso' not in datos.columns:
-        datos['Curso'] = datos[['idioma', 'nivel', 'ciclo']].astype(str).agg(' '.join, axis=1)
-
-    df = pd.DataFrame({
-        'Dias': datos['dias'].apply(traducir_dias),
-        'H. Inicio': datos['horainicio'].astype(str).str[:5],
-        'H. Fin': datos['horafin'].astype(str).str[:5],
-        'Idioma': datos['idioma'],
-        'Nivel': datos['nivel'].str.replace('Ã¡', 'á', regex=False),
-        'Ciclo': datos['ciclo'],
-        'Curso': datos['Curso'],
-        'Sede': datos['sede'],
-        'Sec.': '',
-        'Matr.': datos['matriculados'],
-        'Docente': datos['docente'],
-        'Modalidad': datos['modalidad'],
-        'Estado Planilla': estado_planilla
-    })
-    df = df.sort_values(by='Docente').reset_index(drop=True)
-    df.insert(0, 'N°', range(1, len(df) + 1))
-    return df
+    return _table_builders.construir_tabla_carga_academica(datos, estado_planilla, traducir_dias)
 
 def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
     if not combinacion_anterior:
@@ -835,123 +443,40 @@ def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
 
 # ================================= FUNCIONES CON USO DE MEMORIA CACHE ===================================================
 
-# Cache simple para archivos Excel
-_excel_cache = {}
-
-# Cache para evitar relecturas innecesarias de planilla anterior
-_cache_planilla_anterior = {}
-_cache_agrupacion = {}
-_cache_tablas_construidas = {}
-
 def generar_key_datos(df, col_curso):
-    try:
-        # Crear un hash basado en el contenido de datos relevantes
-        datos_relevantes = df[['docente', col_curso]].copy()
-        datos_str = datos_relevantes.to_string()
-        key = f"{col_curso}_{hash(datos_str)}"
-        return key
-    except:
-        # Fallback: usar shape y columnas como key menos preciso
-        return f"{col_curso}_{df.shape[0]}_{df.shape[1]}"
-    
+    return _cache.generar_key_datos(df, col_curso)
+
 
 def limpiar_cache_excel():
-    global _excel_cache
-    _excel_cache.clear()
+    _cache.limpiar_cache_excel()
 
-# ----------------------- CARGAR ARCHIVO CON CACHE -----------------------
 
 def cargar_excel_con_cache(ruta, sheet_name=0, header='infer'):
-    cache_key = f"{ruta}_{sheet_name}_{header}"
-    
-    if cache_key not in _excel_cache:
-        if header == 'infer':
-            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name)
-        else:
-            _excel_cache[cache_key] = pd.read_excel(ruta, sheet_name=sheet_name, header=header)
-    
-    return _excel_cache[cache_key].copy()  # Retorna una copia para evitar modificaciones accidentales
+    return _cache.cargar_excel_con_cache(ruta, sheet_name=sheet_name, header=header)
+
 
 def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso):
-    # Generar key único basado en los datos de entrada
-    key_datos = generar_key_datos(df, col_curso)
-    
-    # Verificar si ya está en cache
-    if key_datos in _cache_agrupacion:
-        return _cache_agrupacion[key_datos].copy()
-    
-    # Si no está en cache, calcular y guardar
-    resultado = agrupar_y_calcular(df, datos_docentes, col_curso)
-    _cache_agrupacion[key_datos] = resultado.copy()
-    
-    return resultado
+    return _cache.agrupar_y_calcular_con_cache(df, datos_docentes, col_curso, agrupar_y_calcular)
+
 
 def leer_planilla_anterior_con_cache(ruta_planilla):
-    # Verificar si el archivo ya está en cache
-    if ruta_planilla in _cache_planilla_anterior:
-        return _cache_planilla_anterior[ruta_planilla]
-    
-    try:
-        # Obtener la fila de header de manera optimizada
-        fila_header = obtener_header_planilla_con_cache(ruta_planilla)
-        if fila_header is None:
-            fila_header = 6  # Valor por defecto si no se encuentra
-            
-        # Solo leer si no está en cache
-        planilla_anterior = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=fila_header)
-        
-        # Guardar en cache para futuros accesos
-        _cache_planilla_anterior[ruta_planilla] = planilla_anterior
-        
-        return planilla_anterior
-    except Exception as e:
-        print(f"Error al leer planilla anterior: {e}")
-        return pd.DataFrame()
+    return _cache.leer_planilla_anterior_con_cache(ruta_planilla, obtener_header_planilla_con_cache)
+
 
 def limpiar_cache_planilla():
-    global _cache_planilla_anterior
-    _cache_planilla_anterior = {}
+    _cache.limpiar_cache_planilla()
+
 
 def limpiar_cache_procesamiento():
-    global _cache_agrupacion, _cache_tablas_construidas
-    _cache_agrupacion = {}
-    _cache_tablas_construidas = {}
+    _cache.limpiar_cache_procesamiento()
+
 
 def obtener_header_planilla_con_cache(ruta_planilla):
-    try:
-        # Leer solo las primeras 10 filas para encontrar el header (más eficiente)
-        df_raw = pd.read_excel(ruta_planilla, sheet_name="Primera carga académica", header=None, nrows=10)
-        
-        for idx, fila in df_raw.iterrows():
-            if "Docente" in fila.values and "Curso" in fila.values:
-                return idx
-                
-        return None
-    except Exception as e:
-        print(f"Error al obtener header: {e}")
-        return None
-    
+    return _cache.obtener_header_planilla_con_cache(ruta_planilla)
+
+
 def construir_tabla_planilla_con_cache(df, es_enero=False, monto_bono=0):
-    try:
-        # Crear hash basado en las columnas relevantes para la tabla y parámetros adicionales
-        columnas_relevantes = ['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N_Ruc', 'curso', 'cantidad_cursos', 'Curso Dictado', 'Diseño de Examenes', 'Examen Clasif.', 'Estado']
-        
-        df_relevante = df[columnas_relevantes]
-        key_tabla = hash(df_relevante.to_string() + str(es_enero) + str(monto_bono))
-        
-        # Verificar cache
-        if key_tabla in _cache_tablas_construidas:
-            return _cache_tablas_construidas[key_tabla].copy()
-        
-        # Si no está en cache, construir y guardar
-        tabla = construir_tabla_planilla(df, es_enero, monto_bono)
-        _cache_tablas_construidas[key_tabla] = tabla.copy()
-        
-        return tabla
-        
-    except Exception as e:
-        # Fallback: usar función original si hay error en cache
-        return construir_tabla_planilla(df, es_enero, monto_bono)
+    return _cache.construir_tabla_planilla_con_cache(df, es_enero, monto_bono, construir_tabla_planilla)
 
 # ================================= EXPANSIÓN DE FILAS POR CURSO CON MODALIDAD ===================================================
 

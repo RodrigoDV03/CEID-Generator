@@ -40,13 +40,11 @@ class DocenteData:
     
     @property
     def nombre_limpio(self) -> str:
-        import re
-        return re.sub(r'[\\/*?:"<>|]', "", self.nombre)
+        return TextUtils.limpiar_nombre_archivo(self.nombre)
     
     @property
     def dni_formateado(self) -> str:
-        dni = self.dni.strip()
-        return dni.zfill(8) if len(dni) < 8 else dni
+        return TextUtils.formatear_dni(self.dni)
     
     @property
     def modalidad_texto(self) -> str:
