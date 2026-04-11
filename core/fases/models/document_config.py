@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from core.fases.utils import PathUtils
+
 
 class TipoDocumento(Enum):
     OFICIO = "oficio"
@@ -72,10 +74,8 @@ class DocumentConfig:
         return "FASE INICIAL" if self.tipo_fase.lower() == "inicial" else "FASE FINAL"
     
     def obtener_ruta_firma(self, nombre_docente: str) -> str:
-        from core.fases.functions import ruta_absoluta_relativa
-        
         carpeta = "data/firmas/admin" if self.es_administrativo else "data/firmas/docentes"
-        return ruta_absoluta_relativa(f"{carpeta}/{nombre_docente}.png")
+        return PathUtils.ruta_absoluta_relativa(f"{carpeta}/{nombre_docente}.png")
 
 
 @dataclass

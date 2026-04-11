@@ -5,16 +5,12 @@ import threading
 from tkinter import filedialog
 from datetime import datetime
 
-from core.correos.envio_correos import (
-    TipoCorreo,
-    procesar_correos_docente_gmail,
-    procesar_correos_administrativos_gmail,
-    enviar_lote_desde_gui_docentes,
-    enviar_lote_desde_gui_administrativos,
-    procesar_correo_individual_contrato_primera_vez,
-    enviar_correo_contrato_primera_vez_desde_gui
-)
+from core.correos.config import TipoCorreo
+from core.correos.email_sender import EmailPersonalizado, LoteEmailSender
+from core.correos.gmail_service import GmailService
+from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
 
+from ui.components import TextRedirector
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
@@ -42,6 +38,11 @@ def mostrar_correos(app):
 
     data_envio = []
     data_envio_individual = None
+
+    gmail_service = GmailService()
+    correos_processor = CorreosProcessor(gmail_service)
+    lote_sender = LoteEmailSender(gmail_service)
+    correo_individual_sender = EmailPersonalizado(gmail_service)
 
     # =========================
     # CONTENEDOR
@@ -104,7 +105,6 @@ def mostrar_correos(app):
 
     ctk.CTkLabel(frame_conf, text="Año", text_color=TEXT_COLOR)\
         .pack(anchor="w", padx=20, pady=(10, 0))
-    años = [str(a) for a in range(datetime.now().year - 2, datetime.now().year + 3)]
     ctk.CTkOptionMenu(frame_conf, variable=año_var, values=años)\
         .pack(anchor="w", padx=20, pady=(0, 10))
 
@@ -258,17 +258,24 @@ def mostrar_correos(app):
         def tarea():
             try:
                 if es_modo_contrato():
-                    data_envio_individual = procesar_correo_individual_contrato_primera_vez(
-                        ruta_excel, "list", pdf_orden, obtener_tipo_correo()
+                    excel_reader = ExcelReader(ruta_excel, "list")
+                    processor = PDFProcessor(
+                        excel_reader,
+                        incluir_servicio=tipo_var.get() == "Docente",
+                        incluir_modalidad=tipo_var.get() == "Docente",
                     )
+                    datos = processor.procesar_orden_individual_contrato_primera_vez(pdf_orden)
+                    data_envio_individual = datos.to_dict() if datos else None
                     if data_envio_individual:
                         set_estado(estado_lbl, "Correo individual listo", "#4CAF50")
                 else:
-                    if tipo_var.get() == "Docente":
-                        data_envio[:] = procesar_correos_docente_gmail(ruta_excel, "list", pdfs)
-                    else:
-                        data_envio[:] = procesar_correos_administrativos_gmail(ruta_excel, "list", pdfs)
-
+                    tipo_correo = obtener_tipo_correo()
+                    data_envio[:] = correos_processor.procesar_correos(
+                        ruta_excel,
+                        "list",
+                        pdfs,
+                        tipo_correo,
+                    )
                     set_estado(estado_lbl, f"{len(data_envio)} correos listos", "#4CAF50")
 
                 validar_envio()
@@ -298,16 +305,8 @@ def mostrar_correos(app):
     consola.pack(fill="both", expand=True, padx=10, pady=10)
     consola.configure(state="disabled")
 
-    class Redirector:
-        def write(self, txt):
-            consola.configure(state="normal")
-            consola.insert("end", txt)
-            consola.see("end")
-            consola.configure(state="disabled")
-        def flush(self): pass
-
-    sys.stdout = Redirector()
-    sys.stderr = Redirector()
+    sys.stdout = TextRedirector(consola)
+    sys.stderr = TextRedirector(consola)
 
     # =====================================================
     # ④ ENVIAR
@@ -316,30 +315,27 @@ def mostrar_correos(app):
         def tarea():
             try:
                 if es_modo_contrato():
-                    enviar_correo_contrato_primera_vez_desde_gui(
-                        data_envio_individual,
-                        pdf_contrato,
-                        mes_var.get(),
-                        mes_inicio_contrato_var.get(),
-                        mes_fin_contrato_var.get(),
-                        obtener_tipo_texto(),
-                        int(año_var.get())
+                    correo_individual_sender.enviar_contrato_primera_vez(
+                        nombre=data_envio_individual["nombre"],
+                        pdf_orden_path=data_envio_individual["pdf_path"],
+                        pdf_contrato_path=pdf_contrato,
+                        destinatario=data_envio_individual["correo"],
+                        mes=mes_var.get(),
+                        tipo=obtener_tipo_correo(),
+                        mes_inicio_contrato=mes_inicio_contrato_var.get(),
+                        mes_fin_contrato=mes_fin_contrato_var.get(),
+                        servicio=data_envio_individual.get("servicio"),
+                        modalidad=data_envio_individual.get("modalidad"),
+                        anio=int(año_var.get()),
                     )
                 else:
-                    if tipo_var.get() == "Docente":
-                        enviar_lote_desde_gui_docentes(
-                            data_envio,
-                            mes_var.get(),
-                            int(año_var.get()),
-                            es_modo_reconocimiento_deuda()
-                        )
-                    else:
-                        enviar_lote_desde_gui_administrativos(
-                            data_envio,
-                            mes_var.get(),
-                            int(año_var.get()),
-                            es_modo_reconocimiento_deuda()
-                        )
+                    lote_sender.enviar_lote(
+                        data_envio,
+                        mes_var.get(),
+                        obtener_tipo_correo(),
+                        int(año_var.get()),
+                        es_modo_reconocimiento_deuda(),
+                    )
 
                 messagebox.showinfo("Éxito", "Correos enviados correctamente")
 

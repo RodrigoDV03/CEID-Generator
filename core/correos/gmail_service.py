@@ -169,27 +169,3 @@ class GmailService:
                 logger.info("Sesión cerrada y token eliminado")
             except Exception as e:
                 logger.error(f"Error eliminando token: {e}")
-
-
-# Función de compatibilidad con código legacy
-def autenticar_gmail() -> Resource:
-    logger.debug("autenticar_gmail() está deprecated. Usar GmailService en su lugar.")
-    service_manager = GmailService()
-    return service_manager.service
-
-
-def obtener_firma_gmail(service: Resource) -> str:
-    logger.debug("obtener_firma_gmail() está deprecated. Usar GmailService.obtener_firma() en su lugar.")
-    try:
-        send_as = service.users().settings().sendAs().list(userId='me').execute()
-        
-        for alias in send_as.get('sendAs', []):
-            if alias.get('isPrimary'):
-                signature = alias.get('signature', '')
-                if signature:
-                    return signature
-        return ""
-        
-    except Exception as e:
-        logger.warning(f"No se pudo obtener la firma de Gmail: {e}")
-        return ""

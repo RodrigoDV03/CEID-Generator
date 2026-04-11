@@ -7,8 +7,9 @@ from tkinter import filedialog
 from datetime import datetime
 
 from services.fase_service import procesar_fase_final_service
+from ui.components import TextRedirector
 from utils.gui_constants import *
-from utils import helpers as messagebox
+from utils import custom_modals as messagebox
 
 
 def mostrar_fase_final(app):
@@ -235,19 +236,5 @@ def mostrar_fase_final(app):
     consola_text.pack(fill="both", expand=True, padx=10, pady=10)
     consola_text.configure(state="disabled")
 
-    class Redirector:
-        def __init__(self, widget):
-            self.widget = widget
-
-        def write(self, text):
-            if self.widget.winfo_exists():
-                self.widget.configure(state="normal")
-                self.widget.insert("end", text)
-                self.widget.see("end")
-                self.widget.configure(state="disabled")
-
-        def flush(self):
-            pass
-
-    sys.stdout = Redirector(consola_text)
-    sys.stderr = Redirector(consola_text)
+    sys.stdout = TextRedirector(consola_text)
+    sys.stderr = TextRedirector(consola_text)

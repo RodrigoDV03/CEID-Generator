@@ -2,39 +2,39 @@ import os
 from docx import Document
 from decimal import Decimal, ROUND_HALF_UP
 from num2words import num2words
-from core.fases.utils import TextUtils, PathUtils
-
-# Mantener funciones antiguas por compatibilidad
-def limpiar_nombre_archivo(nombre):
-    return TextUtils.limpiar_nombre_archivo(nombre)
 
 
-def limpiar_numero(valor):
-    return TextUtils.limpiar_numero(valor)
+def _iterar_parrafos(documento):
+    for parrafo in documento.paragraphs:
+        yield parrafo
+
+    for tabla in documento.tables:
+        for fila in tabla.rows:
+            for celda in fila.cells:
+                for parrafo in celda.paragraphs:
+                    yield parrafo
+
+
+def reemplazar_en_parrafo(parrafo, reemplazos):
+    for marcador, valor in reemplazos.items():
+        if marcador in parrafo.text:
+            texto_nuevo = parrafo.text.replace(marcador, valor)
+            for run in parrafo.runs:
+                run.text = ''
+            if parrafo.runs:
+                parrafo.runs[0].text = texto_nuevo
 
 
 def reemplazar_en_parrafos(documento, reemplazos):
     for parrafo in documento.paragraphs:
-        for marcador, valor in reemplazos.items():
-            if marcador in parrafo.text:
-                texto_nuevo = parrafo.text.replace(marcador, valor)
-                for run in parrafo.runs:
-                    run.text = ''
-                if parrafo.runs:
-                    parrafo.runs[0].text = texto_nuevo
+        reemplazar_en_parrafo(parrafo, reemplazos)
 
 def reemplazar_en_tablas(documento, reemplazos):
     for tabla in documento.tables:
         for fila in tabla.rows:
             for celda in fila.cells:
                 for parrafo in celda.paragraphs:
-                    for marcador, valor in reemplazos.items():
-                        if marcador in parrafo.text:
-                            texto_nuevo = parrafo.text.replace(marcador, valor)
-                            for run in parrafo.runs:
-                                run.text = ''
-                            if parrafo.runs:
-                                parrafo.runs[0].text = texto_nuevo
+                    reemplazar_en_parrafo(parrafo, reemplazos)
 
 def monto_a_letras(monto):
     try:
@@ -84,9 +84,6 @@ def redactar_cursos(cadena, tiene_bono=False):
         # Si hay más de 2 elementos, usar solo comas
         return f"servicio de dictado de {', '.join(elementos_descripcion)}"
 
-def ruta_absoluta_relativa(path_relativo):
-    return PathUtils.ruta_absoluta_relativa(path_relativo)
-
 def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
     if modelo_path and os.path.exists(modelo_path):
         doc = Document(modelo_path)
@@ -98,20 +95,11 @@ def generar_documento(modelo_path, reemplazos, ruta_salida, firma_path=None):
         
         # Insertar la firma donde está el marcador
         if firma_path and os.path.exists(firma_path):
-            for parrafo in doc.paragraphs:
+            for parrafo in _iterar_parrafos(doc):
                 if "firma_docente" in parrafo.text:
                     parrafo.text = ""
                     run = parrafo.add_run()
                     run.add_picture(firma_path)
-
-            for tabla in doc.tables:
-                for fila in tabla.rows:
-                    for celda in fila.cells:
-                        for parrafo in celda.paragraphs:
-                            if "firma_docente" in parrafo.text:
-                                parrafo.text = ""
-                                run = parrafo.add_run()
-                                run.add_picture(firma_path)
 
         doc.save(ruta_salida)
         return True

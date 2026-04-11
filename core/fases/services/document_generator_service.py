@@ -2,6 +2,7 @@ import os
 from docx import Document
 from typing import Dict, Optional
 from core.fases.models import DocumentConfig
+from core.fases.utils import PathUtils
 
 
 class DocumentGeneratorService:
@@ -124,8 +125,6 @@ class DocumentGeneratorService:
     
     @staticmethod
     def obtener_ruta_plantilla(tipo_documento: str, tipo_contrato: str, config: DocumentConfig) -> str:
-        from core.fases.functions import ruta_absoluta_relativa
-        
         rutas_plantillas = {
             # Oficios - Docentes
             'oficio_docente_contrato': './data/modelos/oficio_docente_contrato.docx',
@@ -169,4 +168,4 @@ class DocumentGeneratorService:
         else:
             clave = tipo_documento
         
-        return ruta_absoluta_relativa(rutas_plantillas.get(clave, ''))
+        return PathUtils.ruta_absoluta_relativa(rutas_plantillas.get(clave, ''))

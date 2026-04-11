@@ -289,7 +289,7 @@ def normalizar_clave_docente(texto):
     return str(texto).strip().upper()
 
 
-def formatear_numero_contrato(valor, ancho_minimo=4):
+def formatear_numero(valor, ancho_minimo):
     if pd.isna(valor):
         return ''
 
@@ -305,26 +305,6 @@ def formatear_numero_contrato(valor, ancho_minimo=4):
 
     if valor_str.isdigit():
         return valor_str.zfill(max(ancho_minimo, len(valor_str)))
-
-    return valor_str
-
-
-def formatear_numero_dni(valor, ancho=8):
-    if pd.isna(valor):
-        return ''
-
-    valor_str = str(valor).strip()
-    if not valor_str or valor_str.lower() == 'nan':
-        return ''
-
-    if '.' in valor_str:
-        try:
-            valor_str = str(int(float(valor_str)))
-        except (ValueError, TypeError):
-            pass
-
-    if valor_str.isdigit():
-        return valor_str.zfill(ancho)
 
     return valor_str
 
@@ -444,47 +424,8 @@ def aplicar_transformaciones_base(datos):
     # NUEVO: Procesar celdas de "Edición" para agregar "Inglés"
     datos_transformados = procesar_ediciones_idioma(datos_transformados)
 
-    mask_general = datos_transformados['nivel'] == 'General'
-    mask_ingles = datos_transformados['idioma'] == 'Inglés'
-    mask_portugues = datos_transformados['idioma'] == 'Portugués'
-    
-    # Aplicar transformaciones vectorizadas donde sea posible
-    datos_transformados['nivel_optimized'] = datos_transformados['nivel']
-    
-    # Caso específico para Inglés General
-    mask_ingles_general = mask_general & mask_ingles
-    if mask_ingles_general.any():
-        for idx in datos_transformados[mask_ingles_general].index:
-            try:
-                ciclo_num = int(str(datos_transformados.loc[idx, 'ciclo']).strip())
-                if 1 <= ciclo_num <= 8:
-                    datos_transformados.loc[idx, 'nivel_optimized'] = 'Posgrado Básico'
-                elif 9 <= ciclo_num <= 18:
-                    datos_transformados.loc[idx, 'nivel_optimized'] = 'Posgrado Intermedio'
-            except:
-                pass  # Mantener el valor original si hay error
-    
-    # Caso específico para Portugués General
-    mask_portugues_general = mask_general & mask_portugues
-    if mask_portugues_general.any():
-        # Para Portugués, necesitamos evaluar los ciclos
-        for idx in datos_transformados[mask_portugues_general].index:
-            try:
-                ciclo_num = int(str(datos_transformados.loc[idx, 'ciclo']).strip())
-                if 1 <= ciclo_num <= 4:
-                    datos_transformados.loc[idx, 'nivel_optimized'] = 'Posgrado Básico'
-                elif 5 <= ciclo_num <= 8:
-                    datos_transformados.loc[idx, 'nivel_optimized'] = 'Posgrado Intermedio'
-            except:
-                pass  # Mantener el valor original si hay error
-    
-    # Para casos restantes, aplicar la función original
-    mask_restantes = ~(mask_general & (mask_ingles | mask_portugues))
-    if mask_restantes.any():
-        datos_transformados.loc[mask_restantes, 'nivel_optimized'] = datos_transformados.loc[mask_restantes].apply(ajustar_nivel, axis=1)
-    
-    datos_transformados['nivel'] = datos_transformados['nivel_optimized']
-    datos_transformados.drop('nivel_optimized', axis=1, inplace=True)
+    # Ajustar el nivel en una sola pasada para todos los casos.
+    datos_transformados['nivel'] = datos_transformados.apply(ajustar_nivel, axis=1)
     
     # Aplicar modalidad (mantener apply por ahora ya que la lógica es compleja)
     datos_transformados['modalidad'] = datos_transformados.apply(ajustar_modalidad, axis=1)
@@ -1658,8 +1599,8 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
     agrupado_resumen = agrupado_resumen.merge(cursos_por_docente, on='Docente', how='left')
     agrupado_resumen['Curso_Virtual'] = agrupado_resumen['Curso_Virtual'].fillna('')
     agrupado_resumen['Curso_Presencial'] = agrupado_resumen['Curso_Presencial'].fillna('')
-    agrupado_resumen['Numero_dni'] = agrupado_resumen['Numero_dni'].apply(formatear_numero_dni)
-    agrupado_resumen['Nro_Contrato'] = agrupado_resumen['Nro_Contrato'].apply(formatear_numero_contrato)
+    agrupado_resumen['Numero_dni'] = agrupado_resumen['Numero_dni'].apply(lambda valor: formatear_numero(valor, 8))
+    agrupado_resumen['Nro_Contrato'] = agrupado_resumen['Nro_Contrato'].apply(lambda valor: formatear_numero(valor, 4))
 
     agrupado_resumen = agrupado_resumen.sort_values('Docente').reset_index(drop=True)
     agrupado_resumen = agrupado_resumen.drop(columns=['N°'], errors='ignore')

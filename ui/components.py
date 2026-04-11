@@ -1,24 +1,64 @@
 import customtkinter as ctk
 from utils.gui_constants import *
 
-def input_archivo(master, texto, comando):
+def _crear_selector_archivo(
+    master,
+    texto,
+    comando,
+    *,
+    frame_fg_color=CARD_COLOR,
+    frame_corner_radius=15,
+    frame_pack_kwargs=None,
+    label_text_color=TEXT_COLOR,
+    label_pack_kwargs=None,
+    button_text="Seleccionar archivo",
+    button_fg_color=BUTTON_BG_COLOR,
+    button_hover_color=BUTTON_HOVER_BG_COLOR,
+    button_text_color=WHITE_COLOR,
+    button_font=FONT_BUTTON,
+    button_width=160,
+    button_pack_kwargs=None,
+):
+    frame = ctk.CTkFrame(master, fg_color=frame_fg_color, corner_radius=frame_corner_radius)
+    frame.pack(**(frame_pack_kwargs or {"fill": "x", "pady": 10}))
 
-    frame = ctk.CTkFrame(master, fg_color=CARD_COLOR, corner_radius=15)
-    frame.pack(fill="x", pady=10)
-
-    label = ctk.CTkLabel(frame, text=texto, text_color=TEXT_COLOR)
-    label.pack(side="left", padx=15, pady=15)
+    label = ctk.CTkLabel(frame, text=texto, text_color=label_text_color)
+    label.pack(**(label_pack_kwargs or {"side": "left", "padx": 15, "pady": 15}))
 
     btn = ctk.CTkButton(
         frame,
-        text="Seleccionar",
-        fg_color=PRIMARY_COLOR,
-        hover_color=ACCENT_COLOR,
-        command=comando
+        text=button_text,
+        fg_color=button_fg_color,
+        hover_color=button_hover_color,
+        text_color=button_text_color,
+        font=button_font,
+        width=button_width,
+        command=comando,
     )
-    btn.pack(side="right", padx=15)
+    btn.pack(**(button_pack_kwargs or {"side": "right", "padx": 15}))
 
-    return btn
+    return btn, label
+
+
+def input_archivo(master, texto, comando, **kwargs):
+    boton, _ = _crear_selector_archivo(
+        master,
+        texto,
+        comando,
+        button_text="Seleccionar",
+        label_text_color=TEXT_COLOR,
+        button_fg_color=PRIMARY_COLOR,
+        button_hover_color=ACCENT_COLOR,
+        button_width=kwargs.pop("button_width", 160),
+        button_font=kwargs.pop("button_font", FONT_BUTTON),
+        frame_fg_color=kwargs.pop("frame_fg_color", CARD_COLOR),
+        frame_corner_radius=kwargs.pop("frame_corner_radius", 15),
+        frame_pack_kwargs=kwargs.pop("frame_pack_kwargs", {"fill": "x", "pady": 10}),
+        label_pack_kwargs=kwargs.pop("label_pack_kwargs", {"side": "left", "padx": 15, "pady": 15}),
+        button_pack_kwargs=kwargs.pop("button_pack_kwargs", {"side": "right", "padx": 15}),
+        **kwargs,
+    )
+    return boton
 
 def card_opcion(master, titulo, descripcion, comando):
 
@@ -78,26 +118,25 @@ def crear_option_menu(frame, variable, opciones):
     return menu
 
 
-def crear_boton_archivo(frame, texto_etiqueta, comando):
-    contenedor = ctk.CTkFrame(frame, fg_color="transparent")
-    contenedor.pack(fill="x", padx=20, pady=(0, 10))
-
-    etiqueta_archivo = ctk.CTkLabel(contenedor, text=texto_etiqueta, text_color=WHITE_COLOR)
-    etiqueta_archivo.pack(side="left", padx=(0, 10))
-
-    boton = ctk.CTkButton(
-        contenedor,
-        text="Seleccionar archivo",
-        command=comando,
-        width=160,
-        fg_color=BUTTON_BG_COLOR,
-        hover_color=BUTTON_HOVER_BG_COLOR,
-        text_color=WHITE_COLOR,
-        font=FONT_BUTTON,
+def crear_boton_archivo(frame, texto_etiqueta, comando, **kwargs):
+    return _crear_selector_archivo(
+        frame,
+        texto_etiqueta,
+        comando,
+        frame_fg_color=kwargs.pop("frame_fg_color", "transparent"),
+        frame_corner_radius=kwargs.pop("frame_corner_radius", 0),
+        frame_pack_kwargs=kwargs.pop("frame_pack_kwargs", {"fill": "x", "padx": 20, "pady": (0, 10)}),
+        label_text_color=kwargs.pop("label_text_color", WHITE_COLOR),
+        label_pack_kwargs=kwargs.pop("label_pack_kwargs", {"side": "left", "padx": (0, 10)}),
+        button_text=kwargs.pop("button_text", "Seleccionar archivo"),
+        button_fg_color=kwargs.pop("button_fg_color", BUTTON_BG_COLOR),
+        button_hover_color=kwargs.pop("button_hover_color", BUTTON_HOVER_BG_COLOR),
+        button_text_color=kwargs.pop("button_text_color", WHITE_COLOR),
+        button_font=kwargs.pop("button_font", FONT_BUTTON),
+        button_width=kwargs.pop("button_width", 160),
+        button_pack_kwargs=kwargs.pop("button_pack_kwargs", {"side": "right", "padx": 10}),
+        **kwargs,
     )
-    boton.pack(side="right", padx=10)
-
-    return boton, etiqueta_archivo
 
 
 def boton_generador(master, texto, comando):

@@ -10,6 +10,13 @@ from .config import PatronesRegex, ServiciosConfig
 logger = logging.getLogger(__name__)
 
 
+def _normalizar_ascii(texto: str) -> str:
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(ch) != "Mn"
+    )
+
+
 class RUCExtractor:
     """Extractor de RUC desde PDFs."""
     
@@ -157,7 +164,7 @@ class ModalidadExtractor:
             return None
 
         modalidad_cruda = match.group(1).strip().upper()
-        modalidad_normalizada = self._normalizar_ascii(modalidad_cruda)
+        modalidad_normalizada = _normalizar_ascii(modalidad_cruda)
 
         if "HIBRIDA" in modalidad_normalizada or "HIBRIDO" in modalidad_normalizada:
             return "HÍBRIDA"
@@ -170,14 +177,6 @@ class ModalidadExtractor:
             logger.warning(f"Modalidad detectada pero no reconocida: {modalidad_cruda}")
         return None
 
-    @staticmethod
-    def _normalizar_ascii(texto: str) -> str:
-        return "".join(
-            ch for ch in unicodedata.normalize("NFD", texto)
-            if unicodedata.category(ch) != "Mn"
-        )
-
-
 class ContratoExtractor:
     """Detector de la frase que indica contrato de locacion de servicios."""
 
@@ -188,15 +187,8 @@ class ContratoExtractor:
         )
 
     def tiene_contrato(self, texto: str) -> bool:
-        texto_normalizado = self._normalizar_ascii(texto).upper()
+        texto_normalizado = _normalizar_ascii(texto).upper()
         return bool(self.patron_contrato.search(texto_normalizado))
-
-    @staticmethod
-    def _normalizar_ascii(texto: str) -> str:
-        return "".join(
-            ch for ch in unicodedata.normalize("NFD", texto)
-            if unicodedata.category(ch) != "Mn"
-        )
 
 
 class PDFExtractor:
@@ -242,19 +234,3 @@ class PDFExtractor:
     def tiene_contrato_locacion(self) -> bool:
         """Valida si la orden incluye la frase de contrato de locacion de servicios."""
         return self.contrato_extractor.tiene_contrato(self.texto)
-
-
-# Funciones de compatibilidad con código legacy
-def extraer_ruc(pdf_path: str, debug: bool = False) -> Optional[str]:
-    extractor = PDFExtractor(pdf_path)
-    return extractor.extraer_ruc(debug)
-
-
-def extraer_servicios(pdf_path: str, debug: bool = False) -> Optional[str]:
-    extractor = PDFExtractor(pdf_path)
-    return extractor.extraer_servicios(debug)
-
-
-def tiene_contrato_locacion(pdf_path: str) -> bool:
-    extractor = PDFExtractor(pdf_path)
-    return extractor.tiene_contrato_locacion()

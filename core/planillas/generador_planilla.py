@@ -37,7 +37,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
 
         for columna_contrato in ['N° Contrato', 'Nro_Contrato', 'Nro_contrato', 'Numero de contrato', 'Número de contrato']:
             if columna_contrato in datos_docentes.columns:
-                datos_docentes['N° Contrato'] = datos_docentes[columna_contrato].apply(formatear_numero_contrato)
+                datos_docentes['N° Contrato'] = datos_docentes[columna_contrato].apply(lambda valor: formatear_numero(valor, 4))
                 break
         else:
             datos_docentes['N° Contrato'] = ''

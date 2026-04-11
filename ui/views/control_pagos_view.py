@@ -4,11 +4,11 @@ import pandas as pd
 import sys
 import threading
 from tkinter import filedialog
-from services.control_pagos_service import actualizar_control_pagos_service
+from core.control_pagos.control_pagos import actualizar_control_pagos
 from ui.components import TextRedirector, boton_generador, crear_boton_archivo, crear_option_menu, etiqueta
 from ui.layout import boton_volver, footer, titulo
 from utils.gui_constants import BG_COLOR, CONSOLE_BG, SECTION_COLOR, WHITE_COLOR
-from utils import helpers as messagebox
+from utils import custom_modals as messagebox
 
 def iniciar_interfaz_control_pagos(callback_volver=None):
     ctk.set_appearance_mode("light")
@@ -81,7 +81,7 @@ def iniciar_interfaz_control_pagos(callback_volver=None):
             return
         def tarea():
             try:
-                actualizar_control_pagos_service(ruta_planilla, ruta_control, numero_armada.get())
+                actualizar_control_pagos(ruta_planilla, ruta_control, numero_armada.get())
                 messagebox.showinfo("Éxito", f"Control de pagos actualizado.")
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")

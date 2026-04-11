@@ -1,26 +1,25 @@
-from core.correos.envio_correos import (
-    TipoCorreo,
-    enviar_correo_contrato_primera_vez_desde_gui,
-    enviar_lote_desde_gui_administrativos,
-    enviar_lote_desde_gui_docentes,
-    procesar_correo_individual_contrato_primera_vez,
-    procesar_correos_administrativos_gmail,
-    procesar_correos_docente_gmail,
-)
+from core.correos.config import TipoCorreo
+from core.correos.email_sender import EmailPersonalizado, LoteEmailSender
+from core.correos.gmail_service import GmailService
+from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
 
 
 def generar_data_correo_service(es_modo_contrato, tipo_var, ruta_excel, pdfs, pdf_orden):
-    if es_modo_contrato:
-        return [], procesar_correo_individual_contrato_primera_vez(
-            ruta_excel=ruta_excel,
-            hoja="list",
-            pdf_orden_path=pdf_orden,
-            tipo=TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO,
-        )
+    gmail_service = GmailService()
+    processor = CorreosProcessor(gmail_service)
 
-    if tipo_var == "Docente":
-        return procesar_correos_docente_gmail(ruta_excel, "list", pdfs), None
-    return procesar_correos_administrativos_gmail(ruta_excel, "list", pdfs), None
+    if es_modo_contrato:
+        excel_reader = ExcelReader(ruta_excel, "list")
+        pdf_processor = PDFProcessor(
+            excel_reader,
+            incluir_servicio=tipo_var == "Docente",
+            incluir_modalidad=tipo_var == "Docente",
+        )
+        datos = pdf_processor.procesar_orden_individual_contrato_primera_vez(pdf_orden)
+        return [], datos.to_dict() if datos else None
+
+    tipo_correo = TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO
+    return processor.procesar_correos(ruta_excel, "list", pdfs, tipo_correo), None
 
 
 def enviar_correos_service(
@@ -35,20 +34,31 @@ def enviar_correos_service(
     anio,
     es_reconocimiento_deuda=False,
 ):
+    gmail_service = GmailService()
+    lote_sender = LoteEmailSender(gmail_service)
+    correo_individual = EmailPersonalizado(gmail_service)
+
     if es_modo_contrato:
-        return enviar_correo_contrato_primera_vez_desde_gui(
-            datos_envio=data_envio_individual,
+        return correo_individual.enviar_contrato_primera_vez(
+            nombre=data_envio_individual["nombre"],
+            pdf_orden_path=data_envio_individual["pdf_path"],
             pdf_contrato_path=pdf_contrato,
+            destinatario=data_envio_individual["correo"],
             mes=mes,
+            tipo=TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO,
             mes_inicio_contrato=mes_inicio,
             mes_fin_contrato=mes_fin,
-            tipo="docente" if tipo_var == "Docente" else "administrativo",
+            servicio=data_envio_individual.get("servicio"),
+            modalidad=data_envio_individual.get("modalidad"),
             anio=anio,
         )
 
-    if tipo_var == "Docente":
-        enviar_lote_desde_gui_docentes(data_envio, mes, anio, es_reconocimiento_deuda)
-    else:
-        enviar_lote_desde_gui_administrativos(data_envio, mes, anio, es_reconocimiento_deuda)
+    lote_sender.enviar_lote(
+        data_envio,
+        mes,
+        TipoCorreo.DOCENTE if tipo_var == "Docente" else TipoCorreo.ADMINISTRATIVO,
+        anio,
+        es_reconocimiento_deuda,
+    )
 
     return True
