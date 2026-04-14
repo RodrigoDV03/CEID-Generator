@@ -6,7 +6,7 @@ from tkinter import filedialog
 from datetime import datetime
 
 from services.correo_service import generar_data_correo_service, enviar_correos_service
-
+from ui.modals.editar_correos_modal import EditarCorreosModal, EditarCorreoIndividualModal
 from ui.components import TextRedirector
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
@@ -34,7 +34,7 @@ def mostrar_correos(app):
     pdf_contrato = ""
 
     data_envio = []
-    data_envio_individual = None
+    data_envio_individual_contenedor = [None]  # Usar contenedor para nonlocal
 
     # =========================
     # CONTENEDOR
@@ -225,8 +225,10 @@ def mostrar_correos(app):
 
     def validar_envio():
         if es_modo_contrato():
-            btn_enviar.configure(state="normal" if data_envio_individual else "disabled")
+            btn_editar_individual.configure(state="normal" if data_envio_individual_contenedor[0] else "disabled")
+            btn_enviar.configure(state="normal" if data_envio_individual_contenedor[0] else "disabled")
         else:
+            btn_editar_masivo.configure(state="normal" if data_envio else "disabled")
             btn_enviar.configure(state="normal" if data_envio else "disabled")
 
     # =====================================================
@@ -239,7 +241,7 @@ def mostrar_correos(app):
     estado_lbl.pack(anchor="w", padx=20)
 
     def generar_data():
-        nonlocal data_envio, data_envio_individual
+        nonlocal data_envio
 
         def tarea():
             try:
@@ -252,9 +254,11 @@ def mostrar_correos(app):
                 )
 
                 if es_modo_contrato():
-                    data_envio_individual = data_envio_individual_resultado
-                    if data_envio_individual:
+                    if data_envio_individual_resultado:
+                        data_envio_individual_contenedor[0] = data_envio_individual_resultado
                         set_estado(estado_lbl, "Correo individual listo", "#4CAF50")
+                    else:
+                        set_estado(estado_lbl, "Error al procesar correo", ACCENT_COLOR)
                 else:
                     data_envio[:] = data_envio_resultado
                     set_estado(estado_lbl, f"{len(data_envio)} correos listos", "#4CAF50")
@@ -272,8 +276,86 @@ def mostrar_correos(app):
                                 command=generar_data)
     btn_generar.pack(padx=20, pady=10)
 
+    # Botones de edición (masivo e individual)
+    def abrir_editar_correos():
+        """Abre modal para editar múltiples correos."""
+        if not data_envio:
+            messagebox.showwarning("Advertencia", "No hay correos para editar")
+            return
+        
+        def guardar_cambios(datos_editados):
+            nonlocal data_envio
+            data_envio[:] = datos_editados
+            set_estado(estado_lbl, f"{len(data_envio)} correos editados", "#FFD700")
+            messagebox.showinfo("Éxito", "Cambios guardados correctamente")
+        
+        EditarCorreosModal(app.root if hasattr(app, 'root') else app.winfo_toplevel(), data_envio, guardar_cambios)
+
+    def abrir_editar_individual():
+        """Abre modal para editar correo individual (contrato)."""
+        if not data_envio_individual_contenedor[0]:
+            messagebox.showwarning("Advertencia", "No hay correo para editar")
+            return
+        
+        def guardar_cambios(datos_editado):
+            data_envio_individual_contenedor[0] = datos_editado
+            set_estado(estado_lbl, "Correo individual editado", "#FFD700")
+            messagebox.showinfo("Éxito", "Cambios guardados correctamente")
+        
+        EditarCorreoIndividualModal(app.root if hasattr(app, 'root') else app.winfo_toplevel(), data_envio_individual_contenedor[0], guardar_cambios)
+
+    btn_editar_masivo = ctk.CTkButton(
+        frame_validar,
+        text="Editar correos",
+        fg_color=PRIMARY_COLOR,
+        hover_color=ACCENT_COLOR,
+        state="disabled",
+        command=abrir_editar_correos
+    )
+    
+    btn_editar_individual = ctk.CTkButton(
+        frame_validar,
+        text="Editar correo",
+        fg_color=PRIMARY_COLOR,
+        hover_color=ACCENT_COLOR,
+        state="disabled",
+        command=abrir_editar_individual
+    )
+    
+    # Mostrar u ocultar botones de edición según modo
+    def actualizar_botones_edicion(*_):
+        if es_modo_contrato():
+            btn_editar_masivo.pack_forget()
+            btn_editar_individual.pack(side="left", padx=10, pady=10)
+        else:
+            btn_editar_individual.pack_forget()
+            btn_editar_masivo.pack(side="left", padx=10, pady=10)
+    
+    def validar_envio_mejorado():
+        """Valida y habilita/deshabilita botones de edición."""
+        if es_modo_contrato():
+            estado_edicion = "normal" if data_envio_individual_contenedor[0] else "disabled"
+            btn_editar_individual.configure(state=estado_edicion)
+            btn_enviar.configure(state="normal" if data_envio_individual_contenedor[0] else "disabled")
+        else:
+            estado_edicion = "normal" if data_envio else "disabled"
+            btn_editar_masivo.configure(state=estado_edicion)
+            btn_enviar.configure(state="normal" if data_envio else "disabled")
+    
+    def validar_generar():
+        if es_modo_contrato():
+            btn_generar.configure(state="normal" if ruta_excel and pdf_orden and pdf_contrato else "disabled")
+        else:
+            btn_generar.configure(state="normal" if ruta_excel and pdfs else "disabled")
+
+    def validar_envio():
+        validar_envio_mejorado()
+    
+    modo_var.trace_add("write", actualizar_botones_edicion)
+
     actualizar_modo()
     actualizar_campos_modo()
+    actualizar_botones_edicion()
     validar_generar()
 
     # =====================================================
@@ -299,7 +381,7 @@ def mostrar_correos(app):
                     es_modo_contrato=es_modo_contrato(),
                     tipo_var=tipo_var.get(),
                     data_envio=data_envio,
-                    data_envio_individual=data_envio_individual,
+                    data_envio_individual=data_envio_individual_contenedor[0],
                     pdf_contrato=pdf_contrato,
                     mes=mes_var.get(),
                     mes_inicio=mes_inicio_contrato_var.get(),

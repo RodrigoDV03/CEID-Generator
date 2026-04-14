@@ -38,7 +38,7 @@ def mostrar_planilla(app):
         label.configure(text=texto, text_color=color)
 
     def validar_formulario():
-        valido = archivo_cursos and archivo_docentes and archivo_clasif
+        valido = archivo_cursos and archivo_docentes
         btn_generar.configure(state="normal" if valido else "disabled")
 
     # =====================================================
@@ -123,7 +123,6 @@ def mostrar_planilla(app):
 
     selector_archivo(frame_archivos, "Cursos (CSV)", ("CSV", "*.csv"), set_cursos)
     selector_archivo(frame_archivos, "Docentes (Excel)", ("Excel", "*.xlsx *.xls"), set_docentes)
-    selector_archivo(frame_archivos, "Clasificación", ("Excel", "*.xlsx *.xls"), set_clasif)
 
     # =====================================================
     # ③ OPCIONAL
@@ -131,14 +130,15 @@ def mostrar_planilla(app):
     frame_extra = ctk.CTkFrame(contenedor, fg_color=CARD_COLOR, corner_radius=15)
     frame_extra.pack(fill="x", pady=10)
 
-    ctk.CTkLabel(frame_extra, text="Archivos adicionales", font=FONT_SECTION, text_color=TEXT_COLOR)\
+    ctk.CTkLabel(frame_extra, text="Archivos adicionales (Opcionales)", font=FONT_SECTION, text_color=TEXT_COLOR)\
         .pack(anchor="w", padx=20, pady=(15, 10))
 
     def set_coord(v): 
         nonlocal archivo_coordinacion
         archivo_coordinacion = v
 
-    selector_archivo(frame_extra, "Coordinación", ("Excel", "*.xlsx *.xls"), set_coord)
+    selector_archivo(frame_extra, "Examen de Clasificación", ("Excel", "*.xlsx *.xls"), set_clasif)
+    selector_archivo(frame_extra, "Apoyo Docente", ("Excel", "*.xlsx *.xls"), set_coord)
 
     # =====================================================
     # ④ DESTINO
