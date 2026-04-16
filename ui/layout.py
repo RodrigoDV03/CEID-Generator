@@ -33,9 +33,6 @@ class AppLayout:
     def __init__(self, titulo="Sistema CEID"):
         self.root = ctk.CTk()
         self.root.title(titulo)
-        # Apertura maximizada consistente en Windows.
-        self.root.geometry(f"{self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()}+0+0")
-        self.root.state("zoomed")
         self.root.minsize(1280, 720)
         self.root.configure(fg_color=BG_COLOR)
         self.botones_sidebar = []
@@ -110,4 +107,12 @@ class AppLayout:
         boton.configure(fg_color=ACCENT_COLOR)
 
     def ejecutar(self):
+        self.root.update_idletasks()
+        self.root.after(0, self._maximizar_ventana)
         self.root.mainloop()
+
+    def _maximizar_ventana(self):
+        try:
+            self.root.state("zoomed")
+        except Exception:
+            self.root.geometry(f"{self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()}+0+0")
