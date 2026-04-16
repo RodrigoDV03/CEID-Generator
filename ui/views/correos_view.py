@@ -1,7 +1,8 @@
 import customtkinter as ctk
 import os
-import sys
 import threading
+import io
+import contextlib
 from tkinter import filedialog
 from datetime import datetime
 
@@ -11,9 +12,23 @@ from services.correo_service import (
     previsualizar_correos_service,
 )
 from ui.modals.preview_correos_modal import PreviewCorreosModal
-from ui.components import TextRedirector
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
+
+
+class _CallbackStream(io.TextIOBase):
+    def __init__(self, callback):
+        super().__init__()
+        self._callback = callback
+
+    def write(self, s):
+        if not s:
+            return 0
+        self._callback(s)
+        return len(s)
+
+    def flush(self):
+        return None
 
 
 def mostrar_correos(app):
@@ -248,21 +263,18 @@ def mostrar_correos(app):
             previsualizaciones[:] = previews_editadas
             set_estado(estado_lbl, "Previsualización actualizada", "#FFD700")
 
-        def on_send(previews_editadas):
+        def on_send(previews_editadas, log_callback, done_callback):
             previsualizaciones[:] = previews_editadas
 
             def tarea_envio():
+                stream = _CallbackStream(lambda texto: root.after(0, lambda t=texto: log_callback(t)))
                 try:
-                    resumen = enviar_previsualizaciones_service(previsualizaciones)
-                    root.after(
-                        0,
-                        lambda: messagebox.showinfo(
-                            "Éxito",
-                            f"Envío completado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos",
-                        ),
-                    )
+                    root.after(0, lambda: log_callback("Iniciando envío de correos...\n"))
+                    with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
+                        resumen = enviar_previsualizaciones_service(previsualizaciones)
+                    root.after(0, lambda: done_callback(resumen, None))
                 except Exception as e:
-                    root.after(0, lambda: messagebox.showerror("Error", str(e)))
+                    root.after(0, lambda: done_callback(None, str(e)))
 
             threading.Thread(target=tarea_envio, daemon=True).start()
 
@@ -339,16 +351,3 @@ def mostrar_correos(app):
     actualizar_modo()
     actualizar_campos_modo()
     validar_generar()
-
-    # =====================================================
-    # CONSOLA
-    # =====================================================
-    consola_frame = ctk.CTkFrame(contenedor, fg_color=CONSOLE_BG)
-    consola_frame.pack(fill="both", expand=True, pady=10)
-
-    consola = ctk.CTkTextbox(consola_frame, fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
-    consola.pack(fill="both", expand=True, padx=10, pady=10)
-    consola.configure(state="disabled")
-
-    sys.stdout = TextRedirector(consola)
-    sys.stderr = TextRedirector(consola)

@@ -70,7 +70,7 @@ def enviar_correos_service(
             anio=anio,
         )
 
-    lote_sender.enviar_lote(
+    resumen = lote_sender.enviar_lote(
         data_envio,
         mes,
         _resolver_tipo_correo(tipo_var),
@@ -78,7 +78,7 @@ def enviar_correos_service(
         es_reconocimiento_deuda,
     )
 
-    return True
+    return resumen["fallidos"] == 0
 
 
 def previsualizar_correos_service(
@@ -99,8 +99,6 @@ def previsualizar_correos_service(
     asunto, cuerpo_html, pdf_path, pdf_paths, destinatario, nombre.
     """
     tipo = _resolver_tipo_correo(tipo_var)
-    firma_html = _obtener_gmail_service().obtener_firma()
-
     previsualizaciones = []
     for datos in data_envio:
         if es_modo_contrato:
@@ -110,7 +108,8 @@ def previsualizar_correos_service(
             builder = EmailBuilderFactory.crear_builder(tipo)
             builder.con_reconocimiento_deuda(es_reconocimiento_deuda)
 
-        builder.con_mes(mes).con_anio(anio).con_firma(firma_html).con_nombre(datos["nombre"])
+        # No se inyecta firma en el cuerpo: Gmail la aplica al enviar el draft.
+        builder.con_mes(mes).con_anio(anio).con_firma("").con_nombre(datos["nombre"])
 
         if tipo == TipoCorreo.DOCENTE:
             builder.con_servicio(datos.get("servicio", ""))

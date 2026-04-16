@@ -203,15 +203,17 @@ class PDFProcessor:
         return resultados
 
     def procesar_orden_individual_contrato_primera_vez(self, pdf_orden_path: str) -> Optional[DatosEnvio]:
-        """Procesa una sola orden y valida que indique contrato de locacion."""
+        """Procesa una sola orden y advierte si no detecta frase de contrato."""
         extractor = PDFExtractor(pdf_orden_path)
 
         if not extractor.tiene_contrato_locacion():
             logger.warning(
                 f"La orden no contiene la frase de contrato de locacion: {os.path.basename(pdf_orden_path)}"
             )
-            print("⚠ La orden seleccionada no contiene 'CONTRATO DE LOCACION DE SERVICIOS'.")
-            return None
+            print(
+                "⚠ Advertencia: la orden seleccionada no contiene 'CONTRATO DE LOCACION DE SERVICIOS'. "
+                "Se continuara con el flujo."
+            )
 
         return self.procesar_pdf(pdf_orden_path)
 

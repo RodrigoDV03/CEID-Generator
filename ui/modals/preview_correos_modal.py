@@ -21,6 +21,8 @@ class PreviewCorreosModal:
         self.on_send = on_send
 
         self.idx_correo = 0
+        self.idx_adjunto = 0
+        self.pdf_paths_actuales = []
         self.idx_pagina_pdf = 0
         self.total_paginas_pdf = 1
         self._img_ref = None
@@ -38,9 +40,8 @@ class PreviewCorreosModal:
 
         self.window = ctk.CTkToplevel(parent)
         self.window.title("Previsualizar correos")
-        self.window.geometry("1300x760")
-        self.window.state("zoomed")
-        self.window.minsize(1100, 650)
+        self.window.geometry("1280x760")
+        self.window.minsize(1100, 680)
         self.window.transient(parent)
         self.window.grab_set()
         self.window.configure(fg_color=BG_COLOR)
@@ -69,7 +70,7 @@ class PreviewCorreosModal:
         self.lbl_dest.pack(anchor="w", padx=14, pady=(0, 10))
 
         split = ctk.CTkFrame(self.window, fg_color="transparent")
-        split.pack(fill="both", expand=True, padx=12, pady=(0, 10))
+        split.pack(fill="both", expand=True, padx=12, pady=(0, 8))
         split.columnconfigure(0, weight=1)
         split.columnconfigure(1, weight=1)
         split.rowconfigure(0, weight=1)
@@ -78,6 +79,30 @@ class PreviewCorreosModal:
         panel_pdf.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
 
         ctk.CTkLabel(panel_pdf, text="PDF adjunto", text_color=TEXT_COLOR, font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=12, pady=(10, 6))
+
+        nav_adjuntos = ctk.CTkFrame(panel_pdf, fg_color="transparent")
+        nav_adjuntos.pack(fill="x", padx=10, pady=(0, 6))
+
+        self.btn_prev_adjunto = ctk.CTkButton(
+            nav_adjuntos,
+            text="Adjunto ◄",
+            width=90,
+            fg_color=PRIMARY_COLOR,
+            command=self._anterior_adjunto,
+        )
+        self.btn_prev_adjunto.pack(side="left")
+
+        self.lbl_adjunto = ctk.CTkLabel(nav_adjuntos, text="Adjunto 1 de 1", text_color=TEXT_LIGHT)
+        self.lbl_adjunto.pack(side="left", expand=True)
+
+        self.btn_next_adjunto = ctk.CTkButton(
+            nav_adjuntos,
+            text="► Adjunto",
+            width=90,
+            fg_color=PRIMARY_COLOR,
+            command=self._siguiente_adjunto,
+        )
+        self.btn_next_adjunto.pack(side="right")
 
         canvas_wrap = ctk.CTkFrame(panel_pdf, fg_color="transparent")
         canvas_wrap.pack(fill="both", expand=True, padx=10, pady=4)
@@ -142,6 +167,33 @@ class PreviewCorreosModal:
         self.txt_cuerpo = ctk.CTkTextbox(panel_msg, fg_color="#FFFFFF", text_color="#000000", wrap="word", font=("Segoe UI", 11))
         self.txt_cuerpo.pack(fill="both", expand=True, padx=12, pady=(4, 10))
 
+        self.logs_frame = ctk.CTkFrame(self.window, fg_color=CARD_COLOR)
+        self.logs_visible = False
+
+        logs_header = ctk.CTkFrame(self.logs_frame, fg_color="transparent")
+        logs_header.pack(fill="x", padx=10, pady=(8, 4))
+
+        ctk.CTkLabel(
+            logs_header,
+            text="Registro en vivo de envío",
+            text_color=TEXT_COLOR,
+            font=("Segoe UI", 11, "bold"),
+        ).pack(side="left")
+
+        self.lbl_estado_envio = ctk.CTkLabel(logs_header, text="", text_color=TEXT_LIGHT)
+        self.lbl_estado_envio.pack(side="right")
+
+        self.txt_logs = ctk.CTkTextbox(
+            self.logs_frame,
+            fg_color=CONSOLE_BG,
+            text_color=WHITE_COLOR,
+            wrap="word",
+            height=170,
+            font=("Consolas", 11),
+        )
+        self.txt_logs.pack(fill="both", expand=False, padx=10, pady=(0, 10))
+        self.txt_logs.configure(state="disabled")
+
         footer = ctk.CTkFrame(self.window, fg_color=CARD_COLOR)
         footer.pack(fill="x", padx=12, pady=(0, 12))
 
@@ -150,7 +202,51 @@ class PreviewCorreosModal:
 
         ctk.CTkButton(btns, text="Cerrar", fg_color=BG_COLOR, text_color=TEXT_COLOR, command=self._cerrar).pack(side="left")
         ctk.CTkButton(btns, text="Guardar cambios", fg_color=PRIMARY_COLOR, hover_color=ACCENT_COLOR, command=self._guardar).pack(side="right", padx=(8, 0))
-        ctk.CTkButton(btns, text="Enviar correos", fg_color=ACCENT_COLOR, hover_color=PRIMARY_COLOR, command=self._enviar).pack(side="right")
+        self.btn_enviar = ctk.CTkButton(
+            btns,
+            text="Enviar correos",
+            fg_color=ACCENT_COLOR,
+            hover_color=PRIMARY_COLOR,
+            command=self._enviar,
+        )
+        self.btn_enviar.pack(side="right")
+
+    def _mostrar_panel_logs(self):
+        if not self.logs_visible:
+            self.logs_frame.pack(fill="x", padx=12, pady=(0, 8), before=self.window.pack_slaves()[-1])
+            self.logs_visible = True
+
+    def _append_log(self, texto):
+        self._mostrar_panel_logs()
+        self.txt_logs.configure(state="normal")
+        self.txt_logs.insert("end", texto)
+        self.txt_logs.see("end")
+        self.txt_logs.configure(state="disabled")
+
+    def _limpiar_logs(self):
+        self._mostrar_panel_logs()
+        self.txt_logs.configure(state="normal")
+        self.txt_logs.delete("1.0", "end")
+        self.txt_logs.configure(state="disabled")
+
+    def _finalizar_envio(self, resumen, error):
+        self.btn_enviar.configure(state="normal")
+
+        if error:
+            self.lbl_estado_envio.configure(text="Error", text_color="#ff6b6b")
+            self._append_log(f"\n❌ Error: {error}\n")
+            messagebox.showerror("Error", error, parent=self.window)
+            return
+
+        self.lbl_estado_envio.configure(text="Completado", text_color="#4CAF50")
+        self._append_log(
+            f"\n✅ Envío finalizado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos\n"
+        )
+        messagebox.showinfo(
+            "Éxito",
+            f"Envío completado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos",
+            parent=self.window,
+        )
 
     def _strip_html(self, html_text):
         texto = html_text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
@@ -161,11 +257,27 @@ class PreviewCorreosModal:
         texto = re.sub(r"\n{3,}", "\n\n", texto)
         return texto.strip()
 
-    def _texto_a_html(self, texto):
-        partes = [f"<p>{escape(linea)}</p>" for linea in texto.split("\n\n") if linea.strip()]
-        if not partes:
-            return "<html><body><p></p></body></html>"
-        return "<html><body style=\"font-family: Arial; font-size: 11pt;\">" + "".join(partes) + "</body></html>"
+    def _texto_a_html(self, texto, html_base=None):
+        body_attrs = ' style="font-family: Arial; font-size: 11pt;"'
+        if html_base:
+            match_body = re.search(r"<body([^>]*)>", html_base, flags=re.IGNORECASE)
+            if match_body:
+                body_attrs = match_body.group(1)
+
+        bloques_html = []
+        for bloque in [b.strip() for b in texto.split("\n\n") if b.strip()]:
+            lineas = [linea.strip() for linea in bloque.split("\n") if linea.strip()]
+            if lineas and all(linea.startswith("- ") for linea in lineas):
+                items = "".join(f"<li>{escape(linea[2:].strip())}</li>" for linea in lineas)
+                bloques_html.append(f"<ul>{items}</ul>")
+            else:
+                contenido = "<br>".join(escape(linea) for linea in lineas)
+                bloques_html.append(f"<p>{contenido}</p>")
+
+        if not bloques_html:
+            bloques_html = ["<p></p>"]
+
+        return f"<html><body{body_attrs}>" + "".join(bloques_html) + "</body></html>"
 
     def _guardar_estado_actual(self):
         if not self.data or not self._form_loaded:
@@ -177,7 +289,28 @@ class PreviewCorreosModal:
         if texto == item.get("cuerpo_texto_original", ""):
             item["cuerpo_html"] = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
         else:
-            item["cuerpo_html"] = self._texto_a_html(texto)
+            item["cuerpo_html"] = self._texto_a_html(
+                texto,
+                html_base=item.get("cuerpo_html_original", item.get("cuerpo_html", "")),
+            )
+
+    def _obtener_pdf_actual(self):
+        if not self.pdf_paths_actuales:
+            return ""
+        idx = max(0, min(self.idx_adjunto, len(self.pdf_paths_actuales) - 1))
+        return self.pdf_paths_actuales[idx]
+
+    def _actualizar_navegacion_adjuntos(self):
+        total = len(self.pdf_paths_actuales)
+        if total == 0:
+            self.lbl_adjunto.configure(text="Adjunto 0 de 0")
+            self.btn_prev_adjunto.configure(state="disabled")
+            self.btn_next_adjunto.configure(state="disabled")
+            return
+
+        self.lbl_adjunto.configure(text=f"Adjunto {self.idx_adjunto + 1} de {total}")
+        self.btn_prev_adjunto.configure(state="normal" if self.idx_adjunto > 0 else "disabled")
+        self.btn_next_adjunto.configure(state="normal" if self.idx_adjunto < total - 1 else "disabled")
 
     def _mostrar_correo(self, idx):
         if not self.data:
@@ -186,12 +319,15 @@ class PreviewCorreosModal:
 
         idx = max(0, min(idx, len(self.data) - 1))
         self.idx_correo = idx
+        self.idx_adjunto = 0
         self.idx_pagina_pdf = 0
         self.zoom_factor = 1.0
         self.zoom_slider.set(self.zoom_factor)
         self._actualizar_zoom_label()
 
         item = self.data[idx]
+        self.pdf_paths_actuales = item.get("pdf_paths") or [item.get("pdf_path", "")]
+        self._actualizar_navegacion_adjuntos()
 
         self.lbl_correo.configure(text=f"Correo {idx + 1} de {len(self.data)}")
         self.lbl_dest.configure(text=f"Para: {item.get('nombre', '')} <{item.get('destinatario', '')}>")
@@ -205,7 +341,7 @@ class PreviewCorreosModal:
         self.txt_cuerpo.insert("1.0", item.get("cuerpo_texto", ""))
         self._form_loaded = True
 
-        self._renderizar_pdf(item.get("pdf_path", ""), 0)
+        self._renderizar_pdf(self._obtener_pdf_actual(), 0)
 
     def _renderizar_pdf(self, pdf_path, pagina=0):
         try:
@@ -259,20 +395,20 @@ class PreviewCorreosModal:
         self.zoom_slider.set(nuevo_zoom)
         self._actualizar_zoom_label()
         if self.data:
-            self._renderizar_pdf(self.data[self.idx_correo].get("pdf_path", ""), self.idx_pagina_pdf)
+            self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf)
 
     def _on_zoom_slider(self, value):
         self.zoom_factor = float(value)
         self._actualizar_zoom_label()
         if self.data:
-            self._renderizar_pdf(self.data[self.idx_correo].get("pdf_path", ""), self.idx_pagina_pdf)
+            self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf)
 
     def _reset_zoom(self):
         self.zoom_factor = 1.0
         self.zoom_slider.set(1.0)
         self._actualizar_zoom_label()
         if self.data:
-            self._renderizar_pdf(self.data[self.idx_correo].get("pdf_path", ""), self.idx_pagina_pdf)
+            self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf)
 
     def _ctrl_presionado(self, event):
         # Tk usa bitmask en event.state; 0x0004 representa Control en Windows/X11.
@@ -328,10 +464,24 @@ class PreviewCorreosModal:
             self._mostrar_correo(self.idx_correo + 1)
 
     def _anterior_pagina(self):
-        self._renderizar_pdf(self.data[self.idx_correo].get("pdf_path", ""), self.idx_pagina_pdf - 1)
+        self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf - 1)
 
     def _siguiente_pagina(self):
-        self._renderizar_pdf(self.data[self.idx_correo].get("pdf_path", ""), self.idx_pagina_pdf + 1)
+        self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf + 1)
+
+    def _anterior_adjunto(self):
+        if self.idx_adjunto > 0:
+            self.idx_adjunto -= 1
+            self.idx_pagina_pdf = 0
+            self._actualizar_navegacion_adjuntos()
+            self._renderizar_pdf(self._obtener_pdf_actual(), 0)
+
+    def _siguiente_adjunto(self):
+        if self.idx_adjunto < len(self.pdf_paths_actuales) - 1:
+            self.idx_adjunto += 1
+            self.idx_pagina_pdf = 0
+            self._actualizar_navegacion_adjuntos()
+            self._renderizar_pdf(self._obtener_pdf_actual(), 0)
 
     def _on_pdf_resize(self, _event):
         if not self.data:
@@ -340,7 +490,7 @@ class PreviewCorreosModal:
             self.window.after_cancel(self._render_job)
         self._render_job = self.window.after(
             120,
-            lambda: self._renderizar_pdf(self.data[self.idx_correo].get("pdf_path", ""), self.idx_pagina_pdf),
+            lambda: self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf),
         )
 
     def _guardar(self):
@@ -354,8 +504,12 @@ class PreviewCorreosModal:
         if not self.on_send:
             return
         try:
-            self.on_send(copy.deepcopy(self.data))
+            self._limpiar_logs()
+            self.lbl_estado_envio.configure(text="Enviando...", text_color="#FFD700")
+            self.btn_enviar.configure(state="disabled")
+            self.on_send(copy.deepcopy(self.data), self._append_log, self._finalizar_envio)
         except Exception as e:
+            self.btn_enviar.configure(state="normal")
             messagebox.showerror("Error", str(e), parent=self.window)
 
     def _cerrar(self):
