@@ -184,7 +184,7 @@ class EmailPersonalizado:
         try:
             # Construir el correo según el tipo
             builder = EmailBuilderFactory.crear_builder(tipo)
-            builder.con_mes(mes).con_anio(anio).con_firma(self.firma_html).con_nombre(nombre)
+            builder.con_mes(mes).con_anio(anio).con_firma("").con_nombre(nombre)
             builder.con_reconocimiento_deuda(es_reconocimiento_deuda)
             
             if tipo == TipoCorreo.DOCENTE:
@@ -228,7 +228,7 @@ class EmailPersonalizado:
 
         try:
             builder = EmailBuilderFactory.crear_builder_contrato_primera_vez(tipo)
-            builder.con_mes(mes).con_anio(anio).con_firma(self.firma_html).con_nombre(nombre)
+            builder.con_mes(mes).con_anio(anio).con_firma("").con_nombre(nombre)
             builder.con_periodo_contrato(mes_inicio_contrato, mes_fin_contrato)
 
             if tipo == TipoCorreo.DOCENTE:

@@ -1,5 +1,6 @@
 from core.correos.config import TipoCorreo
-from core.correos.email_sender import EmailPersonalizado, LoteEmailSender
+from core.correos.email_builder import EmailBuilderFactory
+from core.correos.email_sender import EmailPersonalizado, GmailEmailSender, LoteEmailSender
 from core.correos.gmail_service import GmailService
 from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
 
@@ -69,7 +70,7 @@ def enviar_correos_service(
             anio=anio,
         )
 
-    lote_sender.enviar_lote(
+    resumen = lote_sender.enviar_lote(
         data_envio,
         mes,
         _resolver_tipo_correo(tipo_var),
@@ -77,4 +78,89 @@ def enviar_correos_service(
         es_reconocimiento_deuda,
     )
 
-    return True
+    return resumen["fallidos"] == 0
+
+
+def previsualizar_correos_service(
+    data_envio,
+    mes,
+    tipo_var,
+    anio,
+    es_reconocimiento_deuda=False,
+    es_modo_contrato=False,
+    mes_inicio=None,
+    mes_fin=None,
+    pdf_contrato=None,
+):
+    """
+    Genera asunto y cuerpo HTML para cada correo sin enviarlo.
+
+    Retorna una lista de diccionarios con:
+    asunto, cuerpo_html, pdf_path, pdf_paths, destinatario, nombre.
+    """
+    tipo = _resolver_tipo_correo(tipo_var)
+    previsualizaciones = []
+    for datos in data_envio:
+        if es_modo_contrato:
+            builder = EmailBuilderFactory.crear_builder_contrato_primera_vez(tipo)
+            builder.con_periodo_contrato(mes_inicio, mes_fin)
+        else:
+            builder = EmailBuilderFactory.crear_builder(tipo)
+            builder.con_reconocimiento_deuda(es_reconocimiento_deuda)
+
+        # No se inyecta firma en el cuerpo: Gmail la aplica al enviar el draft.
+        builder.con_mes(mes).con_anio(anio).con_firma("").con_nombre(datos["nombre"])
+
+        if tipo == TipoCorreo.DOCENTE:
+            builder.con_servicio(datos.get("servicio", ""))
+            builder.con_modalidad(datos.get("modalidad", ""))
+
+        pdf_paths = [datos["pdf_path"]]
+        if es_modo_contrato and pdf_contrato:
+            pdf_paths.append(pdf_contrato)
+
+        previsualizaciones.append(
+            {
+                "asunto": builder.construir_asunto(),
+                "cuerpo_html": builder.construir_cuerpo(),
+                "pdf_path": datos["pdf_path"],
+                "pdf_paths": pdf_paths,
+                "destinatario": datos["correo"],
+                "nombre": datos["nombre"],
+            }
+        )
+
+    return previsualizaciones
+
+
+def enviar_previsualizaciones_service(previsualizaciones_editadas):
+    """
+    Envia correos usando asunto/cuerpo ya editados en previsualizacion.
+
+    Cada item debe incluir: destinatario, asunto, cuerpo_html y pdf_paths.
+    """
+    gmail_service = _obtener_gmail_service()
+    sender = GmailEmailSender(gmail_service)
+
+    exitosos = 0
+    fallidos = 0
+
+    for item in previsualizaciones_editadas:
+        try:
+            sender.enviar_con_firma(
+                destinatario=item["destinatario"],
+                asunto=item["asunto"],
+                cuerpo_html=item["cuerpo_html"],
+                pdf_paths=item.get("pdf_paths") or [item.get("pdf_path")],
+            )
+            print(f"Correo enviado a {item.get('nombre', item['destinatario'])}")
+            exitosos += 1
+        except Exception as e:
+            print(f"Error enviando correo a {item.get('nombre', item['destinatario'])}: {e}")
+            fallidos += 1
+
+    return {
+        "exitosos": exitosos,
+        "fallidos": fallidos,
+        "total": len(previsualizaciones_editadas),
+    }
