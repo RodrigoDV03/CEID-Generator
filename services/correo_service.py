@@ -108,7 +108,7 @@ def previsualizar_correos_service(
             builder = EmailBuilderFactory.crear_builder(tipo)
             builder.con_reconocimiento_deuda(es_reconocimiento_deuda)
 
-        # No se inyecta firma en el cuerpo: Gmail la aplica al enviar el draft.
+        # La firma se deja a Gmail en el momento del envio.
         builder.con_mes(mes).con_anio(anio).con_firma("").con_nombre(datos["nombre"])
 
         if tipo == TipoCorreo.DOCENTE:
