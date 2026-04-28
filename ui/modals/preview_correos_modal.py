@@ -251,9 +251,26 @@ class PreviewCorreosModal:
     def _strip_html(self, html_text):
         texto = html_text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
         texto = texto.replace("</p>", "\n\n").replace("</li>", "\n")
-        texto = re.sub(r"<li[^>]*>", "- ", texto, flags=re.IGNORECASE)
+        # Ensure each list item starts on its own line and use a Unicode bullet
+        texto = re.sub(r"<li[^>]*>", "\n• ", texto, flags=re.IGNORECASE)
         texto = re.sub(r"<[^>]+>", "", texto)
         texto = unescape(texto)
+
+        # Collapse internal newlines inside a bullet paragraph so the bullet and
+        # its content appear on a single line; keep regular paragraphs separated
+        # by a blank line.
+        partes = re.split(r"\n{2,}", texto)
+        nuevas_partes = []
+        for p in partes:
+            p_strip = p.strip()
+            if p_strip.startswith("• "):
+                # Join internal lines in the bullet paragraph with spaces
+                joined = " ".join(line.strip() for line in p_strip.splitlines() if line.strip())
+                nuevas_partes.append(joined)
+            else:
+                nuevas_partes.append(p_strip)
+
+        texto = "\n\n".join(nuevas_partes)
         texto = re.sub(r"\n{3,}", "\n\n", texto)
         return texto.strip()
 
@@ -335,7 +352,8 @@ class PreviewCorreosModal:
             items_lista = []
             es_lista = bool(lineas_contenido)
             for linea in lineas_contenido:
-                match_item = re.match(r"^-\s*(.+)$", linea)
+                # Accept both hyphen and bullet as list markers
+                match_item = re.match(r"^(?:[-•])\s*(.+)$", linea)
                 if not match_item:
                     es_lista = False
                     break

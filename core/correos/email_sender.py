@@ -41,13 +41,18 @@ class GmailMessageBuilder:
         
         try:
             with open(pdf_path, 'rb') as adjunto:
-                parte = MIMEBase('application', 'octet-stream')
+                # Use explicit PDF content type and ensure filename is encoded
+                parte = MIMEBase('application', 'pdf')
                 parte.set_payload(adjunto.read())
                 encoders.encode_base64(parte)
-                parte.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename={os.path.basename(pdf_path)}'
-                )
+                filename = os.path.basename(pdf_path)
+                # Add Content-Type name parameter with RFC2231 encoding and
+                # Content-Disposition with encoded filename to preserve non-ASCII
+                # characters such as 'ñ'. The tuple (charset, language, text)
+                # passed to add_header triggers RFC2231 encoding in the email
+                # package.
+                parte.add_header('Content-Type', 'application/pdf', name=('utf-8', '', filename))
+                parte.add_header('Content-Disposition', 'attachment', filename=('utf-8', '', filename))
                 self.mensaje.attach(parte)
         except Exception as e:
             logger.error(f"Error adjuntando PDF {pdf_path}: {e}")
