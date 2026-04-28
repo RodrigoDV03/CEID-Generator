@@ -1,15 +1,34 @@
 import customtkinter as ctk
 import os
-import sys
 import threading
+import io
+import contextlib
 from tkinter import filedialog
 from datetime import datetime
 
-from services.correo_service import generar_data_correo_service, enviar_correos_service
-from ui.modals.editar_correos_modal import EditarCorreosModal, EditarCorreoIndividualModal
-from ui.components import TextRedirector
+from services.correo_service import (
+    generar_data_correo_service,
+    enviar_previsualizaciones_service,
+    previsualizar_correos_service,
+)
+from ui.modals.preview_correos_modal import PreviewCorreosModal
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
+
+
+class _CallbackStream(io.TextIOBase):
+    def __init__(self, callback):
+        super().__init__()
+        self._callback = callback
+
+    def write(self, s):
+        if not s:
+            return 0
+        self._callback(s)
+        return len(s)
+
+    def flush(self):
+        return None
 
 
 def mostrar_correos(app):
@@ -35,6 +54,7 @@ def mostrar_correos(app):
 
     data_envio = []
     data_envio_individual_contenedor = [None]  # Usar contenedor para nonlocal
+    previsualizaciones = []
 
     # =========================
     # CONTENEDOR
@@ -223,13 +243,7 @@ def mostrar_correos(app):
         else:
             btn_generar.configure(state="normal" if ruta_excel and pdfs else "disabled")
 
-    def validar_envio():
-        if es_modo_contrato():
-            btn_editar_individual.configure(state="normal" if data_envio_individual_contenedor[0] else "disabled")
-            btn_enviar.configure(state="normal" if data_envio_individual_contenedor[0] else "disabled")
-        else:
-            btn_editar_masivo.configure(state="normal" if data_envio else "disabled")
-            btn_enviar.configure(state="normal" if data_envio else "disabled")
+    root = app.root if hasattr(app, "root") else app.winfo_toplevel()
 
     # =====================================================
     # ③ VALIDAR
@@ -238,7 +252,33 @@ def mostrar_correos(app):
     frame_validar.pack(fill="x", pady=10)
 
     estado_lbl = ctk.CTkLabel(frame_validar, text="Sin validar", text_color=TEXT_LIGHT)
-    estado_lbl.pack(anchor="w", padx=20)
+    estado_lbl.pack(anchor="w", padx=20, pady=(12, 5))
+
+    def abrir_modal_previsualizacion():
+        if not previsualizaciones:
+            messagebox.showwarning("Advertencia", "No hay correos para previsualizar")
+            return
+
+        def on_save(previews_editadas):
+            previsualizaciones[:] = previews_editadas
+            set_estado(estado_lbl, "Previsualización actualizada", "#FFD700")
+
+        def on_send(previews_editadas, log_callback, done_callback):
+            previsualizaciones[:] = previews_editadas
+
+            def tarea_envio():
+                stream = _CallbackStream(lambda texto: root.after(0, lambda t=texto: log_callback(t)))
+                try:
+                    root.after(0, lambda: log_callback("Iniciando envío de correos...\n"))
+                    with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
+                        resumen = enviar_previsualizaciones_service(previsualizaciones)
+                    root.after(0, lambda: done_callback(resumen, None))
+                except Exception as e:
+                    root.after(0, lambda: done_callback(None, str(e)))
+
+            threading.Thread(target=tarea_envio, daemon=True).start()
+
+        PreviewCorreosModal(root, previsualizaciones, on_save=on_save, on_send=on_send)
 
     def generar_data():
         nonlocal data_envio
@@ -254,155 +294,60 @@ def mostrar_correos(app):
                 )
 
                 if es_modo_contrato():
-                    if data_envio_individual_resultado:
-                        data_envio_individual_contenedor[0] = data_envio_individual_resultado
-                        set_estado(estado_lbl, "Correo individual listo", "#4CAF50")
-                    else:
-                        set_estado(estado_lbl, "Error al procesar correo", ACCENT_COLOR)
+                    if not data_envio_individual_resultado:
+                        root.after(0, lambda: set_estado(estado_lbl, "Error al procesar correo", ACCENT_COLOR))
+                        return
+
+                    data_envio_individual_contenedor[0] = data_envio_individual_resultado
+                    data_envio[:] = []
+                    lista_para_preview = [data_envio_individual_resultado]
+                    texto_estado = "Correo individual listo"
                 else:
                     data_envio[:] = data_envio_resultado
-                    set_estado(estado_lbl, f"{len(data_envio)} correos listos", "#4CAF50")
+                    data_envio_individual_contenedor[0] = None
+                    lista_para_preview = data_envio
+                    texto_estado = f"{len(data_envio)} correos listos"
 
-                validar_envio()
+                previsualizaciones_resultado = previsualizar_correos_service(
+                    data_envio=lista_para_preview,
+                    mes=mes_var.get(),
+                    tipo_var=tipo_var.get(),
+                    anio=int(año_var.get()),
+                    es_reconocimiento_deuda=es_modo_reconocimiento_deuda(),
+                    es_modo_contrato=es_modo_contrato(),
+                    mes_inicio=mes_inicio_contrato_var.get(),
+                    mes_fin=mes_fin_contrato_var.get(),
+                    pdf_contrato=pdf_contrato,
+                )
+
+                def aplicar_resultado():
+                    set_estado(estado_lbl, texto_estado, "#4CAF50")
+                    previsualizaciones[:] = previsualizaciones_resultado
+                    abrir_modal_previsualizacion()
+
+                root.after(0, aplicar_resultado)
 
             except Exception as e:
-                messagebox.showerror("Error", str(e))
+                root.after(0, lambda: messagebox.showerror("Error", str(e)))
 
-        threading.Thread(target=tarea).start()
+        threading.Thread(target=tarea, daemon=True).start()
 
-    btn_generar = ctk.CTkButton(frame_validar, text="Validar",
-                                fg_color=ACCENT_COLOR,
-                                state="disabled",
-                                command=generar_data)
-    btn_generar.pack(padx=20, pady=10)
-
-    # Botones de edición (masivo e individual)
-    def abrir_editar_correos():
-        """Abre modal para editar múltiples correos."""
-        if not data_envio:
-            messagebox.showwarning("Advertencia", "No hay correos para editar")
-            return
-        
-        def guardar_cambios(datos_editados):
-            nonlocal data_envio
-            data_envio[:] = datos_editados
-            set_estado(estado_lbl, f"{len(data_envio)} correos editados", "#FFD700")
-            messagebox.showinfo("Éxito", "Cambios guardados correctamente")
-        
-        EditarCorreosModal(app.root if hasattr(app, 'root') else app.winfo_toplevel(), data_envio, guardar_cambios)
-
-    def abrir_editar_individual():
-        """Abre modal para editar correo individual (contrato)."""
-        if not data_envio_individual_contenedor[0]:
-            messagebox.showwarning("Advertencia", "No hay correo para editar")
-            return
-        
-        def guardar_cambios(datos_editado):
-            data_envio_individual_contenedor[0] = datos_editado
-            set_estado(estado_lbl, "Correo individual editado", "#FFD700")
-            messagebox.showinfo("Éxito", "Cambios guardados correctamente")
-        
-        EditarCorreoIndividualModal(app.root if hasattr(app, 'root') else app.winfo_toplevel(), data_envio_individual_contenedor[0], guardar_cambios)
-
-    btn_editar_masivo = ctk.CTkButton(
+    btn_generar = ctk.CTkButton(
         frame_validar,
-        text="Editar correos",
-        fg_color=PRIMARY_COLOR,
-        hover_color=ACCENT_COLOR,
+        text="Validar",
+        fg_color=ACCENT_COLOR,
         state="disabled",
-        command=abrir_editar_correos
+        command=generar_data,
     )
-    
-    btn_editar_individual = ctk.CTkButton(
-        frame_validar,
-        text="Editar correo",
-        fg_color=PRIMARY_COLOR,
-        hover_color=ACCENT_COLOR,
-        state="disabled",
-        command=abrir_editar_individual
-    )
-    
-    # Mostrar u ocultar botones de edición según modo
-    def actualizar_botones_edicion(*_):
-        if es_modo_contrato():
-            btn_editar_masivo.pack_forget()
-            btn_editar_individual.pack(side="left", padx=10, pady=10)
-        else:
-            btn_editar_individual.pack_forget()
-            btn_editar_masivo.pack(side="left", padx=10, pady=10)
-    
-    def validar_envio_mejorado():
-        """Valida y habilita/deshabilita botones de edición."""
-        if es_modo_contrato():
-            estado_edicion = "normal" if data_envio_individual_contenedor[0] else "disabled"
-            btn_editar_individual.configure(state=estado_edicion)
-            btn_enviar.configure(state="normal" if data_envio_individual_contenedor[0] else "disabled")
-        else:
-            estado_edicion = "normal" if data_envio else "disabled"
-            btn_editar_masivo.configure(state=estado_edicion)
-            btn_enviar.configure(state="normal" if data_envio else "disabled")
-    
-    def validar_generar():
-        if es_modo_contrato():
-            btn_generar.configure(state="normal" if ruta_excel and pdf_orden and pdf_contrato else "disabled")
-        else:
-            btn_generar.configure(state="normal" if ruta_excel and pdfs else "disabled")
+    btn_generar.pack(padx=20, pady=(5, 12))
 
-    def validar_envio():
-        validar_envio_mejorado()
-    
-    modo_var.trace_add("write", actualizar_botones_edicion)
+    def al_cambiar_modo(*_):
+        previsualizaciones.clear()
+        set_estado(estado_lbl, "Sin validar", TEXT_LIGHT)
+        validar_generar()
+
+    modo_var.trace_add("write", al_cambiar_modo)
 
     actualizar_modo()
     actualizar_campos_modo()
-    actualizar_botones_edicion()
     validar_generar()
-
-    # =====================================================
-    # CONSOLA
-    # =====================================================
-    consola_frame = ctk.CTkFrame(contenedor, fg_color=CONSOLE_BG)
-    consola_frame.pack(fill="both", expand=True, pady=10)
-
-    consola = ctk.CTkTextbox(consola_frame, fg_color=CONSOLE_BG, text_color=WHITE_COLOR)
-    consola.pack(fill="both", expand=True, padx=10, pady=10)
-    consola.configure(state="disabled")
-
-    sys.stdout = TextRedirector(consola)
-    sys.stderr = TextRedirector(consola)
-
-    # =====================================================
-    # ④ ENVIAR
-    # =====================================================
-    def enviar():
-        def tarea():
-            try:
-                enviar_correos_service(
-                    es_modo_contrato=es_modo_contrato(),
-                    tipo_var=tipo_var.get(),
-                    data_envio=data_envio,
-                    data_envio_individual=data_envio_individual_contenedor[0],
-                    pdf_contrato=pdf_contrato,
-                    mes=mes_var.get(),
-                    mes_inicio=mes_inicio_contrato_var.get(),
-                    mes_fin=mes_fin_contrato_var.get(),
-                    anio=int(año_var.get()),
-                    es_reconocimiento_deuda=es_modo_reconocimiento_deuda(),
-                )
-
-                messagebox.showinfo("Éxito", "Correos enviados correctamente")
-
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
-
-        threading.Thread(target=tarea).start()
-
-    btn_enviar = ctk.CTkButton(
-        contenedor,
-        text="Enviar correos",
-        height=50,
-        fg_color=ACCENT_COLOR,
-        state="disabled",
-        command=enviar
-    )
-    btn_enviar.pack(pady=20)

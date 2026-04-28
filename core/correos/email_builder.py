@@ -134,9 +134,7 @@ class EmailDocenteBuilder(EmailBuilder):
         
         cuerpo_contenido = f"""
         <p>
-            Adjunto su orden de servicio {texto_orden}. 
-            Con este documento, ya puede proceder con la emisión de su recibo por honorarios. 
-            Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+            Adjunto su orden de servicio {texto_orden}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
         </p>
 
         <ul>
@@ -145,14 +143,12 @@ class EmailDocenteBuilder(EmailBuilder):
             </li>
 
             <li>
-                El pago se realizará a crédito, con un plazo de vencimiento de {plazo_destacado} 
-                desde la fecha de emisión del recibo en la plataforma SUNAT.
+                El pago se realizará a crédito, con un plazo de vencimiento de {plazo_destacado} desde la fecha de emisión del recibo en la plataforma SUNAT.
             </li>
         </ul>
 
         <p>
-            Una vez emitido, envíe el recibo en {formato_destacado} como respuesta a este mismo correo, 
-            sin generar un nuevo hilo.
+            Una vez emitido, envíe el recibo en {formato_destacado} como respuesta a este mismo correo, sin generar un nuevo hilo.
         </p>
 """
         
@@ -183,13 +179,11 @@ class EmailAdministrativoBuilder(EmailBuilder):
         
         cuerpo_contenido = f"""
         <p>
-            Adjunto su orden de servicio {texto_orden}. 
-            Con este documento, ya puede proceder con la emisión de su recibo por honorarios.
+            Adjunto su orden de servicio {texto_orden}. Con este documento, ya puede proceder con la emisión de su recibo por honorarios.
         </p>
 
         <p>
-            Una vez emitido, envíe el recibo en {formato_destacado} como respuesta a este mismo correo, 
-            sin generar un nuevo hilo.
+            Una vez emitido, envíe el recibo en {formato_destacado} como respuesta a este mismo correo, sin generar un nuevo hilo.
         </p>
 """
         
@@ -229,9 +223,7 @@ class EmailDocenteContratoBuilder(EmailDocenteBuilder):
 
         cuerpo_contenido = f"""
         <p>
-            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. 
-            Con este documento, ya puede proceder con la emision de su recibo por honorarios. 
-            Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. Con este documento, ya puede proceder con la emision de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
         </p>
 
         <ul>
@@ -240,19 +232,16 @@ class EmailDocenteContratoBuilder(EmailDocenteBuilder):
             </li>
 
             <li>
-                El pago se realizara a credito, con un plazo de vencimiento de {plazo_destacado} 
-                desde la fecha de emision del recibo en la plataforma SUNAT.
+                El pago se realizara a credito, con un plazo de vencimiento de {plazo_destacado} desde la fecha de emision del recibo en la plataforma SUNAT.
             </li>
         </ul>
 
         <p>
-            Una vez emitido, envie el recibo en {formato_destacado} como respuesta a este mismo correo, 
-            sin generar un nuevo hilo.
+            Una vez emitido, envie el recibo en {formato_destacado} como respuesta a este mismo correo, sin generar un nuevo hilo.
         </p>
 
         <p>
-            Asimismo, se adjunta su contrato de locacion de servicios correspondiente al periodo 
-            {periodo_destacado}, firmado por el decano.
+            Asimismo, se adjunta su contrato de locacion de servicios correspondiente al periodo {periodo_destacado}, firmado por el decano.
         </p>
 """
 
@@ -286,26 +275,21 @@ class EmailAdministrativoContratoBuilder(EmailAdministrativoBuilder):
 
         cuerpo_contenido = f"""
         <p>
-            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. 
-            Con este documento, ya puede proceder con la emision de su recibo por honorarios. 
-            Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
+            Adjunto su orden de servicio correspondiente al mes de {self._mes} {self._anio}. Con este documento, ya puede proceder con la emision de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:
         </p>
 
         <ul>
             <li>
-                El pago se realizara a credito, con un plazo de vencimiento de {plazo_destacado} 
-                desde la fecha de emision del recibo en la plataforma SUNAT.
+                El pago se realizara a credito, con un plazo de vencimiento de {plazo_destacado} desde la fecha de emision del recibo en la plataforma SUNAT.
             </li>
         </ul>
 
         <p>
-            Una vez emitido, envie el recibo en {formato_destacado} como respuesta a este mismo correo, 
-            sin generar un nuevo hilo.
+            Una vez emitido, envie el recibo en {formato_destacado} como respuesta a este mismo correo, sin generar un nuevo hilo.
         </p>
 
         <p>
-            Asimismo, se adjunta su contrato de locacion de servicios correspondiente al periodo 
-            {periodo_destacado}, firmado por el decano.
+            Asimismo, se adjunta su contrato de locacion de servicios correspondiente al periodo {periodo_destacado}, firmado por el decano.
         </p>
 """
 
