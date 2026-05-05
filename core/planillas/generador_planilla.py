@@ -3,7 +3,18 @@ import os
 import datetime
 from openpyxl import load_workbook
 from core.planillas.csv_processing import cargar_archivo, limpiar_docentes, procesar_csv_nuevo_formato
-from core.planillas.functions import *
+from core.planillas.functions import (
+    formatear_numero,
+    agregar_servicio_coordinacion,
+    agregar_examen_clasificacion,
+    construir_tabla_coordinacion,
+    construir_tabla_carga_academica,
+    construir_tabla_planilla_generador_resumida,
+    agrupar_y_calcular,
+)
+from core.planillas import cache as cache_module
+from core.planillas.transformations import aplicar_transformaciones_base
+from core.planillas.table_builders import construir_tabla_planilla
 from core.planillas.excel_styles import *
 from core.fases.utils import TextUtils
 
@@ -15,8 +26,8 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
     print(f"📁 Archivo coordinación: {excel_coordinacion}")
     
     try:
-        limpiar_cache_excel()
-        limpiar_cache_procesamiento()
+        cache_module.limpiar_cache_excel()
+        cache_module.limpiar_cache_procesamiento()
         
         print("📂 Cargando archivo de datos...")
         datos = cargar_archivo(data_path)
@@ -55,7 +66,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         datos = aplicar_transformaciones_base(datos)
         datos['detalles_curso'] = datos['Curso']
 
-        agrupar = agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso')
+        agrupar = cache_module.agrupar_y_calcular_con_cache(datos, datos_docentes, 'detalles_curso', agrupar_y_calcular)
         print("✅ Agrupación completada")
         
         agrupar = agregar_examen_clasificacion(agrupar, excel_exa_clasif, TextUtils.normalizar_texto, datos_docentes)
@@ -65,7 +76,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         agrupar = agregar_servicio_coordinacion(agrupar, excel_coordinacion, TextUtils.normalizar_texto, datos_docentes)
         print("✅ Servicio de coordinación agregado")
 
-        TABLA = construir_tabla_planilla_con_cache(agrupar, es_enero, monto_bono)
+        TABLA = cache_module.construir_tabla_planilla_con_cache(agrupar, es_enero, monto_bono, construir_tabla_planilla)
 
         # Usar carpeta destino seleccionada o crear carpeta por defecto
         if carpeta_destino and os.path.isdir(carpeta_destino):
@@ -83,7 +94,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
 
             if os.path.exists(excel_exa_clasif):
                 # Usar cache para evitar lecturas múltiples
-                clasif_df = cargar_excel_con_cache(excel_exa_clasif, sheet_name=0, header=1)
+                clasif_df = cache_module.cargar_excel_con_cache(excel_exa_clasif, sheet_name=0, header=1)
                 clasif_df.to_excel(writer, sheet_name="Examen de clasificación", index=False)
             
             # Crear hoja de coordinación si existe el archivo
@@ -92,11 +103,11 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 tabla_coordinacion.to_excel(writer, sheet_name="Servicio actualización", index=False)
             
             # Construir hoja Planilla_Generador usando datos ya procesados
-            agrupar_gen = agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso')
+            agrupar_gen = cache_module.agrupar_y_calcular_con_cache(datos_csv_original_procesados, datos_docentes, 'Curso', agrupar_y_calcular)
             agrupar_gen = agregar_examen_clasificacion(agrupar_gen, excel_exa_clasif, TextUtils.normalizar_texto, datos_docentes)
             agrupar_gen = agregar_servicio_coordinacion(agrupar_gen, excel_coordinacion, TextUtils.normalizar_texto, datos_docentes)
 
-            TABLA_GENERADOR = construir_tabla_planilla_con_cache(agrupar_gen, es_enero, monto_bono)
+            TABLA_GENERADOR = cache_module.construir_tabla_planilla_con_cache(agrupar_gen, es_enero, monto_bono, construir_tabla_planilla)
             TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
                 'Categoria (Letra)': 'Categoria_letra',
                 'Categoria (Monto)': 'Categoria_monto',
@@ -161,5 +172,5 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         print(traceback.format_exc())
         return f"❌ Error: {e}"
     finally:
-        limpiar_cache_planilla()
-        limpiar_cache_procesamiento()
+        cache_module.limpiar_cache_planilla()
+        cache_module.limpiar_cache_procesamiento()

@@ -30,7 +30,7 @@ class OficioBuilder:
         if not docente.numero_contrato:
             print(f"⚠️  {docente.nombre} - Número de contrato vacío, usando valor por defecto: {numero_contrato}")
 
-        modalidad_servicio = "híbrida" if docente.es_contrato else docente.modalidad_texto
+        modalidad_servicio = docente.modalidad_texto
         
         return {
             "Nro_Contrato": numero_contrato,

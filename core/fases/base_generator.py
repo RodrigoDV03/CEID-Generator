@@ -53,9 +53,9 @@ class BaseFaseGenerator:
                 es_administrativo=self.config.es_administrativo,
             )
 
-        # En docentes con contrato, la modalidad va al final del documento/oficio (global),
-        # no en cada curso/servicio individual.
-        incluir_modalidad_por_item = not docente.es_contrato
+        # La modalidad debe incluirse en cada servicio para ambos tipos de docentes
+        # (contratados y terceros)
+        incluir_modalidad_por_item = True
         return self.description_service.redactar_servicios_con_modalidad(
             cursos_detallados,
             incluir_modalidad_por_item=incluir_modalidad_por_item,

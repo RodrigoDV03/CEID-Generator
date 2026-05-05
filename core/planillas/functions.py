@@ -5,19 +5,13 @@ from fuzzywuzzy import process, fuzz
 from core.fases.utils import TextUtils
 from core.planillas import cache as _cache
 from core.planillas import table_builders as _table_builders
-from core.planillas import transformations as _transformations
+from core.planillas.transformations import generar_siguiente_curso_intensivo_desde_fila
 
 
 def traducir_dias(dias_raw: str) -> str:
     dias_dict = {'MONDAY': 'Lun', 'TUESDAY': 'Mar', 'WEDNESDAY': 'Mié', 'THURSDAY': 'Jue', 'FRIDAY': 'Vie', 'SATURDAY': 'Sáb', 'SUNDAY': 'Dom'}
     dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
     return ', '.join(dias_dict.get(d.strip().upper(), d.strip()) for d in dias)
-
-
-def normalizar_clave_docente(texto):
-    if pd.isna(texto):
-        return ''
-    return str(texto).strip().upper()
 
 
 def extraer_numero_horas(texto):
@@ -100,34 +94,6 @@ def formatear_numero(valor, ancho_minimo):
 
     return valor_str
 
-
-def generar_siguiente_curso_intensivo(curso):
-    return _transformations.generar_siguiente_curso_intensivo(curso)
-
-
-def expandir_texto_cursos_intensivos(cursos_texto):
-    return _transformations.expandir_texto_cursos_intensivos(cursos_texto)
-
-
-def expandir_filas_carga_intensivos(datos):
-    return _transformations.expandir_filas_carga_intensivos(datos)
-
-
-def generar_siguiente_curso_intensivo_desde_fila(row):
-    return _transformations.generar_siguiente_curso_intensivo_desde_fila(row)
-
-
-def procesar_ediciones_idioma(datos):
-    return _transformations.procesar_ediciones_idioma(datos)
-
-def aplicar_transformaciones_base(datos):
-    return _transformations.aplicar_transformaciones_base(datos)
-    
-def ajustar_nivel(row):
-    return _transformations.ajustar_nivel(row)
-
-def ajustar_modalidad(row):
-    return _transformations.ajustar_modalidad(row)
 
 def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=80):
     mapeo = {}
@@ -242,7 +208,7 @@ def _procesar_archivo_docentes_con_monto(
     
     try:
         # Leer el archivo Excel
-        datos_df = cargar_excel_con_cache(ruta_archivo, sheet_name=0, header=0)
+        datos_df = _cache.cargar_excel_con_cache(ruta_archivo, sheet_name=0, header=0)
         
         # Verificar que existe la columna Docente (con fallback a búsqueda de similares)
         if 'Docente' not in datos_df.columns:
@@ -336,7 +302,7 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
     
     try:
         # Leer el archivo Excel
-        coordinacion_df = cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
+        coordinacion_df = _cache.cargar_excel_con_cache(ruta_coordinacion, sheet_name=0, header=0)
 
         coordinacion_agrupado = preparar_coordinacion_agrupada(
             coordinacion_df,
@@ -462,7 +428,7 @@ def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_doce
         ruta_coordinacion,
         normalizar_texto,
         datos_docentes,
-        cargar_excel_con_cache,
+        _cache.cargar_excel_con_cache,
         preparar_coordinacion_agrupada,
     )
 
@@ -483,43 +449,6 @@ def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
     
     return datos_filtrados
 
-
-# ================================= FUNCIONES CON USO DE MEMORIA CACHE ===================================================
-
-def generar_key_datos(df, col_curso):
-    return _cache.generar_key_datos(df, col_curso)
-
-
-def limpiar_cache_excel():
-    _cache.limpiar_cache_excel()
-
-
-def cargar_excel_con_cache(ruta, sheet_name=0, header='infer'):
-    return _cache.cargar_excel_con_cache(ruta, sheet_name=sheet_name, header=header)
-
-
-def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso):
-    return _cache.agrupar_y_calcular_con_cache(df, datos_docentes, col_curso, agrupar_y_calcular)
-
-
-def leer_planilla_anterior_con_cache(ruta_planilla):
-    return _cache.leer_planilla_anterior_con_cache(ruta_planilla, obtener_header_planilla_con_cache)
-
-
-def limpiar_cache_planilla():
-    _cache.limpiar_cache_planilla()
-
-
-def limpiar_cache_procesamiento():
-    _cache.limpiar_cache_procesamiento()
-
-
-def obtener_header_planilla_con_cache(ruta_planilla):
-    return _cache.obtener_header_planilla_con_cache(ruta_planilla)
-
-
-def construir_tabla_planilla_con_cache(df, es_enero=False, monto_bono=0):
-    return _cache.construir_tabla_planilla_con_cache(df, es_enero, monto_bono, construir_tabla_planilla)
 
 # ================================= EXPANSIÓN DE FILAS POR CURSO CON MODALIDAD ===================================================
 
@@ -709,42 +638,6 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
     return df_expandido
 
 
-def _primer_valor_no_vacio(series):
-    for valor in series:
-        if pd.isna(valor):
-            continue
-        valor_str = str(valor).strip()
-        if valor_str and valor_str.lower() != 'nan':
-            return valor
-    return ''
-
-
-def _unir_valores_unicos(series):
-    valores = []
-    for valor in series:
-        if pd.isna(valor):
-            continue
-        valor_str = str(valor).strip()
-        if not valor_str or valor_str.lower() == 'nan':
-            continue
-        if valor_str not in valores:
-            valores.append(valor_str)
-    return ' / '.join(valores)
-
-
-def _unir_todos_valores(series):
-    """Concatena TODOS los valores incluyendo repetidos (ej: Inglés B2 / Inglés B2 / Inglés B2)."""
-    valores = []
-    for valor in series:
-        if pd.isna(valor):
-            continue
-        valor_str = str(valor).strip()
-        if not valor_str or valor_str.lower() == 'nan':
-            continue
-        valores.append(valor_str)
-    return ' / '.join(valores)
-
-
 def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, datos_csv_procesados):
     tabla_base = tabla_generador.copy()
 
@@ -780,11 +673,14 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
         tabla_base[columna] = pd.to_numeric(tabla_base[columna], errors='coerce').fillna(0)
 
     # Agrupar por Docente: una fila por docente con montos sumados
+    _primer_valor = lambda x: next((v for v in x if pd.notna(v) and str(v).strip() and str(v).strip().lower() != 'nan'), '')
+    _unir_unicos = lambda x: ' / '.join(dict.fromkeys(v for v in x if pd.notna(v) and str(v).strip() and str(v).strip().lower() != 'nan'))
+
     agrupado_resumen = tabla_base.groupby('Docente', as_index=False).agg({
-        'N_Ruc': _primer_valor_no_vacio,
-        'Categoria_letra': _primer_valor_no_vacio,
+        'N_Ruc': _primer_valor,
+        'Categoria_letra': _primer_valor,
         'Categoria_monto': 'max',
-        'Sede': _unir_valores_unicos,
+        'Sede': _unir_unicos,
         'cantidad_cursos': 'sum',
         'Curso Dictado': 'sum',
         'Disenio_examenes': 'sum',
@@ -792,24 +688,24 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
         'Horas_Total': 'sum',
         'Servicio_actualizacion': 'sum',
         'Total_pago': 'sum',
-        'Estado_docente': _primer_valor_no_vacio,
-        'Docente_idioma': _unir_valores_unicos,
-        'Numero_dni': _primer_valor_no_vacio,
-        'Numero_celular': _primer_valor_no_vacio,
-        'Domicilio_docente': _primer_valor_no_vacio,
-        'Correo_personal': _primer_valor_no_vacio,
-        'Nro_Contrato': _primer_valor_no_vacio
+        'Estado_docente': _primer_valor,
+        'Docente_idioma': _unir_unicos,
+        'Numero_dni': _primer_valor,
+        'Numero_celular': _primer_valor,
+        'Domicilio_docente': _primer_valor,
+        'Correo_personal': _primer_valor,
+        'Nro_Contrato': _primer_valor
     })
 
     mapeo_docentes = (
         agrupar_df[['docente', 'Docente']]
         .dropna(subset=['Docente'])
-        .assign(docente_key=lambda df: df['docente'].apply(normalizar_clave_docente))
+        .assign(docente_key=lambda df: df['docente'].apply(TextUtils.normalizar_texto))
         .drop_duplicates(subset=['docente_key'], keep='last')
     )
 
     cursos_df = datos_csv_procesados.copy()
-    cursos_df['docente_key'] = cursos_df['docente'].apply(normalizar_clave_docente)
+    cursos_df['docente_key'] = cursos_df['docente'].apply(TextUtils.normalizar_texto)
     cursos_df = cursos_df.merge(
         mapeo_docentes[['docente_key', 'Docente']],
         on='docente_key',
@@ -851,10 +747,11 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
     cursos_df['Curso_Virtual_tmp'] = cursos_df['Curso'].where(es_virtual, '')
     cursos_df['Curso_Presencial_tmp'] = cursos_df['Curso'].where(~es_virtual, '')
 
-    # Agrupar por Docente: concatenar TODOS los cursos incluyendo repetidos
+    _unir_todos = lambda x: ' / '.join(v for v in x if pd.notna(v) and str(v).strip() and str(v).strip().lower() != 'nan')
+
     cursos_por_docente = cursos_df.groupby('Docente', as_index=False).agg({
-        'Curso_Virtual_tmp': _unir_todos_valores,
-        'Curso_Presencial_tmp': _unir_todos_valores
+        'Curso_Virtual_tmp': _unir_todos,
+        'Curso_Presencial_tmp': _unir_todos
     }).rename(columns={
         'Curso_Virtual_tmp': 'Curso_Virtual',
         'Curso_Presencial_tmp': 'Curso_Presencial'
