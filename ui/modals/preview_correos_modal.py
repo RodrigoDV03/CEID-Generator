@@ -28,7 +28,7 @@ class PreviewCorreosModal:
         self._img_ref = None
         self._render_job = None
         self._form_loaded = False
-        self.zoom_factor = 1.0
+        self.zoom_factor = 2.4
         self._platform = platform.system()
         self._pdf_image_id = None
 
@@ -146,10 +146,10 @@ class PreviewCorreosModal:
         ctk.CTkButton(zoom_frame, text="+", width=32, fg_color=PRIMARY_COLOR, command=lambda: self._cambiar_zoom(0.1)).pack(side="left", padx=(0, 8))
 
         self.zoom_slider = ctk.CTkSlider(zoom_frame, from_=0.5, to=3.0, number_of_steps=25, command=self._on_zoom_slider)
-        self.zoom_slider.set(1.0)
+        self.zoom_slider.set(2.4)
         self.zoom_slider.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
-        self.lbl_zoom = ctk.CTkLabel(zoom_frame, text="100%", text_color=TEXT_LIGHT, width=56)
+        self.lbl_zoom = ctk.CTkLabel(zoom_frame, text="240%", text_color=TEXT_LIGHT, width=56)
         self.lbl_zoom.pack(side="left")
 
         ctk.CTkButton(zoom_frame, text="Ajustar", width=72, fg_color=PRIMARY_COLOR, command=self._reset_zoom).pack(side="left", padx=(8, 0))
@@ -166,6 +166,12 @@ class PreviewCorreosModal:
         ctk.CTkLabel(panel_msg, text="Cuerpo (editable)", text_color=TEXT_COLOR).pack(anchor="w", padx=12)
         self.txt_cuerpo = ctk.CTkTextbox(panel_msg, fg_color="#FFFFFF", text_color="#000000", wrap="word", font=("Segoe UI", 11))
         self.txt_cuerpo.pack(fill="both", expand=True, padx=12, pady=(4, 10))
+        # CTkTextbox blocks the 'font' option at the wrapper level, so configure
+        # the underlying tk.Text widget directly when possible.
+        if hasattr(self.txt_cuerpo, "_textbox"):
+            self.txt_cuerpo._textbox.tag_config("resaltado", foreground="#073763", font=("Segoe UI", 10, "bold"))
+        else:
+            self.txt_cuerpo.tag_config("resaltado", foreground="#073763")
 
         self.logs_frame = ctk.CTkFrame(self.window, fg_color=CARD_COLOR)
         self.logs_visible = False
@@ -249,29 +255,60 @@ class PreviewCorreosModal:
         )
 
     def _strip_html(self, html_text):
-        texto = html_text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-        texto = texto.replace("</p>", "\n\n").replace("</li>", "\n")
-        # Ensure each list item starts on its own line and use a Unicode bullet
-        texto = re.sub(r"<li[^>]*>", "\n• ", texto, flags=re.IGNORECASE)
-        texto = re.sub(r"<[^>]+>", "", texto)
-        texto = unescape(texto)
+        bloques = []
 
-        # Collapse internal newlines inside a bullet paragraph so the bullet and
-        # its content appear on a single line; keep regular paragraphs separated
-        # by a blank line.
-        partes = re.split(r"\n{2,}", texto)
-        nuevas_partes = []
-        for p in partes:
-            p_strip = p.strip()
-            if p_strip.startswith("• "):
-                # Join internal lines in the bullet paragraph with spaces
-                joined = " ".join(line.strip() for line in p_strip.splitlines() if line.strip())
-                nuevas_partes.append(joined)
-            else:
-                nuevas_partes.append(p_strip)
+        for match in re.finditer(r"<(p|ul)\b[^>]*>(.*?)</\1>", html_text, flags=re.IGNORECASE | re.DOTALL):
+            etiqueta = match.group(1).lower()
+            contenido = match.group(2)
 
-        texto = "\n\n".join(nuevas_partes)
-        texto = re.sub(r"\n{3,}", "\n\n", texto)
+            if etiqueta == "p":
+                texto = contenido
+                texto = texto.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+                texto = re.sub(r"<[^>]+>", "", texto)
+                texto = unescape(texto)
+                texto = re.sub(r"[ \t]+", " ", texto)
+                texto = re.sub(r"\s*\n\s*", " ", texto)
+                texto = re.sub(r"\s{2,}", " ", texto).strip()
+                if texto:
+                    bloques.append(("p", texto))
+
+            elif etiqueta == "ul":
+                items = []
+                for li_match in re.finditer(r"<li\b[^>]*>(.*?)</li>", contenido, flags=re.IGNORECASE | re.DOTALL):
+                    item = li_match.group(1)
+                    item = item.replace("<br>", " ").replace("<br/>", " ").replace("<br />", " ")
+                    item = re.sub(r"<[^>]+>", "", item)
+                    item = unescape(item)
+                    item = re.sub(r"[ \t]+", " ", item)
+                    item = re.sub(r"\s*\n\s*", " ", item)
+                    item = re.sub(r"\s{2,}", " ", item).strip()
+                    if item:
+                        items.append(f"• {item}")
+
+                if items:
+                    bloques.append(("ul", "\n".join(items)))
+
+        if bloques:
+            partes = []
+            for indice, (tipo, contenido) in enumerate(bloques):
+                if indice > 0:
+                    tipo_anterior = bloques[indice - 1][0]
+                    if tipo_anterior == "p" and tipo == "ul":
+                        separador = "\n"
+                    else:
+                        separador = "\n\n"
+                    partes.append(separador)
+                partes.append(contenido)
+
+            texto = "".join(partes)
+        else:
+            texto = html_text
+            texto = texto.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+            texto = re.sub(r"<[^>]+>", "", texto)
+            texto = unescape(texto)
+            texto = re.sub(r"[ \t]+", " ", texto)
+            texto = re.sub(r"\n{3,}", "\n\n", texto)
+
         return texto.strip()
 
     def _extraer_resaltados_html(self, html_text):
@@ -302,6 +339,47 @@ class PreviewCorreosModal:
 
         return resultado
 
+    def _aplicar_formato_texto_editable(self, html_base):
+        if not html_base:
+            return
+
+        self.txt_cuerpo.tag_remove("resaltado", "1.0", "end")
+        fragmentos = [contenido for contenido, _ in self._extraer_resaltados_html(html_base)]
+
+        indice_busqueda = "1.0"
+        for fragmento in fragmentos:
+            fragmento = fragmento.strip()
+            if not fragmento:
+                continue
+
+            inicio = self.txt_cuerpo.search(fragmento, indice_busqueda, stopindex="end")
+            if not inicio:
+                inicio = self.txt_cuerpo.search(fragmento, "1.0", stopindex="end")
+            if not inicio:
+                continue
+
+            fin = f"{inicio}+{len(fragmento)}c"
+            self.txt_cuerpo.tag_add("resaltado", inicio, fin)
+            indice_busqueda = fin
+
+        # Mantener el cursor al inicio para facilitar la lectura al abrir.
+        self.txt_cuerpo.mark_set("insert", "1.0")
+        self.txt_cuerpo.see("1.0")
+
+    def _obtener_texto_marcado_desde_editor(self):
+        eventos = self.txt_cuerpo._textbox.dump("1.0", "end-1c", text=True, tag=True)
+        partes = []
+
+        for tipo, valor, _indice in eventos:
+            if tipo == "tagon" and valor == "resaltado":
+                partes.append("*")
+            elif tipo == "tagoff" and valor == "resaltado":
+                partes.append("*")
+            elif tipo == "text":
+                partes.append(valor)
+
+        return "".join(partes)
+
     def _aplicar_resaltados_html(self, html_text, resaltados):
         if not html_text or not resaltados:
             return html_text
@@ -330,6 +408,24 @@ class PreviewCorreosModal:
 
         return re.sub(patron, _reemplazo, html_text, flags=re.IGNORECASE)
 
+    def _formatear_fragmento_marcado(self, texto, estilo_destacado):
+        if not texto:
+            return ""
+
+        partes = re.split(r"(\*[^*]+\*)", texto)
+        salida = []
+
+        for parte in partes:
+            if not parte:
+                continue
+            if parte.startswith("*") and parte.endswith("*"):
+                contenido = escape(parte[1:-1].strip())
+                salida.append(f'<span style="{estilo_destacado}">{contenido}</span>')
+            else:
+                salida.append(escape(parte))
+
+        return "".join(salida)
+
     def _texto_a_html(self, texto, html_base=None):
         body_attrs = ' style="font-family: Arial; font-size: 11pt;"'
         resaltados = []
@@ -345,29 +441,55 @@ class PreviewCorreosModal:
                 estilo_destacado = estilo
                 break
 
-        bloques_html = []
-        for bloque in [b.strip() for b in texto.split("\n\n") if b.strip()]:
-            lineas = [linea.strip() for linea in bloque.split("\n") if linea.strip()]
-            lineas_contenido = [linea for linea in lineas if linea != "-"]
-            items_lista = []
-            es_lista = bool(lineas_contenido)
-            for linea in lineas_contenido:
-                # Accept both hyphen and bullet as list markers
-                match_item = re.match(r"^(?:[-•])\s*(.+)$", linea)
-                if not match_item:
-                    es_lista = False
-                    break
-                texto_item = match_item.group(1).strip()
-                if not texto_item:
-                    continue
-                items_lista.append(texto_item)
 
-            if es_lista and items_lista:
-                items = "".join(f"<li>{escape(item)}</li>" for item in items_lista)
-                bloques_html.append(f"<ul>{items}</ul>")
+        lineas = texto.splitlines()
+        bloques_html = []
+        lista_actual = []
+        parrafo_actual = []
+
+        def flush_parrafo():
+            nonlocal parrafo_actual
+            if not parrafo_actual:
+                return
+            contenido = "<br>".join(self._formatear_fragmento_marcado(l, estilo_destacado) for l in parrafo_actual)
+            bloques_html.append(f"<p>{contenido}</p>")
+            parrafo_actual = []
+
+        def flush_lista():
+            nonlocal lista_actual
+            if not lista_actual:
+                return
+            items = "".join(f'<li style="margin:0;padding:0">{self._formatear_fragmento_marcado(item, estilo_destacado)}</li>' for item in lista_actual)
+            # Inline styles to force indentation in mail clients
+            bloques_html.append(f'<ul style="margin:0 0 6px 22px; padding-left:18px;">{items}</ul>')
+            lista_actual = []
+
+        for raw in lineas:
+            linea = raw.rstrip()
+            if not linea.strip():
+                # Blank line separates paragraphs/lists
+                flush_parrafo()
+                flush_lista()
+                continue
+
+            m = re.match(r"^(?:\s*)(?:[-•])\s*(.+)$", linea)
+            if m:
+                # It's a list item
+                item_text = m.group(1).strip()
+                # if we had paragraph content, flush it first
+                if parrafo_actual:
+                    flush_parrafo()
+                lista_actual.append(item_text)
             else:
-                contenido = "<br>".join(escape(linea) for linea in lineas)
-                bloques_html.append(f"<p>{contenido}</p>")
+                # Normal paragraph line
+                # if we have an active list, flush it before adding paragraph lines
+                if lista_actual:
+                    flush_lista()
+                parrafo_actual.append(linea.strip())
+
+        # flush remaining
+        flush_parrafo()
+        flush_lista()
 
         if not bloques_html:
             bloques_html = ["<p></p>"]
@@ -383,15 +505,17 @@ class PreviewCorreosModal:
             return
         item = self.data[self.idx_correo]
         item["asunto"] = self.entry_asunto.get().strip()
-        texto = self.txt_cuerpo.get("1.0", "end").strip()
-        item["cuerpo_texto"] = texto
-        if texto == item.get("cuerpo_texto_original", ""):
+        texto_visible = self.txt_cuerpo.get("1.0", "end").strip()
+        item["cuerpo_texto"] = texto_visible
+
+        texto_marcado = self._obtener_texto_marcado_desde_editor().strip()
+        if texto_visible == item.get("cuerpo_texto_original", ""):
             item["cuerpo_html"] = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
         else:
             html_base = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
 
             item["cuerpo_html"] = self._texto_a_html(
-                texto,
+                texto_marcado,
                 html_base=html_base,
             )
 
@@ -422,7 +546,7 @@ class PreviewCorreosModal:
         self.idx_correo = idx
         self.idx_adjunto = 0
         self.idx_pagina_pdf = 0
-        self.zoom_factor = 1.0
+        self.zoom_factor = 2.4
         self.zoom_slider.set(self.zoom_factor)
         self._actualizar_zoom_label()
 
@@ -440,6 +564,7 @@ class PreviewCorreosModal:
 
         self.txt_cuerpo.delete("1.0", "end")
         self.txt_cuerpo.insert("1.0", item.get("cuerpo_texto", ""))
+        self._aplicar_formato_texto_editable(item.get("cuerpo_html_original", item.get("cuerpo_html", "")))
         self._form_loaded = True
 
         self._renderizar_pdf(self._obtener_pdf_actual(), 0)
@@ -505,8 +630,8 @@ class PreviewCorreosModal:
             self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf)
 
     def _reset_zoom(self):
-        self.zoom_factor = 1.0
-        self.zoom_slider.set(1.0)
+        self.zoom_factor = 2.4
+        self.zoom_slider.set(2.4)
         self._actualizar_zoom_label()
         if self.data:
             self._renderizar_pdf(self._obtener_pdf_actual(), self.idx_pagina_pdf)
