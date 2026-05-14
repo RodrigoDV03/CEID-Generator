@@ -343,24 +343,47 @@ class PreviewCorreosModal:
         if not html_base:
             return
 
-        self.txt_cuerpo.tag_remove("resaltado", "1.0", "end")
+        # Use the underlying tk.Text for more precise searching and boundary checks
+        if hasattr(self.txt_cuerpo, "_textbox"):
+            text_widget = self.txt_cuerpo._textbox
+        else:
+            text_widget = self.txt_cuerpo
+
+        text_widget.tag_remove("resaltado", "1.0", "end")
         fragmentos = [contenido for contenido, _ in self._extraer_resaltados_html(html_base)]
 
-        indice_busqueda = "1.0"
         for fragmento in fragmentos:
             fragmento = fragmento.strip()
             if not fragmento:
                 continue
 
-            inicio = self.txt_cuerpo.search(fragmento, indice_busqueda, stopindex="end")
-            if not inicio:
-                inicio = self.txt_cuerpo.search(fragmento, "1.0", stopindex="end")
-            if not inicio:
-                continue
+            start_index = "1.0"
+            while True:
+                found = text_widget.search(fragmento, start_index, stopindex="end")
+                if not found:
+                    break
 
-            fin = f"{inicio}+{len(fragmento)}c"
-            self.txt_cuerpo.tag_add("resaltado", inicio, fin)
-            indice_busqueda = fin
+                fin = f"{found}+{len(fragmento)}c"
+
+                # Boundary checks: ensure match is not part of a larger token
+                char_before = ""
+                char_after = ""
+                try:
+                    if found != "1.0":
+                        char_before = text_widget.get(f"{found} -1c", found)
+                    char_after = text_widget.get(fin, f"{fin} +1c")
+                except Exception:
+                    pass
+
+                def is_boundary(ch):
+                    return ch == "" or ch.isspace() or ch in ",.;:()\"'–—-"
+
+                if is_boundary(char_before) and is_boundary(char_after):
+                    text_widget.tag_add("resaltado", found, fin)
+                    break
+                else:
+                    # continue searching after this match
+                    start_index = fin
 
         # Mantener el cursor al inicio para facilitar la lectura al abrir.
         self.txt_cuerpo.mark_set("insert", "1.0")
@@ -394,6 +417,55 @@ class PreviewCorreosModal:
             salida = re.sub(re.escape(texto_html), reemplazo, salida, count=1)
 
         return salida
+
+    def _texto_editor_a_html(self, html_base=None):
+        """Construye el HTML tomando el texto visible del editor y aplicando
+        las etiquetas `resaltado` presentes en el widget. Esto preserva los
+        resaltados aunque el usuario edite el texto dentro de ellos."""
+        if not hasattr(self.txt_cuerpo, "_textbox"):
+            # Fallback: use existing texto->html path via markers
+            texto = self.txt_cuerpo.get("1.0", "end").strip()
+            return self._texto_a_html(texto, html_base=html_base)
+
+        text_widget = self.txt_cuerpo._textbox
+        full_text = text_widget.get("1.0", "end-1c")
+        tag_ranges = text_widget.tag_ranges("resaltado")
+        if not tag_ranges:
+            texto_marcas = full_text
+        else:
+            partes = []
+            cursor = 0
+            for i in range(0, len(tag_ranges), 2):
+                start_idx = tag_ranges[i]
+                end_idx = tag_ranges[i + 1]
+                start_off = len(text_widget.get("1.0", start_idx))
+                end_off = len(text_widget.get("1.0", end_idx))
+
+                if start_off > cursor:
+                    partes.append(full_text[cursor:start_off])
+                partes.append(f"*{full_text[start_off:end_off]}*")
+                cursor = end_off
+
+            if cursor < len(full_text):
+                partes.append(full_text[cursor:])
+
+            texto_marcas = "".join(partes)
+
+        html_resultado = self._texto_a_html(texto_marcas)
+
+        if html_base:
+            match_body = re.search(r"<body([^>]*)>", html_base, flags=re.IGNORECASE)
+            if match_body:
+                body_attrs = match_body.group(1)
+                html_resultado = re.sub(
+                    r"<body[^>]*>",
+                    f"<body{body_attrs}>",
+                    html_resultado,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
+
+        return html_resultado
 
     def _resaltar_concepto_servicio(self, html_text, estilo_destacado):
         if not html_text:
@@ -507,17 +579,17 @@ class PreviewCorreosModal:
         item["asunto"] = self.entry_asunto.get().strip()
         texto_visible = self.txt_cuerpo.get("1.0", "end").strip()
         item["cuerpo_texto"] = texto_visible
-
         texto_marcado = self._obtener_texto_marcado_desde_editor().strip()
         if texto_visible == item.get("cuerpo_texto_original", ""):
             item["cuerpo_html"] = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
         else:
             html_base = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
 
-            item["cuerpo_html"] = self._texto_a_html(
-                texto_marcado,
-                html_base=html_base,
-            )
+            # Build HTML directly from editor while preserving current tag ranges
+            item["cuerpo_html"] = self._texto_editor_a_html(html_base=html_base)
+            # Update originals so subsequent loads use the edited version
+            item["cuerpo_html_original"] = item["cuerpo_html"]
+            item["cuerpo_texto_original"] = texto_visible
 
     def _obtener_pdf_actual(self):
         if not self.pdf_paths_actuales:
