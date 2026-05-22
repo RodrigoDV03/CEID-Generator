@@ -44,8 +44,8 @@ protobuf==6.33.1
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pycparser==2.22
-pyinstaller==6.19.0
-pyinstaller-hooks-contrib==2026.2
+pyinstaller==6.20.0
+pyinstaller-hooks-contrib==2026.4
 pyparsing==3.2.3
 PyPDF2==3.0.1
 pypdfium2==4.30.0

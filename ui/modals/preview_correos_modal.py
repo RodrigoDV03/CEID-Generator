@@ -251,24 +251,119 @@ class PreviewCorreosModal:
     def _strip_html(self, html_text):
         texto = html_text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
         texto = texto.replace("</p>", "\n\n").replace("</li>", "\n")
-        texto = re.sub(r"<li[^>]*>", "- ", texto, flags=re.IGNORECASE)
+        # Ensure each list item starts on its own line and use a Unicode bullet
+        texto = re.sub(r"<li[^>]*>", "\n• ", texto, flags=re.IGNORECASE)
         texto = re.sub(r"<[^>]+>", "", texto)
         texto = unescape(texto)
+
+        # Collapse internal newlines inside a bullet paragraph so the bullet and
+        # its content appear on a single line; keep regular paragraphs separated
+        # by a blank line.
+        partes = re.split(r"\n{2,}", texto)
+        nuevas_partes = []
+        for p in partes:
+            p_strip = p.strip()
+            if p_strip.startswith("• "):
+                # Join internal lines in the bullet paragraph with spaces
+                joined = " ".join(line.strip() for line in p_strip.splitlines() if line.strip())
+                nuevas_partes.append(joined)
+            else:
+                nuevas_partes.append(p_strip)
+
+        texto = "\n\n".join(nuevas_partes)
         texto = re.sub(r"\n{3,}", "\n\n", texto)
         return texto.strip()
 
+    def _extraer_resaltados_html(self, html_text):
+        if not html_text:
+            return []
+
+        resaltados = []
+        for match in re.finditer(
+            r'<span[^>]*style=["\']([^"\']+)["\'][^>]*>(.*?)</span>',
+            html_text,
+            flags=re.IGNORECASE | re.DOTALL,
+        ):
+            estilo = match.group(1).strip()
+            contenido = re.sub(r"<[^>]+>", "", match.group(2))
+            contenido = unescape(contenido).strip()
+            if contenido:
+                resaltados.append((contenido, estilo))
+
+        # Evitar duplicados conservando el orden original.
+        vistos = set()
+        resultado = []
+        for texto, estilo in resaltados:
+            clave = (texto, estilo)
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            resultado.append((texto, estilo))
+
+        return resultado
+
+    def _aplicar_resaltados_html(self, html_text, resaltados):
+        if not html_text or not resaltados:
+            return html_text
+
+        # Aplicar primero los textos mas largos para reducir reemplazos parciales.
+        ordenados = sorted(resaltados, key=lambda item: len(item[0]), reverse=True)
+        salida = html_text
+
+        for texto, estilo in ordenados:
+            texto_html = escape(texto)
+            reemplazo = f'<span style="{estilo}">{texto_html}</span>'
+            salida = re.sub(re.escape(texto_html), reemplazo, salida, count=1)
+
+        return salida
+
+    def _resaltar_concepto_servicio(self, html_text, estilo_destacado):
+        if not html_text:
+            return html_text
+
+        patron = r"(El concepto del recibo por honorarios es:\s*)([^<]+)"
+
+        def _reemplazo(match):
+            prefijo = match.group(1)
+            concepto = match.group(2).strip()
+            return f"{prefijo}<span style=\"{estilo_destacado}\">{concepto}</span>"
+
+        return re.sub(patron, _reemplazo, html_text, flags=re.IGNORECASE)
+
     def _texto_a_html(self, texto, html_base=None):
         body_attrs = ' style="font-family: Arial; font-size: 11pt;"'
+        resaltados = []
         if html_base:
             match_body = re.search(r"<body([^>]*)>", html_base, flags=re.IGNORECASE)
             if match_body:
                 body_attrs = match_body.group(1)
+            resaltados = self._extraer_resaltados_html(html_base)
+
+        estilo_destacado = "font-weight: bold; color: #073763;"
+        for _, estilo in resaltados:
+            if "color" in estilo.lower() or "font-weight" in estilo.lower():
+                estilo_destacado = estilo
+                break
 
         bloques_html = []
         for bloque in [b.strip() for b in texto.split("\n\n") if b.strip()]:
             lineas = [linea.strip() for linea in bloque.split("\n") if linea.strip()]
-            if lineas and all(linea.startswith("- ") for linea in lineas):
-                items = "".join(f"<li>{escape(linea[2:].strip())}</li>" for linea in lineas)
+            lineas_contenido = [linea for linea in lineas if linea != "-"]
+            items_lista = []
+            es_lista = bool(lineas_contenido)
+            for linea in lineas_contenido:
+                # Accept both hyphen and bullet as list markers
+                match_item = re.match(r"^(?:[-•])\s*(.+)$", linea)
+                if not match_item:
+                    es_lista = False
+                    break
+                texto_item = match_item.group(1).strip()
+                if not texto_item:
+                    continue
+                items_lista.append(texto_item)
+
+            if es_lista and items_lista:
+                items = "".join(f"<li>{escape(item)}</li>" for item in items_lista)
                 bloques_html.append(f"<ul>{items}</ul>")
             else:
                 contenido = "<br>".join(escape(linea) for linea in lineas)
@@ -277,7 +372,11 @@ class PreviewCorreosModal:
         if not bloques_html:
             bloques_html = ["<p></p>"]
 
-        return f"<html><body{body_attrs}>" + "".join(bloques_html) + "</body></html>"
+        html_resultado = f"<html><body{body_attrs}>" + "".join(bloques_html)
+        html_resultado += "</body></html>"
+
+        html_resultado = self._aplicar_resaltados_html(html_resultado, resaltados)
+        return self._resaltar_concepto_servicio(html_resultado, estilo_destacado)
 
     def _guardar_estado_actual(self):
         if not self.data or not self._form_loaded:
@@ -289,9 +388,11 @@ class PreviewCorreosModal:
         if texto == item.get("cuerpo_texto_original", ""):
             item["cuerpo_html"] = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
         else:
+            html_base = item.get("cuerpo_html_original", item.get("cuerpo_html", ""))
+
             item["cuerpo_html"] = self._texto_a_html(
                 texto,
-                html_base=item.get("cuerpo_html_original", item.get("cuerpo_html", "")),
+                html_base=html_base,
             )
 
     def _obtener_pdf_actual(self):

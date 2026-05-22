@@ -1,6 +1,7 @@
 import os
 import base64
 import logging
+import re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -40,13 +41,18 @@ class GmailMessageBuilder:
         
         try:
             with open(pdf_path, 'rb') as adjunto:
-                parte = MIMEBase('application', 'octet-stream')
+                # Use explicit PDF content type and ensure filename is encoded
+                parte = MIMEBase('application', 'pdf')
                 parte.set_payload(adjunto.read())
                 encoders.encode_base64(parte)
-                parte.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename={os.path.basename(pdf_path)}'
-                )
+                filename = os.path.basename(pdf_path)
+                # Add Content-Type name parameter with RFC2231 encoding and
+                # Content-Disposition with encoded filename to preserve non-ASCII
+                # characters such as 'ñ'. The tuple (charset, language, text)
+                # passed to add_header triggers RFC2231 encoding in the email
+                # package.
+                parte.add_header('Content-Type', 'application/pdf', name=('utf-8', '', filename))
+                parte.add_header('Content-Disposition', 'attachment', filename=('utf-8', '', filename))
                 self.mensaje.attach(parte)
         except Exception as e:
             logger.error(f"Error adjuntando PDF {pdf_path}: {e}")
@@ -66,6 +72,19 @@ class GmailMessageBuilder:
 class GmailEmailSender:
     def __init__(self, gmail_service: GmailService):
         self.gmail_service = gmail_service
+
+    def _agregar_firma_gmail(self, cuerpo_html: str) -> str:
+        firma_html = (self.gmail_service.obtener_firma() or "").strip()
+        if not firma_html:
+            return cuerpo_html
+
+        if firma_html in cuerpo_html:
+            return cuerpo_html
+
+        if "</body>" in cuerpo_html.lower():
+            return re.sub(r"</body>", f"{firma_html}</body>", cuerpo_html, count=1, flags=re.IGNORECASE)
+
+        return f"{cuerpo_html}{firma_html}"
     
     def enviar_con_firma(
         self,
@@ -76,6 +95,8 @@ class GmailEmailSender:
         pdf_paths: Optional[List[str]] = None
     ) -> dict:
         try:
+            cuerpo_html = self._agregar_firma_gmail(cuerpo_html)
+
             if pdf_paths is None:
                 if not pdf_path:
                     raise EmailSendError("Debe especificar al menos un PDF adjunto")
@@ -84,9 +105,9 @@ class GmailEmailSender:
             # Crear mensaje MIME
             builder = GmailMessageBuilder(destinatario, asunto)
             raw_message = (builder
-                          .agregar_cuerpo_html(cuerpo_html)
-                          .agregar_adjuntos_pdf(pdf_paths)
-                          .codificar())
+                            .agregar_cuerpo_html(cuerpo_html)
+                            .agregar_adjuntos_pdf(pdf_paths)
+                            .codificar())
             
             # Crear draft (esto permite que Gmail añada la firma)
             draft_body = {'message': {'raw': raw_message}}
