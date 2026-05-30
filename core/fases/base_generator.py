@@ -40,6 +40,8 @@ class BaseFaseGenerator:
                 docente.curso,
                 tiene_bono=payment.tiene_bono,
                 tiene_servicio_actualizacion=payment.tiene_servicio_actualizacion,
+                servicio_actualizacion_monto=payment.servicio_actualizacion,
+                categoria_monto=payment.categoria_monto,
             )
 
             # Generar descripciones de horas.

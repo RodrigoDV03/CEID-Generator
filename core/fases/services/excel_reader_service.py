@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List, Any
+from typing import List, Any, Mapping, Callable, Union, cast
 from core.fases.models import DocenteData, PaymentData, CursoDetalle
 from core.fases.utils import TextUtils
 
@@ -54,10 +54,14 @@ class ExcelReaderService:
                 'Número de contrato'
             ]
             dtype_specs = {col: str for col in columnas_contrato}
-            converters = {
-                col: (lambda x: str(x).strip() if pd.notna(x) else '')
-                for col in columnas_contrato
-            }
+            def _strip_or_empty(x: Any) -> str:
+                try:
+                    return str(x).strip() if pd.notna(x) else ''
+                except Exception:
+                    return ''
+
+            converters = cast(Mapping[Union[int, str], Callable[[Any], Any]],
+                              {col: _strip_or_empty for col in columnas_contrato})
             df = pd.read_excel(
                 ruta_excel, 
                 sheet_name=nombre_hoja,
@@ -323,6 +327,13 @@ class ExcelReaderService:
                 servicio_actualizacion = float(fila.get('Servicio_actualizacion', 0) or 0)
                 if servicio_actualizacion > 0:
                     horas_total = int(float(fila.get('Horas_Total', 0) or 0))
+                    # Si no hay horas explícitas, calcular a partir del monto y categoria_monto
+                    if horas_total == 0 and categoria_monto > 0:
+                        try:
+                            horas_total = int(round(servicio_actualizacion / float(categoria_monto)))
+                        except Exception:
+                            horas_total = 0
+
                     cursos.append(CursoDetalle(
                         nombre='Servicio de actualización de materiales de enseñanza',
                         modalidad='VIRTUAL',

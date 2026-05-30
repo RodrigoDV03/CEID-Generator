@@ -5,7 +5,13 @@ from core.fases.models import PaymentData, CursoDetalle
 class DescriptionService:
     
     @staticmethod
-    def redactar_cursos(cadena_cursos: str, tiene_bono: bool = False, tiene_servicio_actualizacion: bool = False) -> str:
+    def redactar_cursos(
+        cadena_cursos: str,
+        tiene_bono: bool = False,
+        tiene_servicio_actualizacion: bool = False,
+        servicio_actualizacion_monto: float = 0.0,
+        categoria_monto: float = 1.0
+    ) -> str:
         if not isinstance(cadena_cursos, str):
             return "N/A"
         
@@ -27,7 +33,22 @@ class DescriptionService:
         if tiene_servicio_actualizacion:
             # Verificar que no esté ya agregado desde la columna Curso
             if not any("Servicio de actualización" in elem for elem in elementos_descripcion):
-                elementos_descripcion.append("Servicio de actualización de materiales de enseñanza")
+                # Calcular horas a partir del monto si es posible
+                horas = 0
+                try:
+                    if categoria_monto and float(categoria_monto) > 0 and servicio_actualizacion_monto:
+                        horas = int(round(float(servicio_actualizacion_monto) / float(categoria_monto)))
+                except Exception:
+                    horas = 0
+
+                if horas and horas > 0:
+                    # Si ya hay otros elementos, usar formato compuesto
+                    if elementos_descripcion:
+                        elementos_descripcion.append(f"{horas} horas de servicio de actualización de materiales de enseñanza")
+                    else:
+                        elementos_descripcion.append(f"servicio de {horas} horas de actualización de materiales de enseñanza")
+                else:
+                    elementos_descripcion.append("Servicio de actualización de materiales de enseñanza")
         
         # Agregar el bono al final si existe
         if tiene_bono:
@@ -168,10 +189,13 @@ class DescriptionService:
             return "N/A"
         
         descripciones = []
+        multiple_items = len(cursos_detallados) > 1
         for curso in cursos_detallados:
+            formato = "compuesto" if multiple_items and curso.tipo_servicio == "SERVICIO_ACTUALIZACION" else "solo"
             descripciones.append(
                 curso.generar_descripcion_individual(
-                    incluir_modalidad=incluir_modalidad_por_item
+                    incluir_modalidad=incluir_modalidad_por_item,
+                    formato_actualizacion=formato
                 )
             )
         
