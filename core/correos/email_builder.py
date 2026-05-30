@@ -152,6 +152,7 @@ class EmailDocenteBuilder(EmailBuilder):
                 f"Adjunto su orden de servicio {texto_orden} Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:"
             )
             + self._crear_lista_html([
+                f"Número de RUC de entidad usuaria: *20148092282* (Número de RUC de la UNMSM).",
                 f"Concepto del recibo: *{concepto_servicio}.*",
                 "Pago: *al crédito.*",
                 f"Plazo de vencimiento: *{EmailConfig.DIAS_VENCIMIENTO} días desde la emisión del recibo* en la plataforma de SUNAT.",
@@ -190,6 +191,7 @@ class EmailAdministrativoBuilder(EmailBuilder):
                 f"Adjunto su orden de servicio {texto_orden} Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:"
             )
             + self._crear_lista_html([
+                f"Número de RUC de entidad usuaria: *20148092282* (Número de RUC de la UNMSM).",
                 "Pago: *al crédito.*",
                 f"Plazo de vencimiento: *{EmailConfig.DIAS_VENCIMIENTO} días desde la emisión del recibo* en la plataforma de SUNAT.",
             ])
@@ -229,6 +231,7 @@ class EmailDocenteContratoBuilder(EmailDocenteBuilder):
                 f"Adjunto su orden de servicio {texto_orden} Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:"
             )
             + self._crear_lista_html([
+                f"Número de RUC de entidad usuaria: *20148092282* (Número de RUC de la UNMSM).",
                 f"Concepto del recibo: *{concepto_servicio}.*",
                 "Pago: *al crédito.*",
                 f"Plazo de vencimiento: *{EmailConfig.DIAS_VENCIMIENTO} días desde la emisión del recibo* en la plataforma de SUNAT.",
@@ -270,6 +273,7 @@ class EmailAdministrativoContratoBuilder(EmailAdministrativoBuilder):
                 f"Adjunto su orden de servicio {texto_orden} Con este documento, ya puede proceder con la emisión de su recibo por honorarios. Para evitar retrasos en el pago, tenga en cuenta lo siguiente:"
             )
             + self._crear_lista_html([
+                f"Número de RUC de entidad usuaria: *20148092282* (Número de RUC de la UNMSM).",
                 "Pago: *al crédito.*",
                 f"Plazo de vencimiento: *{EmailConfig.DIAS_VENCIMIENTO} días desde la emisión del recibo* en la plataforma de SUNAT.",
             ])
