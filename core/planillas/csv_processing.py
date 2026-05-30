@@ -118,10 +118,6 @@ def limpiar_docentes(df, col):
 
 
 def procesar_csv_nuevo_formato(df):
-    """
-    Procesa el DataFrame con el nuevo formato de columnas del CSV y lo convierte
-    al formato interno esperado por el sistema.
-    """
     df_procesado = df.copy()
 
     # Mapeo directo de columnas

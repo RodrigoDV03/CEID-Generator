@@ -95,7 +95,7 @@ def formatear_numero(valor, ancho_minimo):
     return valor_str
 
 
-def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=80):
+def crear_mapeo_fuzzy(nombres_input, nombres_base, umbral=65):
     mapeo = {}
     for nombre in nombres_input:
         if nombre not in mapeo:  # Evitar recálculos
@@ -130,7 +130,7 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     nombres_base = datos_docentes['Docente'].tolist()
 
     # Crear mapeo fuzzy una sola vez (solo sobre docentes únicos)
-    mapeo_docentes = crear_mapeo_fuzzy(agrupado['docente'].tolist(), nombres_base, umbral=80)
+    mapeo_docentes = crear_mapeo_fuzzy(agrupado['docente'].tolist(), nombres_base, umbral=65)
 
     # Aplicar mapeo usando el diccionario
     agrupado['Docente'] = agrupado['docente'].map(mapeo_docentes)
@@ -205,8 +205,25 @@ def _procesar_archivo_docentes_con_monto(
         return df
     
     try:
-        # Leer el archivo Excel
-        datos_df = _cache.cargar_excel_con_cache(ruta_archivo, sheet_name=0, header=0)
+        # Detectar la fila real de encabezados para tolerar archivos con un título arriba.
+        datos_preview = _cache.cargar_excel_con_cache(ruta_archivo, sheet_name=0, header=None)
+        header_idx = 0
+
+        max_scan = min(len(datos_preview), 10)
+        for i in range(max_scan):
+            fila_normalizada = {
+                TextUtils.normalizar_texto(valor)
+                for valor in datos_preview.iloc[i].tolist()
+            }
+            if 'DOCENTE' in fila_normalizada and any(
+                TextUtils.normalizar_texto(patron) in fila_normalizada
+                for patron in patrones_columna_monto
+            ):
+                header_idx = i
+                break
+
+        # Leer el archivo Excel usando la fila de encabezados detectada
+        datos_df = _cache.cargar_excel_con_cache(ruta_archivo, sheet_name=0, header=header_idx)
         
         # Verificar que existe la columna Docente (con fallback a búsqueda de similares)
         if 'Docente' not in datos_df.columns:
@@ -747,7 +764,6 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
         'N°', 'Docente', 'N_Ruc', 'Categoria_letra', 'Categoria_monto', 'Sede',
         'Curso_Virtual', 'Curso_Presencial', 'cantidad_cursos', 'Curso Dictado',
         'Disenio_examenes', 'Examen_clasif', 'Horas_Total', 'Servicio_actualizacion',
-        'Total_pago', 'Estado_docente', 'Docente_idioma', 'Tipo Documento', 'Numero_dni', 'Numero_celular',
         'Total_pago', 'Estado_docente', 'Docente_idioma', 'Tipo_documento', 'Numero_dni', 'Numero_celular',
         'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
     ]

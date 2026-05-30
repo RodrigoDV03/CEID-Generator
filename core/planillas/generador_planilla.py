@@ -90,7 +90,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
 
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
             TABLA.to_excel(writer, sheet_name=f"Planilla {month}", index=False)
-            columnas_extra = ['Idioma', 'Tipo_documento', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
+            columnas_extra = ['Idioma', 'Tipo Documento', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
             columnas_extra_disponibles = [col for col in columnas_extra if col in datos_docentes.columns]
 
             if os.path.exists(excel_exa_clasif):
@@ -117,7 +117,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Total Pago S/.': 'Total_pago',
                 'Estado': 'Estado_docente',
                 'Idioma': 'Docente_idioma',
-                'Tipo_documento': 'Tipo_documento',
+                'Tipo Documento': 'Tipo_documento',
                 'N_Ruc': 'N_Ruc',
                 'Nro. Documento': 'Numero_dni',
                 'Celular': 'Numero_celular',
