@@ -90,7 +90,8 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
 
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
             TABLA.to_excel(writer, sheet_name=f"Planilla {month}", index=False)
-            columnas_extra = ['Idioma', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
+            columnas_extra = ['Idioma', 'Tipo_documento', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
+            columnas_extra_disponibles = [col for col in columnas_extra if col in datos_docentes.columns]
 
             if os.path.exists(excel_exa_clasif):
                 # Usar cache para evitar lecturas múltiples
@@ -108,7 +109,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
             agrupar_gen = agregar_servicio_coordinacion(agrupar_gen, excel_coordinacion, TextUtils.normalizar_texto, datos_docentes)
 
             TABLA_GENERADOR = cache_module.construir_tabla_planilla_con_cache(agrupar_gen, es_enero, monto_bono, construir_tabla_planilla)
-            TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra], on='Docente', how='left').rename(columns={
+            TABLA_GENERADOR = TABLA_GENERADOR.merge(datos_docentes[['Docente'] + columnas_extra_disponibles], on='Docente', how='left').rename(columns={
                 'Categoria (Letra)': 'Categoria_letra',
                 'Categoria (Monto)': 'Categoria_monto',
                 'Diseño de Examenes': 'Disenio_examenes',
@@ -116,6 +117,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Total Pago S/.': 'Total_pago',
                 'Estado': 'Estado_docente',
                 'Idioma': 'Docente_idioma',
+                'Tipo_documento': 'Tipo_documento',
                 'N_Ruc': 'N_Ruc',
                 'Nro. Documento': 'Numero_dni',
                 'Celular': 'Numero_celular',

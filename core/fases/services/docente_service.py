@@ -19,7 +19,8 @@ class DocenteService:
             "ruc_docente_cot": f"RUC N.º {docente.ruc}",
             "correo_docente_cot": f"Correo: {docente.correo}",
             "celular_cot": f"Teléfono: {docente.celular}",
-            "dni_cot": f"DNI: {docente.dni_formateado}"
+            "tipo_documento": f"{docente.tipo_documento}",
+            "dni_cot": f"{docente.dni_formateado}"
         }
     
     @staticmethod

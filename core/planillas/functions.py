@@ -197,8 +197,6 @@ def _procesar_archivo_docentes_con_monto(
     datos_docentes,
     patrones_columna_monto,
     nombre_columna_resultado,
-    nombre_columna_monto_temp='_monto_temp',
-    nombre_columna_docente_temp='_docente_temp',
     procesar_resultado_fn=None,
 ):
 
@@ -396,18 +394,6 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
 
 
 def agregar_examen_clasificacion(df, ruta_clasificacion, normalizar_texto, datos_docentes=None):
-    """
-    Agrega información de examen de clasificación al DataFrame principal.
-    
-    Args:
-        df: DataFrame principal
-        ruta_clasificacion: Ruta al archivo Excel de clasificación
-        normalizar_texto: Función para normalizar nombres
-        datos_docentes: DataFrame con datos de docentes (opcional, para agregar faltantes)
-    
-    Returns:
-        DataFrame con columna 'Examen Clasif.' completa
-    """
     return _procesar_archivo_docentes_con_monto(
         df,
         ruta_clasificacion,
@@ -453,17 +439,6 @@ def filtrar_combinaciones_optimizado(datos, combinacion_anterior):
 # ================================= EXPANSIÓN DE FILAS POR CURSO CON MODALIDAD ===================================================
 
 def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
-    """
-    Expande el DataFrame agrupado creando una fila por cada curso/servicio individual.
-    Cada fila incluye: curso individual, modalidad específica, tipo de servicio, horas y monto.
-    
-    Args:
-        agrupar_df: DataFrame con docentes agrupados (una fila por docente)
-        datos_csv_procesados: DataFrame original con información de cada curso
-    
-    Returns:
-        DataFrame expandido con múltiples filas por docente
-    """
     filas_expandidas = []
     
     for _, row_docente in agrupar_df.iterrows():
@@ -649,13 +624,13 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
             'N°', 'Docente', 'N_Ruc', 'Categoria_letra', 'Categoria_monto', 'Sede',
             'Curso_Virtual', 'Curso_Presencial', 'cantidad_cursos', 'Curso Dictado',
             'Disenio_examenes', 'Examen_clasif', 'Horas_Total', 'Servicio_actualizacion',
-            'Total_pago', 'Estado_docente', 'Docente_idioma', 'Numero_dni', 'Numero_celular',
+            'Total_pago', 'Estado_docente', 'Docente_idioma', 'Tipo_documento', 'Numero_dni', 'Numero_celular',
             'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
         ]
         return pd.DataFrame(columns=columnas)
 
     columnas_texto = [
-        'N_Ruc', 'Categoria_letra', 'Sede', 'Estado_docente', 'Docente_idioma',
+        'N_Ruc', 'Categoria_letra', 'Sede', 'Estado_docente', 'Docente_idioma', 'Tipo_documento',
         'Numero_dni', 'Numero_celular', 'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
     ]
     columnas_numericas = [
@@ -690,6 +665,7 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
         'Total_pago': 'sum',
         'Estado_docente': _primer_valor,
         'Docente_idioma': _unir_unicos,
+        'Tipo_documento': _primer_valor,
         'Numero_dni': _primer_valor,
         'Numero_celular': _primer_valor,
         'Domicilio_docente': _primer_valor,
@@ -771,7 +747,8 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
         'N°', 'Docente', 'N_Ruc', 'Categoria_letra', 'Categoria_monto', 'Sede',
         'Curso_Virtual', 'Curso_Presencial', 'cantidad_cursos', 'Curso Dictado',
         'Disenio_examenes', 'Examen_clasif', 'Horas_Total', 'Servicio_actualizacion',
-        'Total_pago', 'Estado_docente', 'Docente_idioma', 'Numero_dni', 'Numero_celular',
+        'Total_pago', 'Estado_docente', 'Docente_idioma', 'Tipo Documento', 'Numero_dni', 'Numero_celular',
+        'Total_pago', 'Estado_docente', 'Docente_idioma', 'Tipo_documento', 'Numero_dni', 'Numero_celular',
         'Domicilio_docente', 'Correo_personal', 'Nro_Contrato'
     ]
 

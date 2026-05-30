@@ -6,6 +6,7 @@ from core.fases.utils import TextUtils
 class DocenteData:
     # Identificación
     nombre: str
+    tipo_documento: str = ""
     dni: str = ""
     ruc: str = ""
     

@@ -16,7 +16,14 @@ class ExcelReaderService:
                     if valor_str and valor_str.lower() != 'nan':
                         return valor
             except AttributeError:
-                continue
+                try:
+                    valor = fila[col_name]
+                    if pd.notna(valor):
+                        valor_str = str(valor).strip()
+                        if valor_str and valor_str.lower() != 'nan':
+                            return valor
+                except Exception:
+                    continue
         return default
 
     @staticmethod
@@ -144,10 +151,17 @@ class ExcelReaderService:
         if not curso:
             curso = ExcelReaderService._construir_curso_resumido(fila)
 
+        tipo_documento = ExcelReaderService._buscar_columna(
+            fila,
+            ["Tipo_documento", "Tipo Documento"],
+            ""
+        )
+
         return DocenteData(
             nombre=str(getattr(fila, "Docente", "N/A")),
             dni=TextUtils.limpiar_numero(getattr(fila, "Numero_dni", "")),
             ruc=TextUtils.limpiar_numero(getattr(fila, "N_Ruc", "")),
+            tipo_documento=str(tipo_documento).strip(),
             direccion=str(getattr(fila, "Domicilio_docente", "")).strip(),
             correo=str(getattr(fila, "Correo_personal", "")),
             celular=TextUtils.limpiar_numero(getattr(fila, "Numero_celular", "")),
