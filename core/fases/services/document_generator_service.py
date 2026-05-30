@@ -86,6 +86,48 @@ class DocumentGeneratorService:
         except Exception as e:
             print(f"Error al modificar documento administrativo: {e}")
             return False
+
+    @staticmethod
+    def normalizar_control_administrativo(ruta_documento: str, texto_curso: str) -> bool:
+        if not os.path.exists(ruta_documento):
+            return False
+
+        texto_curso = str(texto_curso).strip()
+        if not texto_curso:
+            return False
+
+        try:
+            doc = Document(ruta_documento)
+            frases_genricas = [
+                "SERVICIO DE DICTADO DE CLASES VIRTUALES Y DISEÑO DE EXÁMENES DE",
+                "SERVICIO DE DICTADO DE CLASES VIRTUALES Y DISEÑO DE EXAMENES DE"
+            ]
+
+            for parrafo in doc.paragraphs:
+                texto_parrafo = parrafo.text.strip()
+                if any(frase in texto_parrafo.upper() for frase in frases_genricas):
+                    for run in parrafo.runs:
+                        run.text = ''
+                    if parrafo.runs:
+                        parrafo.runs[0].text = texto_curso
+
+            for tabla in doc.tables:
+                for fila in tabla.rows:
+                    for celda in fila.cells:
+                        for parrafo in celda.paragraphs:
+                            texto_parrafo = parrafo.text.strip()
+                            if any(frase in texto_parrafo.upper() for frase in frases_genricas):
+                                for run in parrafo.runs:
+                                    run.text = ''
+                                if parrafo.runs:
+                                    parrafo.runs[0].text = texto_curso
+
+            doc.save(ruta_documento)
+            return True
+
+        except Exception as e:
+            print(f"Error al normalizar control administrativo: {e}")
+            return False
     
     @staticmethod
     def obtener_ruta_plantilla(tipo_documento: str, tipo_contrato: str, config: DocumentConfig) -> str:

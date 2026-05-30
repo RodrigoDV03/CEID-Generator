@@ -135,6 +135,45 @@ class FaseFinalGenerator(BaseFaseGenerator):
                 print(f"❌ Error procesando control para {nombre}: {e}")
                 continue
 
+    def procesar_control_pagos_administrativos(
+        self,
+        df_planilla: 'pd.DataFrame'
+    ) -> None:
+        for _, fila in df_planilla.iterrows():
+            nombre = "N/A"
+            try:
+                nombre = str(getattr(fila, "Docente", "N/A")).strip()
+                if not nombre or nombre == "N/A":
+                    continue
+
+                estado = str(getattr(fila, "Estado_docente", "")).strip().upper()
+                if estado != "CONTRATO":
+                    continue
+
+                numero_contrato = ExcelReaderService._extraer_numero_contrato(
+                    getattr(fila, "Nro_Contrato", getattr(fila, "Nro_contrato", ""))
+                )
+
+                docente = DocenteData(
+                    nombre=nombre,
+                    dni=str(getattr(fila, "Numero_dni", "")).strip(),
+                    ruc=str(getattr(fila, "N_Ruc", "")).strip(),
+                    curso=str(getattr(fila, "Curso", "")).strip(),
+                    especialidad=str(getattr(fila, "Actividades_admin", "")).strip(),
+                    numero_contrato=numero_contrato,
+                    estado_docente="CONTRATO",
+                    idioma=str(getattr(fila, "Curso", "")).strip()
+                )
+
+                payment = self.excel_service.extraer_payment_data_control(fila)
+                ruta = self.generar_control_avance(docente, payment)
+                if ruta:
+                    print(f"✅ {nombre} - Control de pagos administrativo generado correctamente.")
+
+            except Exception as e:
+                print(f"❌ Error procesando control administrativo para {nombre}: {e}")
+                continue
+
 
 def procesar_planilla_fase_final(
     planilla_path: str,
@@ -193,3 +232,8 @@ def procesar_planilla_fase_final(
             generador.procesar_control_pagos(df_control, idiomas_por_docente, contratos_por_docente)
         except Exception as e:
             print(f"Error procesando control de pagos: {e}")
+    elif tipo_fase_final == "administrativo":
+        try:
+            generador.procesar_control_pagos_administrativos(df)
+        except Exception as e:
+            print(f"Error procesando control de pagos administrativos: {e}")

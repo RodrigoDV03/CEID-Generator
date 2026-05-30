@@ -209,7 +209,7 @@ class ExcelReaderService:
     def extraer_payment_data_control(fila: Any) -> PaymentData:
         monto_total = ExcelReaderService._buscar_columna(
             fila,
-            ["MONTO TOTAL PARA CONTRATO S/", "TOTAL", "Monto total", "MONTO TOTAL"],
+            ["MONTO TOTAL PARA CONTRATO S/", "TOTAL", "Total_pago", "Total Pago", "Monto total", "MONTO TOTAL"],
             0
         )
         primera = ExcelReaderService._buscar_columna(fila, ["Primera armada", "PRIMERA ARMADA"], 0)

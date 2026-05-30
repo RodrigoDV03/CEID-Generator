@@ -1,11 +1,11 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 from core.fases.models import PaymentData
 
 
 class PaymentService:
     
     @staticmethod
-    def calcular_montos_completos(payment: PaymentData, es_administrativo: bool) -> Dict[str, any]:
+    def calcular_montos_completos(payment: PaymentData, es_administrativo: bool) -> Dict[str, Any]:
         # Determinar qué bono mostrar según el tipo
         bono_para_mostrar = 0 if es_administrativo else payment.bono
         

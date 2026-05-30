@@ -26,10 +26,15 @@ class ControlAvanceBuilder:
             print(f"⚠️  Advertencia: {docente.nombre} no tiene número de contrato asignado")
             numero_contrato = "[SIN_CONTRATO]"
 
-        idioma_docente = docente.idioma.strip() if docente.idioma else ""
-        if not idioma_docente:
-            # Fallback para no dejar el marcador vacío en casos no mapeados.
-            idioma_docente = docente.especialidad
+        if self.config.es_administrativo:
+            idioma_docente = docente.curso.strip() if docente.curso else ""
+            if not idioma_docente:
+                idioma_docente = docente.actividades_admin.strip() if docente.actividades_admin else docente.especialidad
+        else:
+            idioma_docente = docente.idioma.strip() if docente.idioma else ""
+            if not idioma_docente:
+                # Fallback para no dejar el marcador vacío en casos no mapeados.
+                idioma_docente = docente.especialidad
         
         return {
             "Nombre_Docente": docente.nombre,
@@ -76,5 +81,8 @@ class ControlAvanceBuilder:
         
         # Generar documento
         self.doc_service.generar_documento(ruta_template, reemplazos, ruta_salida)
+
+        if self.config.es_administrativo:
+            self.doc_service.normalizar_control_administrativo(ruta_salida, docente.curso)
         
         return ruta_salida
