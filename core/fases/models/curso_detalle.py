@@ -37,7 +37,7 @@ class CursoDetalle:
         """Indica si el servicio no requiere especificar modalidad"""
         return self.tipo_servicio in ["DISENO_EXAMENES", "BONO"]
     
-    def generar_descripcion_individual(self, incluir_modalidad: bool = True) -> str:
+    def generar_descripcion_individual(self, incluir_modalidad: bool = True, formato_actualizacion: str = "solo") -> str:
         """
         Genera la descripción textual de este curso/servicio.
         
@@ -57,7 +57,20 @@ class CursoDetalle:
             return f"{self.horas} horas de examen de clasificación"
         
         elif self.tipo_servicio == "SERVICIO_ACTUALIZACION":
-            # "Servicio de actualización de materiales de enseñanza" o con modalidad por ítem
+            if self.horas and self.horas > 0:
+                if formato_actualizacion == "compuesto":
+                    base = f"{self.horas} horas de servicio de actualización de materiales de enseñanza"
+                    if incluir_modalidad:
+                        return f"{base} bajo la modalidad {self.modalidad_texto}"
+                    return base
+
+                # formato 'solo' por defecto
+                base = f"servicio de {self.horas} horas de actualización de materiales de enseñanza"
+                if incluir_modalidad:
+                    return f"{base} bajo la modalidad {self.modalidad_texto}"
+                return base
+
+            # Si no hay horas, mantener la redacción previa (sin horas)
             if incluir_modalidad:
                 return f"Servicio de actualización de materiales de enseñanza bajo la modalidad {self.modalidad_texto}"
             return "Servicio de actualización de materiales de enseñanza"

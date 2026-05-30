@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List, Any
+from typing import List, Any, Mapping, Callable, Union, cast
 from core.fases.models import DocenteData, PaymentData, CursoDetalle
 from core.fases.utils import TextUtils
 
@@ -16,7 +16,14 @@ class ExcelReaderService:
                     if valor_str and valor_str.lower() != 'nan':
                         return valor
             except AttributeError:
-                continue
+                try:
+                    valor = fila[col_name]
+                    if pd.notna(valor):
+                        valor_str = str(valor).strip()
+                        if valor_str and valor_str.lower() != 'nan':
+                            return valor
+                except Exception:
+                    continue
         return default
 
     @staticmethod
@@ -54,10 +61,14 @@ class ExcelReaderService:
                 'Número de contrato'
             ]
             dtype_specs = {col: str for col in columnas_contrato}
-            converters = {
-                col: (lambda x: str(x).strip() if pd.notna(x) else '')
-                for col in columnas_contrato
-            }
+            def _strip_or_empty(x: Any) -> str:
+                try:
+                    return str(x).strip() if pd.notna(x) else ''
+                except Exception:
+                    return ''
+
+            converters = cast(Mapping[Union[int, str], Callable[[Any], Any]],
+                              {col: _strip_or_empty for col in columnas_contrato})
             df = pd.read_excel(
                 ruta_excel, 
                 sheet_name=nombre_hoja,
@@ -140,10 +151,17 @@ class ExcelReaderService:
         if not curso:
             curso = ExcelReaderService._construir_curso_resumido(fila)
 
+        tipo_documento = ExcelReaderService._buscar_columna(
+            fila,
+            ["Tipo_documento", "Tipo Documento"],
+            ""
+        )
+
         return DocenteData(
             nombre=str(getattr(fila, "Docente", "N/A")),
             dni=TextUtils.limpiar_numero(getattr(fila, "Numero_dni", "")),
             ruc=TextUtils.limpiar_numero(getattr(fila, "N_Ruc", "")),
+            tipo_documento=str(tipo_documento).strip(),
             direccion=str(getattr(fila, "Domicilio_docente", "")).strip(),
             correo=str(getattr(fila, "Correo_personal", "")),
             celular=TextUtils.limpiar_numero(getattr(fila, "Numero_celular", "")),
@@ -191,7 +209,7 @@ class ExcelReaderService:
     def extraer_payment_data_control(fila: Any) -> PaymentData:
         monto_total = ExcelReaderService._buscar_columna(
             fila,
-            ["MONTO TOTAL PARA CONTRATO S/", "TOTAL", "Monto total", "MONTO TOTAL"],
+            ["MONTO TOTAL PARA CONTRATO S/", "TOTAL", "Total_pago", "Total Pago", "Monto total", "MONTO TOTAL"],
             0
         )
         primera = ExcelReaderService._buscar_columna(fila, ["Primera armada", "PRIMERA ARMADA"], 0)
@@ -323,6 +341,13 @@ class ExcelReaderService:
                 servicio_actualizacion = float(fila.get('Servicio_actualizacion', 0) or 0)
                 if servicio_actualizacion > 0:
                     horas_total = int(float(fila.get('Horas_Total', 0) or 0))
+                    # Si no hay horas explícitas, calcular a partir del monto y categoria_monto
+                    if horas_total == 0 and categoria_monto > 0:
+                        try:
+                            horas_total = int(round(servicio_actualizacion / float(categoria_monto)))
+                        except Exception:
+                            horas_total = 0
+
                     cursos.append(CursoDetalle(
                         nombre='Servicio de actualización de materiales de enseñanza',
                         modalidad='VIRTUAL',

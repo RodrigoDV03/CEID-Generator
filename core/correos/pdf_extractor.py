@@ -21,38 +21,36 @@ class RUCExtractor:
     """Extractor de RUC desde PDFs."""
     
     def __init__(self):
-        """Inicializa el extractor de RUC."""
-        # Patrón para RUC: puede tener saltos de línea después de "RUC:"
-        self.patron_ruc = re.compile(r'\bRUC:\s*[\n\r]*\s*(\d{11})\b', re.IGNORECASE)
-        # Patrón para RUC pegado al nombre (formato común en el PDF)
-        self.patron_ruc_nombre = re.compile(r'\b(\d{11})([A-ZÁÉÍÓÚÑ\s]+,\s*[A-ZÁÉÍÓÚÑ\s]+)', re.IGNORECASE)
+        self.patron_ruc_nombre = re.compile(
+            r'\b(\d{11})(?=[A-ZÑ\s]{3,},\s*[A-ZÑ\s]+)',
+            re.IGNORECASE,
+        )
+
+    def _buscar_ruc_cerca_de_marcador(self, texto: str) -> Optional[str]:
+        """Busca el primer RUC de 11 dígitos cerca del marcador RUC."""
+        for match in re.finditer(r'\bRUC\b', texto, re.IGNORECASE):
+            ventana = texto[match.end():match.end() + 200]
+            coincidencia = re.search(r'\b(\d{11})\b', ventana)
+            if coincidencia:
+                return coincidencia.group(1)
+        return None
     
     def extraer(self, texto: str, debug: bool = False) -> Optional[str]:
-        """
-        Extrae el RUC del texto del PDF.
-        
-        Args:
-            texto: Texto extraído del PDF
-            debug: Si True, imprime información de depuración
-        
-        Returns:
-            RUC de 11 dígitos o None si no se encuentra
-        """
-        # Intentar primero con patrón "RUC:XXXXXXXXXX" (puede tener saltos de línea)
-        match = self.patron_ruc.search(texto)
+        texto_normalizado = _normalizar_ascii(texto)
+
+        # Priorizar el RUC del proveedor, que suele aparecer junto al nombre.
+        match = self.patron_ruc_nombre.search(texto_normalizado)
         if match:
             ruc = match.group(1)
             if debug:
-                logger.info(f"RUC encontrado (patrón RUC:): {ruc}")
+                logger.info(f"RUC encontrado (patrón proveedor+nombre): {ruc}")
             return ruc
-        
-        # Buscar patrón RUC pegado a nombre (11 dígitos seguidos de nombre con formato)
-        match = self.patron_ruc_nombre.search(texto)
-        if match:
-            ruc = match.group(1)
-            nombre = match.group(2).strip()
+
+        # Intentar después con el RUC cerca del marcador "RUC".
+        ruc = self._buscar_ruc_cerca_de_marcador(texto_normalizado)
+        if ruc:
             if debug:
-                logger.info(f"RUC encontrado (patrón RUC+nombre): {ruc} - {nombre}")
+                logger.info(f"RUC encontrado (cerca de marcador RUC): {ruc}")
             return ruc
         
         if debug:
@@ -148,7 +146,6 @@ class ServicioExtractor:
 
 
 class ModalidadExtractor:
-    """Extractor de modalidad (PRESENCIAL/VIRTUAL/HIBRIDA) desde la orden."""
 
     def __init__(self):
         self.patron_modalidad = re.compile(
@@ -178,7 +175,6 @@ class ModalidadExtractor:
         return None
 
 class ContratoExtractor:
-    """Detector de la frase que indica contrato de locacion de servicios."""
 
     def __init__(self):
         self.patron_contrato = re.compile(
@@ -192,7 +188,6 @@ class ContratoExtractor:
 
 
 class PDFExtractor:
-    """Extractor de datos desde PDFs de órdenes de servicio."""
     
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
