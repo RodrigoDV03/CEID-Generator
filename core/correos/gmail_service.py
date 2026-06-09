@@ -144,6 +144,35 @@ class GmailService:
         except Exception as e:
             logger.warning(f"No se pudo obtener la firma de Gmail: {e}")
             return ""
+
+    def obtener_thread_id(self, message_id: str) -> str:
+        """
+        Recupera el threadId asociado a un mensaje enviado.
+
+        Args:
+            message_id: Identificador del mensaje devuelto por Gmail al enviar.
+
+        Returns:
+            El threadId si se pudo consultar, o cadena vacía en caso contrario.
+        """
+        try:
+            mensaje = self.service.users().messages().get(
+                userId='me',
+                id=message_id,
+                format='minimal'
+            ).execute()
+            thread_id = mensaje.get('threadId', '')
+
+            if thread_id:
+                logger.info(f"Thread ID recuperado para messageId {message_id}")
+            else:
+                logger.warning(f"La consulta del messageId {message_id} no devolvió threadId")
+
+            return thread_id
+
+        except Exception as e:
+            logger.warning(f"No se pudo recuperar el threadId para messageId {message_id}: {e}")
+            return ""
     
     def es_autenticado(self) -> bool:
         """

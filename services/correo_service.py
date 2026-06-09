@@ -3,6 +3,7 @@ from core.correos.email_builder import EmailBuilderFactory
 from core.correos.email_sender import EmailPersonalizado, GmailEmailSender, LoteEmailSender
 from core.correos.gmail_service import GmailService
 from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
+from typing import Any
 
 
 _gmail_service_shared = None
@@ -56,7 +57,7 @@ def enviar_correos_service(
     correo_individual = EmailPersonalizado(gmail_service)
 
     if es_modo_contrato:
-        return correo_individual.enviar_contrato_primera_vez(
+        resultado = correo_individual.enviar_contrato_primera_vez(
             nombre=data_envio_individual["nombre"],
             pdf_orden_path=data_envio_individual["pdf_path"],
             pdf_contrato_path=pdf_contrato,
@@ -70,6 +71,23 @@ def enviar_correos_service(
             anio=anio,
         )
 
+        return {
+            "exitosos": 1 if resultado.success else 0,
+            "fallidos": 0 if resultado.success else 1,
+            "total": 1,
+            "thread_ids": [resultado.thread_id] if resultado.success and resultado.thread_id else [],
+            "resultados": [
+                {
+                    "nombre": data_envio_individual["nombre"],
+                    "destinatario": data_envio_individual["correo"],
+                    "success": resultado.success,
+                    "message_id": resultado.message_id,
+                    "thread_id": resultado.thread_id,
+                    "error": resultado.error,
+                }
+            ],
+        }
+
     resumen = lote_sender.enviar_lote(
         data_envio,
         mes,
@@ -78,7 +96,7 @@ def enviar_correos_service(
         es_reconocimiento_deuda,
     )
 
-    return resumen["fallidos"] == 0
+    return resumen
 
 
 def previsualizar_correos_service(
@@ -102,10 +120,10 @@ def previsualizar_correos_service(
     previsualizaciones = []
     for datos in data_envio:
         if es_modo_contrato:
-            builder = EmailBuilderFactory.crear_builder_contrato_primera_vez(tipo)
-            builder.con_periodo_contrato(mes_inicio, mes_fin)
+            builder: Any = EmailBuilderFactory.crear_builder_contrato_primera_vez(tipo)
+            builder.con_periodo_contrato(mes_inicio or "", mes_fin or "")
         else:
-            builder = EmailBuilderFactory.crear_builder(tipo)
+            builder: Any = EmailBuilderFactory.crear_builder(tipo)
             builder.con_reconocimiento_deuda(es_reconocimiento_deuda)
 
         # La firma se deja a Gmail en el momento del envio.
@@ -144,23 +162,52 @@ def enviar_previsualizaciones_service(previsualizaciones_editadas):
 
     exitosos = 0
     fallidos = 0
+    resultados = []
 
     for item in previsualizaciones_editadas:
         try:
-            sender.enviar_con_firma(
+            resultado = sender.enviar_con_firma(
                 destinatario=item["destinatario"],
                 asunto=item["asunto"],
                 cuerpo_html=item["cuerpo_html"],
                 pdf_paths=item.get("pdf_paths") or [item.get("pdf_path")],
             )
-            print(f"Correo enviado a {item.get('nombre', item['destinatario'])}")
-            exitosos += 1
+            if resultado.success:
+                print(f"Correo enviado a {item.get('nombre', item['destinatario'])}")
+                exitosos += 1
+            else:
+                fallidos += 1
+
+            resultados.append(
+                {
+                    "nombre": item.get("nombre"),
+                    "destinatario": item["destinatario"],
+                    "success": resultado.success,
+                    "message_id": resultado.message_id,
+                    "thread_id": resultado.thread_id,
+                    "error": resultado.error,
+                }
+            )
         except Exception as e:
             print(f"Error enviando correo a {item.get('nombre', item['destinatario'])}: {e}")
             fallidos += 1
+            resultados.append(
+                {
+                    "nombre": item.get("nombre"),
+                    "destinatario": item["destinatario"],
+                    "success": False,
+                    "message_id": None,
+                    "thread_id": None,
+                    "error": str(e),
+                }
+            )
+
+    resultados = locals().get("resultados", [])
 
     return {
         "exitosos": exitosos,
         "fallidos": fallidos,
         "total": len(previsualizaciones_editadas),
+        "thread_ids": [r["thread_id"] for r in resultados if r["success"] and r["thread_id"]],
+        "resultados": resultados,
     }

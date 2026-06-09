@@ -1,8 +1,15 @@
-import pandas as pd
 import os
 import datetime
+
+import pandas as pd
 from openpyxl import load_workbook
-from core.planillas.csv_processing import cargar_archivo, limpiar_docentes, procesar_csv_nuevo_formato
+from core.planillas.csv_processing import (
+    cargar_archivo,
+    filtrar_docentes_validos,
+    limpiar_docentes,
+    normalizar_columnas_planilla,
+    procesar_csv_nuevo_formato,
+)
 from core.planillas.functions import (
     formatear_numero,
     agregar_servicio_coordinacion,
@@ -18,7 +25,7 @@ from core.planillas.table_builders import construir_tabla_planilla
 from core.planillas.excel_styles import *
 from core.fases.utils import TextUtils
 
-def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordinacion, month, monto_bono: float = 0, carpeta_destino: str = None):
+def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordinacion, month, monto_bono: float = 0, carpeta_destino: str | None = None):
     año_actual = datetime.datetime.now().year
     es_enero = month.lower() == 'enero'
     
@@ -31,6 +38,7 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         
         print("📂 Cargando archivo de datos...")
         datos = cargar_archivo(data_path)
+        datos = normalizar_columnas_planilla(datos)
         
         # Procesar CSV con nuevo formato de columnas
         if 'Detalle Curso' in datos.columns or 'Horario Completo' in datos.columns:
@@ -56,9 +64,9 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
             datos_docentes['N° Contrato'] = ''
 
         datos = limpiar_docentes(datos, 'docente')
+        datos = filtrar_docentes_validos(datos, 'docente')
         datos_docentes = limpiar_docentes(datos_docentes, 'Docente')
 
-        datos = datos[~datos['docente'].isin(['', ',', None])]
         datos_csv_original = datos.copy()
 
         datos_csv_original_procesados = aplicar_transformaciones_base(datos_csv_original)

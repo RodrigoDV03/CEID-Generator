@@ -26,6 +26,20 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
         else:
             df[campo] = df[campo].fillna(valor_default)
 
+    columnas_numericas = [
+        'Curso Dictado',
+        'cantidad_cursos',
+        'Diseño de Examenes',
+        'Examen Clasif.',
+        'Servicio Actualización',
+    ]
+    for columna in columnas_numericas:
+        df[columna] = pd.to_numeric(df[columna], errors='coerce').fillna(0)
+
+    monto_bono = pd.to_numeric(monto_bono, errors='coerce')
+    if pd.isna(monto_bono):
+        monto_bono = 0
+
     columnas_tabla = {
         'N°': range(1, len(df) + 1),
         'Docente': df['Docente'],
@@ -55,7 +69,9 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
 
     def agregar_servicio_a_curso(row):
         curso_actual = str(row['Curso']).strip()
-        servicio_actualizacion = row['Servicio Actualización']
+        servicio_actualizacion = pd.to_numeric(row['Servicio Actualización'], errors='coerce')
+        if pd.isna(servicio_actualizacion):
+            servicio_actualizacion = 0
 
         if servicio_actualizacion > 0:
             texto_servicio = 'Servicio de actualización de materiales de enseñanza'

@@ -2,6 +2,7 @@ import os
 import base64
 import logging
 import re
+from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -21,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 class EmailSendError(Exception):
     pass
+
+
+@dataclass
+class ResultadoEnvioCorreo:
+    success: bool
+    message_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    destinatario: Optional[str] = None
+    asunto: Optional[str] = None
+    error: Optional[str] = None
+
+    def __bool__(self) -> bool:
+        return self.success
 
 
 class GmailMessageBuilder:
@@ -93,7 +107,7 @@ class GmailEmailSender:
         cuerpo_html: str,
         pdf_path: Optional[str] = None,
         pdf_paths: Optional[List[str]] = None
-    ) -> dict:
+    ) -> ResultadoEnvioCorreo:
         try:
             cuerpo_html = self._agregar_firma_gmail(cuerpo_html)
 
@@ -123,9 +137,18 @@ class GmailEmailSender:
                 userId='me',
                 body={'id': draft['id']}
             ).execute()
+
+            message_id = result.get('id', '')
+            thread_id = result.get('threadId', '') or self.gmail_service.obtener_thread_id(message_id)
             
             logger.info(f"Correo enviado exitosamente a {destinatario}")
-            return result
+            return ResultadoEnvioCorreo(
+                success=True,
+                message_id=message_id or None,
+                thread_id=thread_id or None,
+                destinatario=destinatario,
+                asunto=asunto,
+            )
             
         except HttpError as e:
             logger.error(f"Error HTTP enviando correo a {destinatario}: {e}")
@@ -141,17 +164,27 @@ class GmailEmailSender:
         cuerpo_html: str,
         pdf_path: Optional[str],
         nombre_destinatario: str
-    ) -> bool:
+    ) -> ResultadoEnvioCorreo:
         try:
-            self.enviar_con_firma(destinatario, asunto, cuerpo_html, pdf_path)
+            resultado = self.enviar_con_firma(destinatario, asunto, cuerpo_html, pdf_path)
             print(f"Correo enviado a {nombre_destinatario}")
-            return True
+            return resultado
         except EmailSendError as e:
             print(f"❌ Error enviando correo a {nombre_destinatario}: {e}")
-            return False
+            return ResultadoEnvioCorreo(
+                success=False,
+                destinatario=destinatario,
+                asunto=asunto,
+                error=str(e),
+            )
         except Exception as e:
             print(f"❌ Error inesperado enviando correo a {nombre_destinatario}: {e}")
-            return False
+            return ResultadoEnvioCorreo(
+                success=False,
+                destinatario=destinatario,
+                asunto=asunto,
+                error=str(e),
+            )
 
 
 class EmailPersonalizado:
@@ -189,18 +222,18 @@ class EmailPersonalizado:
         modalidad: Optional[str] = None,
         anio: Optional[int] = None,
         es_reconocimiento_deuda: bool = False
-    ) -> bool:
+    ) -> ResultadoEnvioCorreo:
         if anio is None:
             anio = AÑO_ACTUAL
         
         # Validar que docentes tengan servicio
         if tipo == TipoCorreo.DOCENTE and not servicio:
             print(f"⚠ No se puede enviar correo a {nombre}: servicio no especificado")
-            return False
+            return ResultadoEnvioCorreo(False, destinatario=destinatario, error="servicio no especificado")
 
         if tipo == TipoCorreo.DOCENTE and not modalidad:
             print(f"⚠ No se puede enviar correo a {nombre}: modalidad no especificada")
-            return False
+            return ResultadoEnvioCorreo(False, destinatario=destinatario, error="modalidad no especificada")
         
         try:
             # Construir el correo según el tipo
@@ -220,7 +253,11 @@ class EmailPersonalizado:
         except Exception as e:
             print(f"❌ Error preparando correo para {nombre}: {e}")
             logger.error(f"Error en enviar correo personalizado para {nombre}: {e}")
-            return False
+            return ResultadoEnvioCorreo(
+                success=False,
+                destinatario=destinatario,
+                error=str(e),
+            )
 
     def enviar_contrato_primera_vez(
         self,
@@ -235,17 +272,17 @@ class EmailPersonalizado:
         servicio: Optional[str] = None,
         modalidad: Optional[str] = None,
         anio: Optional[int] = None
-    ) -> bool:
+    ) -> ResultadoEnvioCorreo:
         if anio is None:
             anio = AÑO_ACTUAL
 
         if tipo == TipoCorreo.DOCENTE and not servicio:
             print(f"⚠ No se puede enviar correo a {nombre}: servicio no especificado")
-            return False
+            return ResultadoEnvioCorreo(False, destinatario=destinatario, error="servicio no especificado")
 
         if tipo == TipoCorreo.DOCENTE and not modalidad:
             print(f"⚠ No se puede enviar correo a {nombre}: modalidad no especificada")
-            return False
+            return ResultadoEnvioCorreo(False, destinatario=destinatario, error="modalidad no especificada")
 
         try:
             builder = EmailBuilderFactory.crear_builder_contrato_primera_vez(tipo)
@@ -258,19 +295,23 @@ class EmailPersonalizado:
             asunto = builder.construir_asunto()
             cuerpo_html = builder.construir_cuerpo()
 
-            self.sender.enviar_con_firma(
+            resultado = self.sender.enviar_con_firma(
                 destinatario=destinatario,
                 asunto=asunto,
                 cuerpo_html=cuerpo_html,
                 pdf_paths=[pdf_orden_path, pdf_contrato_path]
             )
             print(f"Correo de primera vez con contrato enviado a {nombre}")
-            return True
+            return resultado
 
         except Exception as e:
             print(f"❌ Error preparando correo de primera vez para {nombre}: {e}")
             logger.error(f"Error en enviar contrato primera vez para {nombre}: {e}")
-            return False
+            return ResultadoEnvioCorreo(
+                success=False,
+                destinatario=destinatario,
+                error=str(e),
+            )
 
 
 class LoteEmailSender:
@@ -293,6 +334,7 @@ class LoteEmailSender:
         
         exitosos = 0
         fallidos = 0
+        resultados = []
         
         for datos in data_para_envio:
             servicio = datos.get("servicio") if tipo == TipoCorreo.DOCENTE else None
@@ -310,15 +352,28 @@ class LoteEmailSender:
                 es_reconocimiento_deuda=es_reconocimiento_deuda
             )
             
-            if resultado:
+            if resultado.success:
                 exitosos += 1
             else:
                 fallidos += 1
+
+            resultados.append(
+                {
+                    "nombre": datos.get("nombre"),
+                    "destinatario": datos.get("correo"),
+                    "success": resultado.success,
+                    "message_id": resultado.message_id,
+                    "thread_id": resultado.thread_id,
+                    "error": resultado.error,
+                }
+            )
         
         print(f"\n✅ Envío completado: {exitosos} exitosos, {fallidos} fallidos")
         
         return {
             "exitosos": exitosos,
             "fallidos": fallidos,
-            "total": len(data_para_envio)
+            "total": len(data_para_envio),
+            "thread_ids": [r["thread_id"] for r in resultados if r["success"] and r["thread_id"]],
+            "resultados": resultados,
         }

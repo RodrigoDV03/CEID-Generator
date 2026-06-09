@@ -3,6 +3,51 @@ import re
 import pandas as pd
 
 
+COLUMNAS_PLANILLA_CANONICAS = {
+    'Programa Educativo': 'programa_educativo',
+    'Idioma': 'idioma',
+    'Nivel': 'nivel',
+    'Ciclo': 'ciclo',
+    'Modalidad': 'modalidad',
+    'Sede': 'sede',
+    'Dia': 'dias',
+    'Día': 'dias',
+    'Hora Inicio': 'horainicio',
+    'Hora Fin': 'horafin',
+    'Docente': 'docente',
+    'Fecha Inicio Clases': 'fecha_inicio_clases',
+    'Fecha Fin Clases': 'fecha_fin_clases',
+    'Inicio Matricula': 'inicio_matricula',
+    'Cierre Matricula': 'cierre_matricula',
+    'Capacidad Min': 'capacidad_min',
+    'Capacidad Max': 'capacidad_max',
+    'Total Matriculados': 'matriculados',
+}
+
+
+def normalizar_columnas_planilla(df):
+    df_normalizado = df.copy()
+    df_normalizado.columns = [str(col).strip() for col in df_normalizado.columns]
+
+    renombres = {
+        origen: destino
+        for origen, destino in COLUMNAS_PLANILLA_CANONICAS.items()
+        if origen in df_normalizado.columns and destino not in df_normalizado.columns
+    }
+
+    if renombres:
+        df_normalizado = df_normalizado.rename(columns=renombres)
+
+    if 'Curso' not in df_normalizado.columns and {'idioma', 'nivel', 'ciclo'}.issubset(df_normalizado.columns):
+        df_normalizado['Curso'] = (
+            df_normalizado['idioma'].astype(str).str.strip() + ' ' +
+            df_normalizado['nivel'].astype(str).str.strip() + ' ' +
+            df_normalizado['ciclo'].astype(str).str.strip()
+        )
+
+    return df_normalizado
+
+
 def cargar_archivo(ruta):
     extension = os.path.splitext(ruta)[-1].lower()
     if extension == ".csv":
@@ -117,8 +162,28 @@ def limpiar_docentes(df, col):
     return df
 
 
+def docente_es_valido(valor):
+    if pd.isna(valor):
+        return False
+
+    texto = str(valor).strip()
+    if not texto:
+        return False
+
+    return texto.lower() not in {'nan', 'none', 'null'} and texto != ','
+
+
+def filtrar_docentes_validos(df, col='docente'):
+    if col not in df.columns:
+        return df.copy()
+
+    return df[df[col].apply(docente_es_valido)].copy()
+
+
 def procesar_csv_nuevo_formato(df):
     df_procesado = df.copy()
+
+    df_procesado = normalizar_columnas_planilla(df_procesado)
 
     # Mapeo directo de columnas
     mapeo_columnas = {

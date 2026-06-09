@@ -34,6 +34,7 @@ from .email_sender import (
     EmailPersonalizado,
     LoteEmailSender,
     EmailSendError,
+    ResultadoEnvioCorreo,
 )
 
 from .processor import (
@@ -77,6 +78,7 @@ __all__ = [
     'EmailPersonalizado',
     'LoteEmailSender',
     'EmailSendError',
+    'ResultadoEnvioCorreo',
     
     # Processor
     'CorreosProcessor',

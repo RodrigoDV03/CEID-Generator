@@ -21,7 +21,7 @@ def limpiar_cache_excel():
     _excel_cache.clear()
 
 
-def cargar_excel_con_cache(ruta, sheet_name=0, header='infer'):
+def cargar_excel_con_cache(ruta, sheet_name=0, header: int | str = 'infer'):
     cache_key = f"{ruta}_{sheet_name}_{header}"
 
     if cache_key not in _excel_cache:

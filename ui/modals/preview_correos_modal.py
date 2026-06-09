@@ -248,9 +248,32 @@ class PreviewCorreosModal:
         self._append_log(
             f"\n✅ Envío finalizado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos\n"
         )
+
+        for item in resumen.get("resultados", []):
+            if item.get("success"):
+                thread_id = item.get("thread_id") or "N/A"
+                message_id = item.get("message_id") or "N/A"
+                self._append_log(
+                    f"• {item.get('nombre', item.get('destinatario', 'Destinatario'))}: "
+                    f"threadId={thread_id} messageId={message_id}\n"
+                )
+            else:
+                self._append_log(
+                    f"• {item.get('nombre', item.get('destinatario', 'Destinatario'))}: ERROR {item.get('error', 'desconocido')}\n"
+                )
+
+        thread_ids = resumen.get("thread_ids", [])
+        if thread_ids:
+            self._append_log("\nThread IDs generados:\n")
+            for thread_id in thread_ids:
+                self._append_log(f"- {thread_id}\n")
+
         messagebox.showinfo(
             "Éxito",
-            f"Envío completado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos",
+            (
+                f"Envío completado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos. "
+                "Los threadId quedaron registrados en el panel de envío."
+            ),
             parent=self.window,
         )
 

@@ -664,6 +664,9 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
             tabla_base[columna] = 0
         tabla_base[columna] = pd.to_numeric(tabla_base[columna], errors='coerce').fillna(0)
 
+    # Evitar que filas sin nombre de docente se agrupen en una sola fila residual.
+    tabla_base = tabla_base[tabla_base['Docente'].fillna('').astype(str).str.strip() != ''].copy()
+
     # Agrupar por Docente: una fila por docente con montos sumados
     _primer_valor = lambda x: next((v for v in x if pd.notna(v) and str(v).strip() and str(v).strip().lower() != 'nan'), '')
     _unir_unicos = lambda x: ' / '.join(dict.fromkeys(v for v in x if pd.notna(v) and str(v).strip() and str(v).strip().lower() != 'nan'))
@@ -728,6 +731,7 @@ def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, dat
 
     cursos_df['modalidad'] = cursos_df.get('modalidad', '').fillna('').astype(str)
     cursos_df = cursos_df.dropna(subset=['Docente'])
+    cursos_df = cursos_df[cursos_df['Docente'].fillna('').astype(str).str.strip() != ''].copy()
 
     # Para cursos intensivos, agregar también el siguiente curso (ej: Básico 1 -> Básico 2).
     cursos_df['Curso_Siguiente_Intensivo'] = cursos_df.apply(generar_siguiente_curso_intensivo_desde_fila, axis=1)
