@@ -1,6 +1,65 @@
 import re
+import unicodedata
 
 import pandas as pd
+
+
+_DIAS_INTENSIVOS = [
+    {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'},
+    {'SATURDAY', 'SUNDAY'},
+]
+
+_MAPA_DIAS = {
+    'MON': 'MONDAY',
+    'MONDAY': 'MONDAY',
+    'LUN': 'MONDAY',
+    'LUNES': 'MONDAY',
+    'TUE': 'TUESDAY',
+    'TUESDAY': 'TUESDAY',
+    'MAR': 'TUESDAY',
+    'MARTES': 'TUESDAY',
+    'WED': 'WEDNESDAY',
+    'WEDNESDAY': 'WEDNESDAY',
+    'MIE': 'WEDNESDAY',
+    'MIERCOLES': 'WEDNESDAY',
+    'THU': 'THURSDAY',
+    'THURSDAY': 'THURSDAY',
+    'JUE': 'THURSDAY',
+    'JUEVES': 'THURSDAY',
+    'FRI': 'FRIDAY',
+    'FRIDAY': 'FRIDAY',
+    'VIE': 'FRIDAY',
+    'VIERNES': 'FRIDAY',
+    'SAT': 'SATURDAY',
+    'SATURDAY': 'SATURDAY',
+    'SAB': 'SATURDAY',
+    'SABADO': 'SATURDAY',
+    'SUN': 'SUNDAY',
+    'SUNDAY': 'SUNDAY',
+    'DOM': 'SUNDAY',
+    'DOMINGO': 'SUNDAY',
+}
+
+
+def _normalizar_texto_simple(texto):
+    texto_limpio = unicodedata.normalize('NFKD', str(texto).strip().upper())
+    return ''.join(ch for ch in texto_limpio if not unicodedata.combining(ch))
+
+
+def _normalizar_dias(dias):
+    if pd.isna(dias):
+        return []
+
+    texto = str(dias).strip().strip('{}')
+    if not texto:
+        return []
+
+    partes = [parte.strip() for parte in re.split(r'[,/]+', texto) if parte.strip()]
+    dias_normalizados = []
+    for parte in partes:
+        token = _normalizar_texto_simple(parte).replace('.', '')
+        dias_normalizados.append(_MAPA_DIAS.get(token, token))
+    return dias_normalizados
 
 
 def ajustar_nivel(row):
@@ -33,7 +92,12 @@ def ajustar_modalidad(row):
     hora_fin = row['horafin']
     modalidad = row['modalidad']
 
-    if (hora_fin == '22:30:00' or hora_fin == '15:00:00') and (dias == '{MONDAY,TUESDAY,WEDNESDAY,THURSDAY}' or dias == '{SATURDAY,SUNDAY}'):
+    dias_normalizados = set(_normalizar_dias(dias))
+    hora_fin_normalizada = _normalizar_texto_simple(hora_fin)
+    if re.fullmatch(r'\d{1,2}:\d{2}$', hora_fin_normalizada):
+        hora_fin_normalizada = f"{hora_fin_normalizada}:00"
+
+    if dias_normalizados in _DIAS_INTENSIVOS and hora_fin_normalizada in {'22:30:00', '15:00:00'}:
         modalidad = 'INTENSIVO VIRTUAL'
 
     return modalidad
