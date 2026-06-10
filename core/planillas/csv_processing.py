@@ -158,7 +158,8 @@ def parsear_csv_comillas_dobles(ruta):
 
 
 def limpiar_docentes(df, col):
-    df[col] = df[col].astype(str).str.strip()
+    if col in df.columns:
+        df[col] = df[col].astype(str).str.strip()
     return df
 
 

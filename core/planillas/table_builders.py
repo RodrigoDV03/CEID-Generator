@@ -129,13 +129,7 @@ def construir_tabla_carga_academica(datos, estado_planilla, traducir_dias_fn):
     return df
 
 
-def construir_tabla_coordinacion(
-    ruta_coordinacion,
-    normalizar_texto,
-    datos_docentes,
-    cargar_excel_con_cache_fn,
-    preparar_coordinacion_agrupada_fn,
-):
+def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_docentes, cargar_excel_con_cache_fn, preparar_coordinacion_agrupada_fn):
     if not os.path.exists(ruta_coordinacion):
         return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
 
@@ -149,21 +143,13 @@ def construir_tabla_coordinacion(
         datos_docentes_temp = datos_docentes.copy()
         datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
 
-        coordinacion_con_categoria = coordinacion_agrupado.merge(
-            datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Letra)', 'Categoria (Monto)']],
-            on='docente_norm', how='left'
-        )
+        coordinacion_con_categoria = coordinacion_agrupado.merge(datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Letra)', 'Categoria (Monto)']], on='docente_norm', how='left')
 
-        coordinacion_con_categoria['Docente_Final'] = coordinacion_con_categoria['Docente'].fillna(
-            coordinacion_con_categoria['Docente_Original']
-        )
+        coordinacion_con_categoria['Docente_Final'] = coordinacion_con_categoria['Docente'].fillna(coordinacion_con_categoria['Docente_Original'])
         coordinacion_con_categoria['Categoria (Letra)'] = coordinacion_con_categoria['Categoria (Letra)'].fillna('N/A')
         coordinacion_con_categoria['Categoria (Monto)'] = coordinacion_con_categoria['Categoria (Monto)'].fillna(0)
 
-        coordinacion_con_categoria['Monto_Total'] = (
-            coordinacion_con_categoria['Horas_Total'] *
-            coordinacion_con_categoria['Categoria (Monto)']
-        )
+        coordinacion_con_categoria['Monto_Total'] = (coordinacion_con_categoria['Horas_Total'] * coordinacion_con_categoria['Categoria (Monto)'])
 
         tabla_coordinacion = pd.DataFrame({
             'N°': range(1, len(coordinacion_con_categoria) + 1),

@@ -3,6 +3,15 @@ from typing import List, Any, Mapping, Callable, Union, cast
 from core.fases.models import DocenteData, PaymentData, CursoDetalle
 from core.fases.utils import TextUtils
 
+COLUMNAS_CONTRATO = [
+    "N.° Contrato",
+    "N° Contrato",
+    "Nro_Contrato",
+    "Nro_contrato",
+    "Numero de contrato",
+    "Número de contrato"
+]
+
 
 class ExcelReaderService:
 
@@ -52,23 +61,14 @@ class ExcelReaderService:
     @staticmethod
     def leer_planilla(ruta_excel: str, nombre_hoja: str) -> pd.DataFrame:
         try:
-            # Especificar dtype para preservar ceros iniciales en número de contrato
-            columnas_contrato = [
-                'Nro_Contrato',
-                'Nro_contrato',
-                'N° Contrato',
-                'Numero de contrato',
-                'Número de contrato'
-            ]
-            dtype_specs = {col: str for col in columnas_contrato}
+            dtype_specs = {col: str for col in COLUMNAS_CONTRATO}
             def _strip_or_empty(x: Any) -> str:
                 try:
                     return str(x).strip() if pd.notna(x) else ''
                 except Exception:
                     return ''
 
-            converters = cast(Mapping[Union[int, str], Callable[[Any], Any]],
-                              {col: _strip_or_empty for col in columnas_contrato})
+            converters = cast(Mapping[Union[int, str], Callable[[Any], Any]], {col: _strip_or_empty for col in COLUMNAS_CONTRATO})
             df = pd.read_excel(
                 ruta_excel, 
                 sheet_name=nombre_hoja,
@@ -111,7 +111,7 @@ class ExcelReaderService:
         dtype_dict = {
             'Numero de contrato': str,
             'Número de contrato': str,
-            'N° Contrato': str,
+            'N.° Contrato': str,
             'Nro_Contrato': str,
             'Nro_contrato': str
         }
@@ -139,7 +139,7 @@ class ExcelReaderService:
     def extraer_docente_data(fila: Any) -> DocenteData:
         # Extraer número de contrato con múltiples variaciones de nombre
         numero_contrato = ""
-        for col_name in ["Nro_Contrato", "Nro_contrato", "N° Contrato", "Numero de contrato", "Número de contrato"]:
+        for col_name in COLUMNAS_CONTRATO:
             try:
                 numero_contrato = getattr(fila, col_name, "")
                 if numero_contrato and numero_contrato != "":
@@ -236,7 +236,7 @@ class ExcelReaderService:
     def extraer_numero_contrato_control(fila: Any) -> str:
         # Intentar con diferentes variaciones de nombre de columna
         numero = ""
-        for col_name in ["Numero de contrato", "Número de contrato", "N° Contrato", "Nro_Contrato", "Nro_contrato"]:
+        for col_name in COLUMNAS_CONTRATO:
             try:
                 numero = getattr(fila, col_name, "")
                 if numero and numero != "":
@@ -269,23 +269,7 @@ class ExcelReaderService:
         return valor_str if valor_str else "001"
     
     @staticmethod
-    def leer_cursos_detallados_por_docente(
-        ruta_excel: str,
-        nombre_hoja: str,
-        nombre_docente: str
-    ) -> List[CursoDetalle]:
-        """
-        Lee la hoja Planilla_Generador y extrae todos los cursos/servicios
-        de un docente específico, tanto desde formato expandido como resumido.
-        
-        Args:
-            ruta_excel: Ruta al archivo Excel de la planilla
-            nombre_hoja: Nombre de la hoja (generalmente "Planilla_Generador")
-            nombre_docente: Nombre del docente a buscar
-        
-        Returns:
-            Lista de objetos CursoDetalle con todos los cursos/servicios del docente
-        """
+    def leer_cursos_detallados_por_docente(ruta_excel: str, nombre_hoja: str, nombre_docente: str) -> List[CursoDetalle]:
         try:
             df = pd.read_excel(ruta_excel, sheet_name=nombre_hoja)
             df.columns = df.columns.str.strip()

@@ -62,6 +62,19 @@ def _normalizar_dias(dias):
     return dias_normalizados
 
 
+def _asegurar_prefijo_intensivo(nivel):
+    nivel_limpio = str(nivel).strip()
+    if not nivel_limpio:
+        return nivel_limpio
+    if nivel_limpio.startswith('Intensivo'):
+        return nivel_limpio
+    return f'Intensivo {nivel_limpio}'
+
+
+def _construir_curso(idioma, nivel, ciclo):
+    return f"{str(idioma).strip()} {str(nivel).strip()} {str(ciclo).strip()}"
+
+
 def ajustar_nivel(row):
     nivel = row['nivel']
     idioma = row['idioma']
@@ -71,19 +84,11 @@ def ajustar_nivel(row):
     except Exception:
         ciclo_num = None
 
-    if nivel == 'General':
-        if idioma == 'Inglés':
-            if ciclo_num is not None:
-                if 1 <= ciclo_num <= 8:
-                    return 'Posgrado Básico'
-                elif 9 <= ciclo_num <= 18:
-                    return 'Posgrado Intermedio'
-        elif idioma == 'Portugués':
-            if ciclo_num is not None:
-                if 1 <= ciclo_num <= 4:
-                    return 'Posgrado Básico'
-                elif 5 <= ciclo_num <= 8:
-                    return 'Posgrado Intermedio'
+    if nivel == 'General' and idioma in {'Inglés', 'Portugués'} and ciclo_num is not None:
+        if 1 <= ciclo_num <= 8:
+            return 'Posgrado Básico'
+        elif 9 <= ciclo_num <= 18:
+            return 'Posgrado Intermedio'
     return nivel
 
 
@@ -120,18 +125,24 @@ def generar_siguiente_curso_intensivo(curso):
     return f"{prefijo} {ciclo_actual + 1}"
 
 
-def expandir_texto_cursos_intensivos(cursos_texto):
+def _partir_cursos_intensivos(cursos_texto):
     if pd.isna(cursos_texto):
-        return ''
+        return []
 
-    partes = [p.strip() for p in str(cursos_texto).split('/') if p and str(p).strip()]
+    return [p.strip() for p in str(cursos_texto).split('/') if p and str(p).strip()]
+
+
+def expandir_texto_cursos_intensivos(cursos_texto):
+    partes = _partir_cursos_intensivos(cursos_texto)
     if not partes:
         return ''
 
-    resultado = list(partes)
-    cursos_ya_presentes = set(partes)
+    resultado = []
+    cursos_ya_presentes = set()
 
-    for curso in set(partes):
+    for curso in dict.fromkeys(partes):
+        resultado.append(curso)
+        cursos_ya_presentes.add(curso)
         siguiente = generar_siguiente_curso_intensivo(curso)
         if siguiente and siguiente not in cursos_ya_presentes:
             resultado.append(siguiente)
@@ -141,7 +152,6 @@ def expandir_texto_cursos_intensivos(cursos_texto):
 
 
 def _calcular_ciclo_siguiente_portugues(nivel_sin_intensivo, ciclo_actual):
-    """Helper para lógica de Portugués: cambios de nivel al llegar al tope de ciclos."""
     if 'Básico' in nivel_sin_intensivo or 'Basico' in nivel_sin_intensivo:
         if ciclo_actual == 5:
             return 'Intensivo Intermedio', '1'
@@ -157,15 +167,6 @@ def _calcular_ciclo_siguiente_portugues(nivel_sin_intensivo, ciclo_actual):
 
 
 def expandir_filas_carga_intensivos(datos, modalidad_filter='INTENSIVO', aplicar_logica_portugues=False):
-    """
-    Expande filas de cursos intensivos, generando nuevas filas con ciclo + 1.
-    
-    Args:
-        datos: DataFrame con datos de cursos
-        modalidad_filter: Patrón de modalidad a filtrar (defecto: 'INTENSIVO')
-        aplicar_logica_portugues: Si True, aplica lógica especial para Portugués
-                                  (cambio de nivel al alcanzar tope de ciclos)
-    """
     datos_base = datos.copy()
     if datos_base.empty:
         return datos_base
@@ -179,13 +180,10 @@ def expandir_filas_carga_intensivos(datos, modalidad_filter='INTENSIVO', aplicar
 
     for _, row in datos_base[mask_intensivo].iterrows():
         nivel_original = str(row.get('nivel', '')).strip()
-        
-        # Asegurar que nivel tiene prefijo "Intensivo"
-        if aplicar_logica_portugues and not nivel_original.startswith('Intensivo'):
-            datos_base.loc[row.name] = row.copy() if isinstance(row.name, int) else row
+        if aplicar_logica_portugues:
+            nivel_original = _asegurar_prefijo_intensivo(nivel_original)
             if isinstance(row.name, int):
-                datos_base.at[row.name, 'nivel'] = f'Intensivo {nivel_original}'
-            nivel_original = f'Intensivo {nivel_original}'
+                datos_base.at[row.name, 'nivel'] = nivel_original
 
         try:
             ciclo_actual = int(str(row.get('ciclo', '')).strip())
@@ -212,7 +210,7 @@ def expandir_filas_carga_intensivos(datos, modalidad_filter='INTENSIVO', aplicar
             ciclo_siguiente = ciclo_actual + 1
             fila_nueva['ciclo'] = str(ciclo_siguiente)
 
-        fila_nueva['Curso'] = f"{idioma_nueva} {fila_nueva['nivel']} {fila_nueva['ciclo']}"
+        fila_nueva['Curso'] = _construir_curso(idioma_nueva, fila_nueva['nivel'], fila_nueva['ciclo'])
         filas_adicionales.append(fila_nueva)
 
     if filas_adicionales:
@@ -241,7 +239,7 @@ def generar_siguiente_curso_intensivo_desde_fila(row):
     if not idioma or not nivel:
         return generar_siguiente_curso_intensivo(row.get('Curso', ''))
 
-    return f"{idioma} {nivel} {ciclo_actual + 1}"
+    return _construir_curso(idioma, nivel, ciclo_actual + 1)
 
 
 def procesar_ediciones_idioma(datos):
@@ -267,13 +265,10 @@ def aplicar_transformaciones_base(datos):
 
     mask_intensivo = datos_transformados['modalidad'] == 'INTENSIVO VIRTUAL'
     for idx in datos_transformados[mask_intensivo].index:
-        nivel_original = str(datos_transformados.loc[idx, 'nivel']).strip()
-        if not nivel_original.startswith('Intensivo'):
-            datos_transformados.loc[idx, 'nivel'] = f'Intensivo {nivel_original}'
+        datos_transformados.loc[idx, 'nivel'] = _asegurar_prefijo_intensivo(datos_transformados.loc[idx, 'nivel'])
 
-    datos_transformados['Curso'] = (
-        datos_transformados['idioma'].astype(str) + ' ' +
-        datos_transformados['nivel'].astype(str) + ' ' +
-        datos_transformados['ciclo'].astype(str)
+    datos_transformados['Curso'] = datos_transformados.apply(
+        lambda row: _construir_curso(row['idioma'], row['nivel'], row['ciclo']),
+        axis=1,
     )
     return datos_transformados

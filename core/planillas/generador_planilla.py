@@ -56,12 +56,20 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         datos_docentes = pd.read_excel(excel_docentes, sheet_name="list", dtype=dtype_contrato)
         print(f"✅ Docentes cargados: {len(datos_docentes)} registros")
 
-        for columna_contrato in ['N° Contrato', 'Nro_Contrato', 'Nro_contrato', 'Numero de contrato', 'Número de contrato']:
-            if columna_contrato in datos_docentes.columns:
-                datos_docentes['N° Contrato'] = datos_docentes[columna_contrato].apply(lambda valor: formatear_numero(valor, 4))
-                break
+        if 'N_Ruc' not in datos_docentes.columns:
+            for columna_ruc in ('N. Ruc', 'N.° RUC'):
+                if columna_ruc in datos_docentes.columns:
+                    datos_docentes['N_Ruc'] = datos_docentes[columna_ruc]
+                    break
+
+        datos_docentes['Categoria (Monto)'] = pd.to_numeric(datos_docentes['Categoria (Monto)'], errors='coerce').fillna(0)
+
+        if 'N.° Contrato' in datos_docentes.columns:
+            datos_docentes['N.° Contrato'] = datos_docentes['N.° Contrato'].apply(
+                lambda valor: formatear_numero(valor, 4)
+            )
         else:
-            datos_docentes['N° Contrato'] = ''
+            datos_docentes['N.° Contrato'] = ''
 
         datos = limpiar_docentes(datos, 'docente')
         datos = filtrar_docentes_validos(datos, 'docente')
@@ -97,8 +105,8 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         ruta_salida = os.path.join(carpeta_salida, nombre_salida)
 
         with pd.ExcelWriter(ruta_salida, engine='openpyxl') as writer:
-            TABLA.to_excel(writer, sheet_name=f"Planilla {month}", index=False)
-            columnas_extra = ['Idioma', 'Tipo Documento', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N° Contrato']
+            TABLA.rename(columns={'N_Ruc': 'N.° RUC'}).to_excel(writer, sheet_name=f"Planilla {month}", index=False)
+            columnas_extra = ['Idioma', 'Tipo Documento', 'Nro. Documento', 'Celular', 'Dirección', 'Correo personal', 'N.° Contrato']
             columnas_extra_disponibles = [col for col in columnas_extra if col in datos_docentes.columns]
 
             if os.path.exists(excel_exa_clasif):
@@ -126,20 +134,15 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
                 'Estado': 'Estado_docente',
                 'Idioma': 'Docente_idioma',
                 'Tipo Documento': 'Tipo_documento',
-                'N_Ruc': 'N_Ruc',
                 'Nro. Documento': 'Numero_dni',
                 'Celular': 'Numero_celular',
                 'Dirección': 'Domicilio_docente',
                 'Correo personal': 'Correo_personal',
-                'N° Contrato': 'Nro_Contrato',
+                'N.° Contrato': 'Nro_Contrato',
                 'Servicio Actualización': 'Servicio_actualizacion'
             })
             
-            TABLA_GENERADOR_RESUMIDA = construir_tabla_planilla_generador_resumida(
-                agrupar_gen,
-                TABLA_GENERADOR,
-                datos_csv_original_procesados
-            )
+            TABLA_GENERADOR_RESUMIDA = construir_tabla_planilla_generador_resumida(agrupar_gen,TABLA_GENERADOR,datos_csv_original_procesados)
             TABLA_GENERADOR_RESUMIDA.to_excel(writer, sheet_name="Planilla_Generador", index=False)
 
             df_carga = construir_tabla_carga_academica(datos_csv_original_procesados, 'Planilla')
@@ -148,28 +151,27 @@ def generar_planilla(data_path, excel_docentes, excel_exa_clasif, excel_coordina
         wb = load_workbook(ruta_salida)
 
         titulo_hojas = [
-            ("Examen de clasificación", 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
-            
-            ("Servicio actualización", 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nSERVICIO DE ACTUALIZACIÓN DE MATERIALES - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
-            
             (f"Planilla {month}", 
             f"CENTRO DE IDIOMAS - FLCH - UNMSM\nPLANILLA - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
 
             ("Carga académica", 
-            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nCARGA ACADÉMICA - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL")
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nCARGA ACADÉMICA - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL Y PRESENCIAL"),
+
+            ("Examen de clasificación", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nEXAMEN DE CLASIFICACIÓN - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL"),
+
+            ("Servicio actualización", 
+            f"CENTRO DE IDIOMAS - FLCH - UNMSM\nSERVICIO DE ACTUALIZACIÓN DE MATERIALES - PERIODO {month.upper()} {año_actual}\nMODALIDAD: VIRTUAL"),
         ]
 
         # Procesar formato de todas las hojas de manera optimizada
-        procesar_formato_multiple_hojas(wb, titulo_hojas, "Planilla", month)
-                        
+        procesar_formato_multiple_hojas(wb, titulo_hojas)    
 
         hojas_ordenadas = [
+            f"Planilla {month}",
+            "Carga académica",
             "Examen de clasificación",
             "Servicio actualización",
-            "Carga académica",
-            f"Planilla {month}",
             "Planilla_Generador"
         ]
         wb = ordenar_hojas_excel(wb, hojas_ordenadas)        

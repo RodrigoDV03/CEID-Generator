@@ -8,6 +8,23 @@ from core.planillas import table_builders as _table_builders
 from core.planillas.transformations import generar_siguiente_curso_intensivo_desde_fila
 
 
+_COLUMNAS_RUC = ('N_Ruc', 'N. Ruc', 'N.° RUC')
+
+
+def _normalizar_columna_ruc(df):
+    df_normalizado = df.copy()
+
+    if 'N_Ruc' in df_normalizado.columns:
+        return df_normalizado
+
+    for columna in _COLUMNAS_RUC[1:]:
+        if columna in df_normalizado.columns:
+            df_normalizado['N_Ruc'] = df_normalizado[columna]
+            break
+
+    return df_normalizado
+
+
 def traducir_dias(dias_raw: str) -> str:
     dias_dict = {'MONDAY': 'Lun', 'TUESDAY': 'Mar', 'WEDNESDAY': 'Mié', 'THURSDAY': 'Jue', 'FRIDAY': 'Vie', 'SATURDAY': 'Sáb', 'SUNDAY': 'Dom'}
     dias = dias_raw.strip('{}').split(',') if isinstance(dias_raw, str) else []
@@ -135,9 +152,10 @@ def agrupar_y_calcular(df, datos_docentes, col_curso):
     # Aplicar mapeo usando el diccionario
     agrupado['Docente'] = agrupado['docente'].map(mapeo_docentes)
 
+    datos_docentes = _normalizar_columna_ruc(datos_docentes)
     agrupado = agrupado.merge(datos_docentes[['Docente', 'Sede', 'Categoria (Letra)', 'Categoria (Monto)', 'N_Ruc', 'Estado']], on='Docente', how='left')
-    agrupado['Curso Dictado'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 28
-    agrupado['Diseño de Examenes'] = agrupado['Categoria (Monto)'] * agrupado['cantidad_cursos'] * 4
+    agrupado['Curso Dictado'] = (agrupado['Categoria (Monto)']* agrupado['cantidad_cursos']* 28)
+    agrupado['Diseño de Examenes'] = (agrupado['Categoria (Monto)']* agrupado['cantidad_cursos']* 4)
     return agrupado
 
 
@@ -337,21 +355,13 @@ def agregar_servicio_coordinacion(df, ruta_coordinacion, normalizar_texto, datos
             datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
             
             # Hacer merge con datos_docentes para obtener categoría
-            coordinacion_con_categoria = coordinacion_agrupado.merge(
-                datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Monto)']],
-                on='docente_norm', how='left'
-            )
+            coordinacion_con_categoria = coordinacion_agrupado.merge(datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Monto)']], on='docente_norm', how='left')
             
             # Calcular monto: Horas * Categoria (Monto) * 1 (tarifa base por hora de coordinación)
-            coordinacion_con_categoria['Monto_Coordinacion'] = (
-                coordinacion_con_categoria['Horas_Total'] * 
-                coordinacion_con_categoria['Categoria (Monto)'].fillna(0)
-            )
+            coordinacion_con_categoria['Monto_Coordinacion'] = (coordinacion_con_categoria['Horas_Total'] * coordinacion_con_categoria['Categoria (Monto)'].fillna(0))
             
             # Usar el nombre corregido del merge
-            coordinacion_con_categoria['Docente_Correcto'] = coordinacion_con_categoria['Docente'].fillna(
-                coordinacion_con_categoria['Docente_Original']
-            )
+            coordinacion_con_categoria['Docente_Correcto'] = coordinacion_con_categoria['Docente'].fillna(coordinacion_con_categoria['Docente_Original'])
             
         else:
             # Si no hay datos_docentes, usar un monto fijo por hora
@@ -617,7 +627,7 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
     
     # Agregar cualquier columna que falte al final
     columnas_restantes = [col for col in df_expandido.columns 
-                          if col not in columnas_ordenadas and col not in ['_orden_servicio', 'docente', 'curso', 'Tipo_Servicio']]
+                            if col not in columnas_ordenadas and col not in ['_orden_servicio', 'docente', 'curso', 'Tipo_Servicio']]
     
     columnas_finales = [col for col in columnas_ordenadas if col in df_expandido.columns] + columnas_restantes
     
@@ -631,7 +641,7 @@ def expandir_filas_por_curso(agrupar_df, datos_csv_procesados):
 
 
 def construir_tabla_planilla_generador_resumida(agrupar_df, tabla_generador, datos_csv_procesados):
-    tabla_base = tabla_generador.copy()
+    tabla_base = _normalizar_columna_ruc(tabla_generador)
 
     if 'cantidad_cursos' not in tabla_base.columns and 'Cantidad Cursos' in tabla_base.columns:
         tabla_base['cantidad_cursos'] = tabla_base['Cantidad Cursos']
