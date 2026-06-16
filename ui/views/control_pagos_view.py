@@ -115,7 +115,7 @@ def mostrar_control_pagos(app):
     ctk.CTkOptionMenu(
         frame_params,
         variable=numero_armada,
-        values=["Primera", "Segunda", "Tercera"],
+        values=["Primera", "Segunda", "Tercera", "Cuarta", "Quinta", "Sexta"],
         command=lambda _: validar(),
     ).pack(anchor="w", padx=20, pady=(0, 10))
 

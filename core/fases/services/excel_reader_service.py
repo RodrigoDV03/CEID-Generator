@@ -215,12 +215,18 @@ class ExcelReaderService:
         primera = ExcelReaderService._buscar_columna(fila, ["Primera armada", "PRIMERA ARMADA"], 0)
         segunda = ExcelReaderService._buscar_columna(fila, ["Segunda armada", "SEGUNDA ARMADA"], 0)
         tercera = ExcelReaderService._buscar_columna(fila, ["Tercera armada", "TERCERA ARMADA"], 0)
+        cuarta = ExcelReaderService._buscar_columna(fila, ["Cuarta armada", "CUARTA ARMADA"], 0)
+        quinta = ExcelReaderService._buscar_columna(fila, ["Quinta armada", "QUINTA ARMADA"], 0)
+        sexta = ExcelReaderService._buscar_columna(fila, ["Sexta armada", "SEXTA ARMADA"], 0)
 
         return PaymentData(
             monto_total_contrato=ExcelReaderService._parse_float_safe(monto_total),
             primera_armada=ExcelReaderService._parse_float_safe(primera),
             segunda_armada=ExcelReaderService._parse_float_safe(segunda),
-            tercera_armada=ExcelReaderService._parse_float_safe(tercera)
+            tercera_armada=ExcelReaderService._parse_float_safe(tercera),
+            cuarta_armada=ExcelReaderService._parse_float_safe(cuarta),
+            quinta_armada=ExcelReaderService._parse_float_safe(quinta),
+            sexta_armada=ExcelReaderService._parse_float_safe(sexta)
         )
     
     @staticmethod

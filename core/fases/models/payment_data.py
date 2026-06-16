@@ -19,6 +19,9 @@ class PaymentData:
     primera_armada: float = 0.0
     segunda_armada: float = 0.0
     tercera_armada: float = 0.0
+    cuarta_armada: float = 0.0
+    quinta_armada: float = 0.0
+    sexta_armada: float = 0.0
     
     def __post_init__(self):
         self.categoria_monto = float(self.categoria_monto) if self.categoria_monto else 1.0
@@ -71,8 +74,20 @@ class PaymentData:
     def calcular_saldo_segunda(self) -> float:
         return self.calcular_saldo_primera() - self.segunda_armada
     
+    def calcular_saldo_tercera(self) -> float:
+        return self.calcular_saldo_segunda() - self.tercera_armada
+    
+    def calcular_saldo_cuarta(self) -> float:
+        return self.calcular_saldo_tercera() - self.cuarta_armada
+    
+    def calcular_saldo_quinta(self) -> float:
+        return self.calcular_saldo_cuarta() - self.quinta_armada
+    
+    def calcular_saldo_sexta(self) -> float:
+        return self.calcular_saldo_quinta() - self.sexta_armada
+    
     def calcular_saldo_restante(self) -> float:
-        return self.monto_total_contrato - self.primera_armada - self.segunda_armada - self.tercera_armada
+        return self.monto_total_contrato - self.primera_armada - self.segunda_armada - self.tercera_armada - self.cuarta_armada - self.quinta_armada - self.sexta_armada
     
     @staticmethod
     def monto_a_letras(monto: float) -> str:

@@ -101,7 +101,7 @@ def mostrar_fase_inicial(app):
         .pack(anchor="w", padx=20)
 
     ctk.CTkOptionMenu(frame_extra, variable=numero_armada,
-                      values=["primera", "segunda", "tercera", "sin armada"])\
+                    values=["primera", "segunda", "tercera", "cuarta", "quinta", "sexta", "sin armada"])\
         .pack(anchor="w", padx=20, pady=5)
 
     # =====================================================

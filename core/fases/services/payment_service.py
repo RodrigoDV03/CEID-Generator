@@ -103,7 +103,14 @@ class PaymentService:
             'Total_Primera': payment.formatear_monto(payment.primera_armada),
             'Total_Segunda': payment.formatear_monto(payment.segunda_armada),
             'Total_Tercera': payment.formatear_monto(payment.tercera_armada),
+            'Total_Cuarta': payment.formatear_monto(payment.cuarta_armada),
+            'Total_Quinta': payment.formatear_monto(payment.quinta_armada),
+            'Total_Sexta': payment.formatear_monto(payment.sexta_armada),
             'Saldo_Restante': payment.formatear_monto(payment.calcular_saldo_restante()),
             'Saldo_Primera': payment.formatear_monto(payment.calcular_saldo_primera()),
-            'Saldo_Segunda': payment.formatear_monto(payment.calcular_saldo_segunda())
+            'Saldo_Segunda': payment.formatear_monto(payment.calcular_saldo_segunda()),
+            'Saldo_Tercera': payment.formatear_monto(payment.calcular_saldo_tercera()),
+            'Saldo_Cuarta': payment.formatear_monto(payment.calcular_saldo_cuarta()),
+            'Saldo_Quinta': payment.formatear_monto(payment.calcular_saldo_quinta()),
+            'Saldo_Sexta': payment.formatear_monto(payment.calcular_saldo_sexta()),
         }

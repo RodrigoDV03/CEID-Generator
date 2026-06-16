@@ -154,7 +154,10 @@ class DocumentGeneratorService:
             # Control de pagos
             'control_primera': './data/modelos/control_pagos_primera.docx',
             'control_segunda': './data/modelos/control_pagos_segunda.docx',
-            'control_tercera': './data/modelos/control_pagos_tercera.docx'
+            'control_tercera': './data/modelos/control_pagos_tercera.docx',
+            'control_cuarta': './data/modelos/control_pagos_cuarta.docx',
+            'control_quinta': './data/modelos/control_pagos_quinta.docx',
+            'control_sexta': './data/modelos/control_pagos_sexta.docx',
         }
         
         # Determinar la clave según el contexto

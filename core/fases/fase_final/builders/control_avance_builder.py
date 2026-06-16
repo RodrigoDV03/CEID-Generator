@@ -44,9 +44,16 @@ class ControlAvanceBuilder:
             "Total_Primera": saldos['Total_Primera'],
             "Total_Segunda": saldos['Total_Segunda'],
             "Total_Tercera": saldos['Total_Tercera'],
+            "Total_Cuarta": saldos['Total_Cuarta'],
+            "Total_Quinta": saldos['Total_Quinta'],
+            "Total_Sexta": saldos['Total_Sexta'],
             "Saldo_Restante": saldos['Saldo_Restante'],
             "Saldo_Primera": saldos['Saldo_Primera'],
-            "Saldo_Segunda": saldos['Saldo_Segunda']
+            "Saldo_Segunda": saldos['Saldo_Segunda'],
+            "Saldo_Tercera": saldos['Saldo_Tercera'],
+            "Saldo_Cuarta": saldos['Saldo_Cuarta'],
+            "Saldo_Quinta": saldos['Saldo_Quinta'],
+            "Saldo_Sexta": saldos['Saldo_Sexta']
         }
     
     def generar(

@@ -24,10 +24,13 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         "Primera": "Primera armada",
         "Segunda": "Segunda armada",
         "Tercera": "Tercera armada",
+        "Cuarta": "Cuarta armada",
+        "Quinta": "Quinta armada",
+        "Sexta": "Sexta armada"
     }
 
     if numero_armada not in columnas_armada:
-        raise ValueError("Número de armada inválido. Use 'Primera', 'Segunda' o 'Tercera'.")
+        raise ValueError("Número de armada inválido.")
     col_armada_name = columnas_armada[numero_armada]
 
     # Matching Docente y Total_Pago
@@ -112,6 +115,9 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         "PRIMERA ARMADA",
         "SEGUNDA ARMADA",
         "TERCERA ARMADA",
+        "CUARTA ARMADA",
+        "QUINTA ARMADA",
+        "SEXTA ARMADA",
         col_armada_name.upper(),
         "SALDO RESTANTE",
     ]
@@ -124,6 +130,9 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     col_idx_primera = headers["PRIMERA ARMADA"]
     col_idx_segunda = headers["SEGUNDA ARMADA"]
     col_idx_tercera = headers["TERCERA ARMADA"]
+    col_idx_cuarta  = headers.get("CUARTA ARMADA")
+    col_idx_quinta  = headers.get("QUINTA ARMADA")
+    col_idx_sexta   = headers.get("SEXTA ARMADA")
     col_idx_armada  = headers[col_armada_name.upper()]
     col_idx_saldo   = headers["SALDO RESTANTE"]
 
@@ -131,6 +140,9 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     L_primera = get_column_letter(col_idx_primera)
     L_segunda = get_column_letter(col_idx_segunda)
     L_tercera = get_column_letter(col_idx_tercera)
+    L_cuarta  = get_column_letter(col_idx_cuarta)
+    L_quinta  = get_column_letter(col_idx_quinta)
+    L_sexta   = get_column_letter(col_idx_sexta)
 
     def es_cero(x, tol=1e-6):
         return abs(float(x)) < tol
@@ -154,8 +166,11 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         primera = ws_values.cell(row=r, column=col_idx_primera).value or 0
         segunda = ws_values.cell(row=r, column=col_idx_segunda).value or 0
         tercera = ws_values.cell(row=r, column=col_idx_tercera).value or 0
+        cuarta  = ws_values.cell(row=r, column=col_idx_cuarta).value or 0
+        quinta  = ws_values.cell(row=r, column=col_idx_quinta).value or 0
+        sexta   = ws_values.cell(row=r, column=col_idx_sexta).value or 0
     
-        saldo_actual = float(total) - float(primera) - float(segunda) - float(tercera)
+        saldo_actual = float(total) - float(primera) - float(segunda) - float(tercera) - float(cuarta) - float(quinta) - float(sexta)
 
         if monto <= saldo_actual:
             ws.cell(row=r, column=col_idx_armada).value = float(monto)
@@ -165,7 +180,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
             excedente = monto - saldo_actual
 
         # Mantener la fórmula en "Saldo Restante"
-        formula = f"={L_total}{r}-SUM({L_primera}{r},{L_segunda}{r},{L_tercera}{r})"
+        formula = f"={L_total}{r}-SUM({L_primera}{r},{L_segunda}{r},{L_tercera}{r},{L_cuarta}{r},{L_quinta}{r},{L_sexta}{r})"
         ws.cell(row=r, column=col_idx_saldo).value = formula
 
         # Registrar el excedente en una columna nueva
@@ -180,7 +195,10 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         nueva_primera = ws.cell(row=r, column=col_idx_primera).value or 0
         nueva_segunda = ws.cell(row=r, column=col_idx_segunda).value or 0
         nueva_tercera = ws.cell(row=r, column=col_idx_tercera).value or 0
-        nuevo_saldo = float(total) - float(nueva_primera) - float(nueva_segunda) - float(nueva_tercera)
+        nueva_cuarta = ws.cell(row=r, column=col_idx_cuarta).value or 0
+        nueva_quinta = ws.cell(row=r, column=col_idx_quinta).value or 0
+        nueva_sexta = ws.cell(row=r, column=col_idx_sexta).value or 0
+        nuevo_saldo = float(total) - float(nueva_primera) - float(nueva_segunda) - float(nueva_tercera) - float(nueva_cuarta) - float(nueva_quinta) - float(nueva_sexta)
 
         # ---- Acumular mensajes ----
         if es_cero(nuevo_saldo) and es_cero(excedente):

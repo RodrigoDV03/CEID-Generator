@@ -33,6 +33,9 @@ class NumeroArmada(Enum):
     PRIMERA = "primera"
     SEGUNDA = "segunda"
     TERCERA = "tercera"
+    CUARTA = "cuarta"
+    QUINTA = "quinta"
+    SEXTA = "sexta"
     SIN_ARMADA = "sin armada"
 
 
