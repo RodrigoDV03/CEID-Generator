@@ -1,12 +1,11 @@
 import customtkinter as ctk
 import os
 import pandas as pd
-import sys
-import threading
 from tkinter import filedialog
 
 from core.control_pagos.control_pagos import actualizar_control_pagos
-from ui.components import TextRedirector
+from ui.console_stream import ConsolaEnVivo
+from ui.progress import BarraProgreso
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
@@ -19,6 +18,8 @@ def mostrar_control_pagos(app):
     numero_armada = ctk.StringVar()
     ruta_planilla = None
     ruta_control = None
+
+    root = app.root if hasattr(app, "root") else app.winfo_toplevel()
 
     contenedor = ctk.CTkScrollableFrame(app.main, fg_color="transparent")
     contenedor.pack(fill="both", expand=True, padx=30, pady=20)
@@ -49,8 +50,7 @@ def mostrar_control_pagos(app):
         )
         if ruta:
             try:
-                hojas = pd.ExcelFile(ruta).sheet_names
-                _ = "Planilla_Generador" if "Planilla_Generador" in hojas else hojas[0]
+                pd.ExcelFile(ruta)
                 label_excel.configure(text=os.path.basename(ruta), text_color="#4CAF50")
                 ruta_planilla = ruta
                 validar()
@@ -122,19 +122,55 @@ def mostrar_control_pagos(app):
     # =====================================================
     # ④ GENERAR
     # =====================================================
+    def mostrar_resultado(resultado):
+        boton_gen.configure(state="normal")
+
+        resumen = (
+            f"{resultado.actualizados} de {resultado.total_filas} docente(s) del control de pagos "
+            f"fueron actualizados.\n"
+            f"- Contratos terminados: {len(resultado.contratos_terminados)}\n"
+            f"- Contratos por acabar (saldo bajo): {len(resultado.contratos_por_acabar)}\n"
+            f"- Contratos con excedente: {len(resultado.contratos_con_excedente)}"
+        )
+
+        if resultado.sin_coincidencia:
+            barra.completar("Completado con advertencias")
+            lista = "\n".join(f"- {nombre}" for nombre in resultado.sin_coincidencia)
+            messagebox.showwarning(
+                "Control de pagos actualizado con advertencias",
+                f"{resumen}\n\n"
+                f"{len(resultado.sin_coincidencia)} docente(s) del archivo de control NO se encontraron "
+                f"en la planilla y NO se actualizaron:\n{lista}\n\n"
+                "Revisa que el nombre esté escrito igual en ambos archivos."
+            )
+        else:
+            barra.completar("Completado")
+            messagebox.showinfo("Éxito", f"Control de pagos actualizado.\n\n{resumen}")
+
     def generar():
         if not ruta_planilla or not ruta_control or not numero_armada.get():
             messagebox.showerror("Error", "Por favor, complete todos los campos antes de generar.")
             return
 
-        def tarea():
-            try:
-                actualizar_control_pagos(ruta_planilla, ruta_control, numero_armada.get())
-                messagebox.showinfo("Éxito", f"Control de pagos actualizado.")
-            except Exception as e:
-                messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
+        armada = numero_armada.get()
 
-        threading.Thread(target=tarea).start()
+        boton_gen.configure(state="disabled")
+        barra.iniciar()
+
+        def tarea():
+            return actualizar_control_pagos(
+                ruta_planilla,
+                ruta_control,
+                armada,
+                on_progreso=lambda actual, total: barra.actualizar(actual, total, "filas revisadas"),
+            )
+
+        def al_error(e):
+            boton_gen.configure(state="normal")
+            barra.completar("Error")
+            messagebox.showerror("Error", f"No se pudo procesar el Excel: {e}")
+
+        consola.ejecutar(tarea, on_exito=mostrar_resultado, on_error=al_error)
 
     boton_gen = ctk.CTkButton(
         contenedor,
@@ -148,7 +184,13 @@ def mostrar_control_pagos(app):
     boton_gen.pack(pady=20)
 
     # =====================================================
-    # ⑤ CONSOLA
+    # ⑤ PROGRESO
+    # =====================================================
+    barra = BarraProgreso(contenedor, root)
+    barra.frame.pack(fill="x", padx=20, pady=(0, 10))
+
+    # =====================================================
+    # ⑥ CONSOLA
     # =====================================================
     consola_frame = ctk.CTkFrame(contenedor, fg_color=CONSOLE_BG, corner_radius=12)
     consola_frame.pack(fill="both", expand=True, pady=10)
@@ -157,5 +199,4 @@ def mostrar_control_pagos(app):
     consola_text.pack(padx=10, pady=10, fill="both", expand=True)
     consola_text.configure(state="disabled")
 
-    sys.stdout = TextRedirector(consola_text)
-    sys.stderr = TextRedirector(consola_text)
+    consola = ConsolaEnVivo(consola_text, root)

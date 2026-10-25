@@ -9,7 +9,7 @@ class CursoDetalle:
     Se usa para generar descripciones detalladas con modalidades en los documentos.
     """
     nombre: str
-    modalidad: str  # INPERSON, VIRTUAL, INTENSIVO VIRTUAL, N/A
+    modalidad: str  # INPERSON, VIRTUAL, SUPERINTENSIVO VIRTUAL, N/A
     tipo_servicio: str  # CURSO_DICTADO, EXAMEN_CLASIF, DISENO_EXAMENES, SERVICIO_ACTUALIZACION, BONO
     horas: int
     monto: float
@@ -18,7 +18,7 @@ class CursoDetalle:
     def modalidad_texto(self) -> str:
         """
         Convierte la modalidad del curso a texto legible.
-        INTENSIVO VIRTUAL se considera como "virtual" para la redacción.
+        SUPERINTENSIVO VIRTUAL se considera como "virtual" para la redacción.
         """
         return TextUtils.modalidad_a_texto(self.modalidad, permitir_na_vacio=True)
     

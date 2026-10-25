@@ -1,13 +1,11 @@
-import sys
-import threading
 import customtkinter as ctk
 import pandas as pd
 import os
 from tkinter import filedialog
-from datetime import datetime
 
 from core.fases.fase_final.generador_fase_final import procesar_planilla_fase_final
-from ui.components import TextRedirector
+from ui.console_stream import ConsolaEnVivo
+from ui.progress import BarraProgreso
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
@@ -21,13 +19,15 @@ def mostrar_fase_final(app):
     # VARIABLES
     # =========================
     hoja_var = ctk.StringVar()
-    mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    mes_var = ctk.StringVar(value=mes_actual())
     numero_armada = ctk.StringVar()
     tipo_fase_final = ctk.StringVar(value="planilla docente (con contrato)")
 
     planilla_path = None
     excel_control_pagos = None
     carpeta_destino = None
+
+    root = app.root if hasattr(app, "root") else app.winfo_toplevel()
 
     # =========================
     # CONTENEDOR
@@ -122,12 +122,10 @@ def mostrar_fase_final(app):
 
     def actualizar_visibilidad(*_):
         if tipo_fase_final.get() == "planilla docente (con contrato)":
-            frame_docente.pack(fill="x", pady=10)
+            frame_docente.pack(fill="x", pady=10, after=frame_excel)
         else:
             frame_docente.pack_forget()
-
-    tipo_fase_final.trace_add("write", actualizar_visibilidad)
-    actualizar_visibilidad()
+        validar()
 
     # =====================================================
     # ④ PARÁMETROS
@@ -146,7 +144,8 @@ def mostrar_fase_final(app):
     ctk.CTkLabel(frame_params, text="Número de armada", text_color=TEXT_COLOR)\
         .pack(anchor="w", padx=20, pady=(10, 0))
     ctk.CTkOptionMenu(frame_params, variable=numero_armada,
-                    values=["primera", "segunda", "tercera", "cuarta", "quinta", "sexta", "sin armada"])\
+                    values=["primera", "segunda", "tercera", "cuarta", "quinta", "sexta", "sin armada"],
+                    command=lambda _: validar())\
         .pack(anchor="w", padx=20, pady=(0, 10))
 
     # =====================================================
@@ -192,23 +191,50 @@ def mostrar_fase_final(app):
     # =====================================================
     # GENERAR
     # =====================================================
-    def generar():
-        def tarea():
-            try:
-                procesar_planilla_fase_final(
-                    planilla_path,
-                    excel_control_pagos if tipo_fase_final.get() == "planilla docente (con contrato)" else None,
-                    hoja_var.get(),
-                    carpeta_destino,
-                    mes_var.get(),
-                    numero_armada.get(),
-                    tipo_fase_final.get()
-                )
-                messagebox.showinfo("Éxito", "Documentos generados correctamente")
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
+    def mostrar_resultado(resultado):
+        boton_gen.configure(state="normal")
 
-        threading.Thread(target=tarea).start()
+        if resultado.con_error:
+            barra.completar("Completado con errores")
+            lista = "\n".join(f"- {nombre}" for nombre in resultado.con_error)
+            messagebox.showwarning(
+                "Documentos generados con errores",
+                f"Se generaron {resultado.exitosos} de {resultado.total_procesados} documentos.\n\n"
+                f"No se pudieron generar los documentos de:\n{lista}\n\n"
+                "Revisa la consola para el detalle de cada error."
+            )
+        else:
+            barra.completar("Completado")
+            messagebox.showinfo("Éxito", "Documentos generados correctamente")
+
+    def generar():
+        # Leer los valores de la pantalla en el hilo principal.
+        tipo = tipo_fase_final.get()
+        hoja = hoja_var.get()
+        mes = mes_var.get()
+        armada = numero_armada.get()
+
+        boton_gen.configure(state="disabled")
+        barra.iniciar()
+
+        def tarea():
+            return procesar_planilla_fase_final(
+                planilla_path,
+                excel_control_pagos if tipo == "planilla docente (con contrato)" else None,
+                hoja,
+                carpeta_destino,
+                mes,
+                armada,
+                tipo,
+                on_progreso=barra.actualizar,
+            )
+
+        def al_error(e):
+            boton_gen.configure(state="normal")
+            barra.completar("Error")
+            messagebox.showerror("Error", str(e))
+
+        consola.ejecutar(tarea, on_exito=mostrar_resultado, on_error=al_error)
 
     boton_gen = ctk.CTkButton(
         contenedor,
@@ -220,6 +246,15 @@ def mostrar_fase_final(app):
         command=generar
     )
     boton_gen.pack(pady=20)
+
+    tipo_fase_final.trace_add("write", actualizar_visibilidad)
+    actualizar_visibilidad()
+
+    # =====================================================
+    # PROGRESO
+    # =====================================================
+    barra = BarraProgreso(contenedor, root)
+    barra.frame.pack(fill="x", padx=20, pady=(0, 10))
 
     # =====================================================
     # CONSOLA
@@ -236,5 +271,4 @@ def mostrar_fase_final(app):
     consola_text.pack(fill="both", expand=True, padx=10, pady=10)
     consola_text.configure(state="disabled")
 
-    sys.stdout = TextRedirector(consola_text)
-    sys.stderr = TextRedirector(consola_text)
+    consola = ConsolaEnVivo(consola_text, root)

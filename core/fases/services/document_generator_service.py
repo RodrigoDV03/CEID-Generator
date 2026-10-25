@@ -1,47 +1,79 @@
+import logging
 import os
+from dataclasses import dataclass
 from docx import Document
 from typing import Dict, Optional
 from core.fases.models import DocumentConfig
 from core.fases.functions import _iterar_parrafos, reemplazar_en_documento
 from core.fases.utils import PathUtils
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ResultadoDocumento:
+    """Resultado de generar un documento .docx individual."""
+    ruta_salida: str
+    firma_faltante: bool = False
+    ruta_firma_esperada: Optional[str] = None
+
 
 class DocumentGeneratorService:
-    
+
     @staticmethod
     def generar_documento(
         ruta_template: str,
         reemplazos: Dict[str, str],
         ruta_salida: str,
         ruta_firma: Optional[str] = None
-    ) -> bool:
+    ) -> ResultadoDocumento:
+        """
+        Genera un documento .docx a partir de una plantilla.
+
+        Si `ruta_firma` no existe en disco, el documento se genera igual pero
+        SIN firma; el resultado devuelto marca `firma_faltante=True` para que
+        quien llama pueda avisar visiblemente en vez de dejarlo pasar en
+        silencio. Cualquier otro fallo (plantilla inexistente, documento
+        corrupto, etc.) se propaga como excepción en vez de devolver un
+        booleano que nadie llegaba a revisar.
+        """
         if not ruta_template or not os.path.exists(ruta_template):
-            return False
-        
-        try:
-            doc = Document(ruta_template)
-            
-            # Reemplazar texto (sin la firma)
-            reemplazos_sin_firma = {
-                k: v for k, v in reemplazos.items() 
-                if k != "firma_docente"
-            }
-            
-            reemplazar_en_documento(doc, reemplazos_sin_firma)
-            
-            # Insertar firma si existe
-            if ruta_firma and os.path.exists(ruta_firma):
+            raise FileNotFoundError(f"No se encontró la plantilla del documento: {ruta_template}")
+
+        doc = Document(ruta_template)
+
+        # Reemplazar texto (sin la firma)
+        reemplazos_sin_firma = {
+            k: v for k, v in reemplazos.items()
+            if k != "firma_docente"
+        }
+
+        reemplazar_en_documento(doc, reemplazos_sin_firma)
+
+        # Insertar firma si existe; si no, avisar en vez de continuar en silencio.
+        firma_faltante = False
+        if ruta_firma:
+            if os.path.exists(ruta_firma):
                 DocumentGeneratorService._insertar_firma(doc, ruta_firma)
-            
-            # Crear directorio si no existe
-            os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
-            
-            doc.save(ruta_salida)
-            return True
-            
-        except Exception as e:
-            print(f"Error al generar documento: {e}")
-            return False
+            else:
+                firma_faltante = True
+                mensaje = (
+                    f"⚠️  No se encontró la firma esperada ({ruta_firma}); "
+                    f"el documento se generará SIN firma: {os.path.basename(ruta_salida)}"
+                )
+                print(mensaje)
+                logger.warning(mensaje)
+
+        # Crear directorio si no existe
+        os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
+
+        doc.save(ruta_salida)
+
+        return ResultadoDocumento(
+            ruta_salida=ruta_salida,
+            firma_faltante=firma_faltante,
+            ruta_firma_esperada=ruta_firma,
+        )
     
     @staticmethod
     def _insertar_firma(documento: Document, ruta_firma: str):

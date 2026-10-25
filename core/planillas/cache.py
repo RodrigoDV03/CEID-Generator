@@ -33,13 +33,15 @@ def cargar_excel_con_cache(ruta, sheet_name=0, header: int | str = 'infer'):
     return _excel_cache[cache_key].copy()
 
 
-def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso, agrupar_fn):
+def agrupar_y_calcular_con_cache(df, datos_docentes, col_curso, agrupar_fn, on_sin_coincidencia=None):
     key_datos = generar_key_datos(df, col_curso)
 
     if key_datos in _cache_agrupacion:
+        # En un hit de cache no se vuelve a calcular el mapeo de nombres,
+        # así que no hay nada nuevo que reportar en on_sin_coincidencia.
         return _cache_agrupacion[key_datos].copy()
 
-    resultado = agrupar_fn(df, datos_docentes, col_curso)
+    resultado = agrupar_fn(df, datos_docentes, col_curso, on_sin_coincidencia=on_sin_coincidencia)
     _cache_agrupacion[key_datos] = resultado.copy()
 
     return resultado

@@ -1,9 +1,10 @@
 import customtkinter as ctk
 from tkinter import filedialog
-from datetime import datetime
 import os
+import threading
 
 from core.planillas.generador_planilla import generar_planilla
+from ui.progress import BarraProgreso
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 
@@ -20,10 +21,13 @@ def mostrar_planilla(app):
     archivo_docentes = ""
     archivo_clasif = ""
     archivo_coordinacion = ""
+    planillas_anteriores = []
     carpeta_destino = ""
 
-    mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    mes_var = ctk.StringVar(value=mes_actual())
     bono_var = ctk.StringVar(value="0")
+
+    root = app.root if hasattr(app, "root") else app.winfo_toplevel()
 
     # =========================
     # CONTENEDOR PRINCIPAL
@@ -109,15 +113,15 @@ def mostrar_planilla(app):
             command=seleccionar
         ).pack(side="right")
 
-    def set_cursos(v): 
+    def set_cursos(v):
         nonlocal archivo_cursos
         archivo_cursos = v
 
-    def set_docentes(v): 
+    def set_docentes(v):
         nonlocal archivo_docentes
         archivo_docentes = v
 
-    def set_clasif(v): 
+    def set_clasif(v):
         nonlocal archivo_clasif
         archivo_clasif = v
 
@@ -133,12 +137,54 @@ def mostrar_planilla(app):
     ctk.CTkLabel(frame_extra, text="Archivos adicionales (Opcionales)", font=FONT_SECTION, text_color=TEXT_COLOR)\
         .pack(anchor="w", padx=20, pady=(15, 10))
 
-    def set_coord(v): 
+    def set_coord(v):
         nonlocal archivo_coordinacion
         archivo_coordinacion = v
 
     selector_archivo(frame_extra, "Examen de Clasificación", ("Excel", "*.xlsx *.xls"), set_clasif)
     selector_archivo(frame_extra, "Apoyo Docente", ("Excel", "*.xlsx *.xls"), set_coord)
+
+    # Planillas anteriores del mes: si se eligen, esta es la 2ª (3ª...) planilla
+    # y solo incluye cursos nuevos o con cambio de docente.
+    frame_anteriores = ctk.CTkFrame(frame_extra, fg_color="transparent")
+    frame_anteriores.pack(fill="x", padx=20, pady=(5, 15))
+
+    ctk.CTkLabel(frame_anteriores, text="CSV de planillas anteriores del mes (para la 2ª planilla)", text_color=TEXT_COLOR)\
+        .pack(anchor="w")
+
+    lbl_anteriores = ctk.CTkLabel(frame_anteriores, text="Ninguno (1ª planilla)", text_color=TEXT_LIGHT)
+    lbl_anteriores.pack(side="left", padx=10)
+
+    def seleccionar_anteriores():
+        nonlocal planillas_anteriores
+        rutas = filedialog.askopenfilenames(filetypes=[("CSV", "*.csv")])
+        if rutas:
+            planillas_anteriores = list(rutas)
+            texto = os.path.basename(rutas[0]) if len(rutas) == 1 else f"{len(rutas)} archivos"
+            estado(lbl_anteriores, f"{texto} → se generará la planilla N.° {len(rutas) + 1}", "#4CAF50")
+
+    def quitar_anteriores():
+        nonlocal planillas_anteriores
+        planillas_anteriores = []
+        estado(lbl_anteriores, "Ninguno (1ª planilla)")
+
+    ctk.CTkButton(
+        frame_anteriores,
+        text="Quitar",
+        width=80,
+        fg_color=PRIMARY_COLOR,
+        hover_color=ACCENT_COLOR,
+        command=quitar_anteriores
+    ).pack(side="right", padx=(10, 0))
+
+    ctk.CTkButton(
+        frame_anteriores,
+        text="Seleccionar",
+        width=140,
+        fg_color=PRIMARY_COLOR,
+        hover_color=ACCENT_COLOR,
+        command=seleccionar_anteriores
+    ).pack(side="right")
 
     # =====================================================
     # ④ DESTINO
@@ -170,24 +216,78 @@ def mostrar_planilla(app):
     # =====================================================
     # BOTÓN GENERAR
     # =====================================================
+    def mostrar_resultado(resultado):
+        btn_generar.configure(state="normal")
+
+        mensaje = resultado.mensaje
+        if resultado.comparacion is not None:
+            c = resultado.comparacion
+            mensaje += (
+                f"\n\nComparación con {c.planillas_anteriores} planilla(s) anterior(es):\n"
+                f"- Cursos ya emitidos (excluidos): {c.excluidos}\n"
+                f"- Cursos con cambio de docente (incluidos): {c.cambio_docente}\n"
+                f"- Cursos nuevos (incluidos): {c.nuevos}\n"
+                "El detalle está en la hoja \"Comparación\"."
+            )
+
+        if not resultado.ok:
+            barra.completar("Error")
+            messagebox.showerror("Error", mensaje)
+        elif resultado.sin_coincidencia:
+            barra.completar("Completado con advertencias")
+            lista = "\n".join(f"- {nombre}" for nombre in resultado.sin_coincidencia)
+            messagebox.showwarning(
+                "Planilla generada con advertencias",
+                f"{mensaje}\n\n"
+                f"{len(resultado.sin_coincidencia)} docente(s) del archivo de cursos NO se pudieron "
+                f"emparejar con la base de docentes y quedaron FUERA del cálculo de pago:\n{lista}\n\n"
+                "Revisa que el nombre esté escrito igual en ambos archivos."
+            )
+        else:
+            barra.completar("Completado")
+            messagebox.showinfo("Éxito", mensaje)
+
     def procesar():
         if not messagebox.askyesno("Confirmar", "¿Generar la planilla?"):
             return
 
-        resultado = generar_planilla(
-            archivo_cursos,
-            archivo_docentes,
-            archivo_clasif,
-            archivo_coordinacion,
-            mes_var.get(),
-            float(bono_var.get() or 0),
-            carpeta_destino or None
-        )
+        try:
+            monto_bono = float(bono_var.get() or 0)
+        except ValueError:
+            messagebox.showerror("Error", "El monto del bono debe ser un número.")
+            return
 
-        if resultado.startswith("❌"):
-            messagebox.showerror("Error", resultado)
-        else:
-            messagebox.showinfo("Éxito", resultado)
+        # Leer los valores de la pantalla aquí, en el hilo principal: los
+        # StringVar de Tkinter no deben leerse desde el hilo de fondo.
+        mes = mes_var.get()
+        anteriores = list(planillas_anteriores)
+
+        btn_generar.configure(state="disabled")
+        barra.iniciar()
+
+        def al_error(e):
+            btn_generar.configure(state="normal")
+            barra.completar("Error")
+            messagebox.showerror("Error", str(e))
+
+        def tarea():
+            try:
+                resultado = generar_planilla(
+                    archivo_cursos,
+                    archivo_docentes,
+                    archivo_clasif,
+                    archivo_coordinacion,
+                    mes,
+                    monto_bono,
+                    carpeta_destino or None,
+                    planillas_anteriores=anteriores,
+                    on_progreso=barra.actualizar,
+                )
+                root.after(0, lambda: mostrar_resultado(resultado))
+            except Exception as e:
+                root.after(0, lambda: al_error(e))
+
+        threading.Thread(target=tarea, daemon=True).start()
 
     btn_generar = ctk.CTkButton(
         contenedor,
@@ -199,3 +299,9 @@ def mostrar_planilla(app):
         command=procesar
     )
     btn_generar.pack(pady=30)
+
+    # =====================================================
+    # PROGRESO
+    # =====================================================
+    barra = BarraProgreso(contenedor, root)
+    barra.frame.pack(fill="x", padx=20, pady=(0, 10))

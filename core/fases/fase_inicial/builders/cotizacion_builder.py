@@ -2,6 +2,7 @@ import os
 from typing import Dict
 from core.fases.models import DocenteData, PaymentData, DocumentConfig
 from core.fases.services import PaymentService, DescriptionService, DocenteService, DocumentGeneratorService
+from core.fases.services.document_generator_service import ResultadoDocumento
 from core.fases.utils import PathUtils
 
 
@@ -69,29 +70,29 @@ class CotizacionBuilder:
         payment: PaymentData,
         descripcion_completa: str,
         carpeta_docente: str
-    ) -> str:
+    ) -> ResultadoDocumento:
         # Obtener plantilla según el tipo de destinatario
         ruta_template = self.doc_service.obtener_ruta_plantilla(
             'cotizacion',
             '',
             self.config
         )
-        
+
         # Construir reemplazos
         reemplazos = self.construir_reemplazos(docente, payment, descripcion_completa)
-        
+
         # Formato: {tipo documento} - {mes}{anio} - {nombre}
         nombre_archivo = f"COTIZACIÓN - {self.config.mes} {self.config.anio} - {docente.nombre_limpio}.docx"
         ruta_salida = os.path.join(carpeta_docente, nombre_archivo)
-        
+
         # Obtener ruta de firma
         ruta_firma = self.docente_service.obtener_ruta_firma(docente, self.config)
-        
+
         # Generar documento con firma
-        self.doc_service.generar_documento(ruta_template, reemplazos, ruta_salida, ruta_firma)
-        
+        resultado = self.doc_service.generar_documento(ruta_template, reemplazos, ruta_salida, ruta_firma)
+
         # Limpiar texto administrativo si aplica
         if self.config.es_administrativo:
             self.doc_service.eliminar_texto_administrativo(ruta_salida)
-        
-        return ruta_salida
+
+        return resultado

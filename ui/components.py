@@ -153,18 +153,3 @@ def boton_generador(master, texto, comando):
     )
     boton.pack(pady=(15, 20))
     return boton
-
-
-class TextRedirector:
-    def __init__(self, text_widget):
-        self.text_widget = text_widget
-
-    def write(self, message):
-        if self.text_widget.winfo_exists():
-            self.text_widget.configure(state="normal")
-            self.text_widget.insert("end", message)
-            self.text_widget.see("end")
-            self.text_widget.configure(state="disabled")
-
-    def flush(self):
-        return None

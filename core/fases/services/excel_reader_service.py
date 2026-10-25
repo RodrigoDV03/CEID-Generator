@@ -2,15 +2,14 @@ import pandas as pd
 from typing import List, Any, Mapping, Callable, Union, cast
 from core.fases.models import DocenteData, PaymentData, CursoDetalle
 from core.fases.utils import TextUtils
+from core.planillas.columnas import ALIAS_COLUMNA_CONTRATO
+from core.reglas_negocio import regla_para_curso
 
-COLUMNAS_CONTRATO = [
-    "N.° Contrato",
-    "N° Contrato",
-    "Nro_Contrato",
-    "Nro_contrato",
-    "Numero de contrato",
-    "Número de contrato"
-]
+# Alias local por compatibilidad: este módulo lo usaba con este nombre.
+# La lista en sí vive en core.planillas.columnas, que también la usa
+# generador_planilla.py, para que no vuelva a haber dos listas distintas de
+# "posibles nombres de la columna de número de contrato".
+COLUMNAS_CONTRATO = list(ALIAS_COLUMNA_CONTRATO)
 
 
 class ExcelReaderService:
@@ -108,13 +107,7 @@ class ExcelReaderService:
                 break
 
         # Forzar que columnas de números de contrato se lean como texto
-        dtype_dict = {
-            'Numero de contrato': str,
-            'Número de contrato': str,
-            'N.° Contrato': str,
-            'Nro_Contrato': str,
-            'Nro_contrato': str
-        }
+        dtype_dict = {alias: str for alias in ALIAS_COLUMNA_CONTRATO}
         df = pd.read_excel(ruta_excel, sheet_name=0, header=header_idx, dtype=dtype_dict)
         df.columns = df.columns.str.strip()
         return df
@@ -298,12 +291,14 @@ class ExcelReaderService:
                     if pd.isna(cursos_raw):
                         continue
                     for curso_nombre in [c.strip() for c in str(cursos_raw).split('/') if c.strip()]:
+                        regla = regla_para_curso(curso_nombre)
+                        tarifa = regla.tarifa_hora_fija or categoria_monto
                         cursos.append(CursoDetalle(
                             nombre=curso_nombre,
                             modalidad=modalidad,
                             tipo_servicio='CURSO_DICTADO',
-                            horas=28,
-                            monto=float(categoria_monto * 28)
+                            horas=regla.horas_dictado,
+                            monto=float(tarifa * regla.horas_dictado)
                         ))
 
                 examen_clasif = float(fila.get('Examen_clasif', 0) or 0)

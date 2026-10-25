@@ -1,8 +1,14 @@
 import re
-import unicodedata
 
 import pandas as pd
 
+from core.fases.utils import TextUtils
+
+
+# La modalidad que antes se llamaba "Intensivo" ahora se llama "Superintensivo".
+MODALIDAD_SUPERINTENSIVO = 'SUPERINTENSIVO VIRTUAL'
+_MODALIDAD_INTENSIVO_ANTERIOR = 'INTENSIVO VIRTUAL'
+PREFIJO_SUPERINTENSIVO = 'Superintensivo'
 
 _DIAS_INTENSIVOS = [
     {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'},
@@ -41,11 +47,6 @@ _MAPA_DIAS = {
 }
 
 
-def _normalizar_texto_simple(texto):
-    texto_limpio = unicodedata.normalize('NFKD', str(texto).strip().upper())
-    return ''.join(ch for ch in texto_limpio if not unicodedata.combining(ch))
-
-
 def _normalizar_dias(dias):
     if pd.isna(dias):
         return []
@@ -57,18 +58,25 @@ def _normalizar_dias(dias):
     partes = [parte.strip() for parte in re.split(r'[,/]+', texto) if parte.strip()]
     dias_normalizados = []
     for parte in partes:
-        token = _normalizar_texto_simple(parte).replace('.', '')
+        token = TextUtils.normalizar_texto(parte).replace('.', '')
         dias_normalizados.append(_MAPA_DIAS.get(token, token))
     return dias_normalizados
+
+
+def _quitar_prefijo_intensivo(nivel):
+    nivel_limpio = str(nivel).strip()
+    for prefijo in (PREFIJO_SUPERINTENSIVO, 'Intensivo'):
+        if nivel_limpio.startswith(prefijo):
+            return nivel_limpio[len(prefijo):].strip()
+    return nivel_limpio
 
 
 def _asegurar_prefijo_intensivo(nivel):
     nivel_limpio = str(nivel).strip()
     if not nivel_limpio:
         return nivel_limpio
-    if nivel_limpio.startswith('Intensivo'):
-        return nivel_limpio
-    return f'Intensivo {nivel_limpio}'
+    # Reemplaza también el prefijo anterior "Intensivo" si viniera así del sistema.
+    return f'{PREFIJO_SUPERINTENSIVO} {_quitar_prefijo_intensivo(nivel_limpio)}'
 
 
 def _construir_curso(idioma, nivel, ciclo):
@@ -98,12 +106,14 @@ def ajustar_modalidad(row):
     modalidad = row['modalidad']
 
     dias_normalizados = set(_normalizar_dias(dias))
-    hora_fin_normalizada = _normalizar_texto_simple(hora_fin)
+    hora_fin_normalizada = TextUtils.normalizar_texto(hora_fin)
     if re.fullmatch(r'\d{1,2}:\d{2}$', hora_fin_normalizada):
         hora_fin_normalizada = f"{hora_fin_normalizada}:00"
 
     if dias_normalizados in _DIAS_INTENSIVOS and hora_fin_normalizada in {'22:30:00', '15:00:00'}:
-        modalidad = 'INTENSIVO VIRTUAL'
+        modalidad = MODALIDAD_SUPERINTENSIVO
+    elif str(modalidad).strip().upper() == _MODALIDAD_INTENSIVO_ANTERIOR:
+        modalidad = MODALIDAD_SUPERINTENSIVO
 
     return modalidad
 
@@ -154,12 +164,12 @@ def expandir_texto_cursos_intensivos(cursos_texto):
 def _calcular_ciclo_siguiente_portugues(nivel_sin_intensivo, ciclo_actual):
     if 'Básico' in nivel_sin_intensivo or 'Basico' in nivel_sin_intensivo:
         if ciclo_actual == 5:
-            return 'Intensivo Intermedio', '1'
+            return f'{PREFIJO_SUPERINTENSIVO} Intermedio', '1'
         else:
             return None, str(ciclo_actual + 1)
     elif 'Intermedio' in nivel_sin_intensivo:
         if ciclo_actual == 4:
-            return 'Intensivo Avanzado', '1'
+            return f'{PREFIJO_SUPERINTENSIVO} Avanzado', '1'
         else:
             return None, str(ciclo_actual + 1)
     else:  # Avanzado u otro
@@ -173,7 +183,7 @@ def expandir_filas_carga_intensivos(datos, modalidad_filter='INTENSIVO', aplicar
 
     # Si se aplica lógica de Portugués, especificar modalidad exacta
     if aplicar_logica_portugues:
-        modalidad_filter = 'INTENSIVO VIRTUAL'
+        modalidad_filter = MODALIDAD_SUPERINTENSIVO
 
     filas_adicionales = []
     mask_intensivo = datos_base['modalidad'].astype(str).str.upper().str.contains(modalidad_filter, na=False)
@@ -199,7 +209,7 @@ def expandir_filas_carga_intensivos(datos, modalidad_filter='INTENSIVO', aplicar
 
         # Calcular ciclo siguiente (con lógica especial para Portugués si aplica)
         if aplicar_logica_portugues and idioma_nueva == 'Portugués':
-            nivel_sin_intensivo = nivel_original.replace('Intensivo ', '').strip()
+            nivel_sin_intensivo = _quitar_prefijo_intensivo(nivel_original)
             nivel_siguiente, ciclo_siguiente = _calcular_ciclo_siguiente_portugues(nivel_sin_intensivo, ciclo_actual)
             if nivel_siguiente:
                 fila_nueva['nivel'] = nivel_siguiente
@@ -263,7 +273,7 @@ def aplicar_transformaciones_base(datos):
     datos_transformados['nivel'] = datos_transformados.apply(ajustar_nivel, axis=1)
     datos_transformados['modalidad'] = datos_transformados.apply(ajustar_modalidad, axis=1)
 
-    mask_intensivo = datos_transformados['modalidad'] == 'INTENSIVO VIRTUAL'
+    mask_intensivo = datos_transformados['modalidad'] == MODALIDAD_SUPERINTENSIVO
     for idx in datos_transformados[mask_intensivo].index:
         datos_transformados.loc[idx, 'nivel'] = _asegurar_prefijo_intensivo(datos_transformados.loc[idx, 'nivel'])
 

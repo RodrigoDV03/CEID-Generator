@@ -1,15 +1,38 @@
 import pandas as pd
 import os
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional
 from fuzzywuzzy import process
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
-def _norm(s):
-    if not isinstance(s, str):
-        return ""
-    return " ".join(s.strip().upper().split())
+from core.fases.utils import TextUtils
+from core.reglas_negocio import (
+    UMBRAL_COINCIDENCIA_DOCENTE_CONTROL_PAGOS as UMBRAL_COINCIDENCIA_DOCENTE,
+    SALDO_MAXIMO_CONTRATO_POR_ACABAR as SALDO_MAXIMO_POR_ACABAR,
+)
 
-def actualizar_control_pagos(planilla_path, control_path, numero_armada):
+
+@dataclass
+class ResultadoControlPagos:
+    """
+    Resumen explícito de correr `actualizar_control_pagos`, en vez de que la
+    pantalla solo se entere de "Éxito" o "Error" sin ningún detalle.
+    """
+    actualizados: int = 0
+    total_filas: int = 0
+    contratos_terminados: List[str] = field(default_factory=list)
+    contratos_por_acabar: List[str] = field(default_factory=list)
+    contratos_con_excedente: List[str] = field(default_factory=list)
+    sin_coincidencia: List[str] = field(default_factory=list)
+
+
+def actualizar_control_pagos(
+    planilla_path,
+    control_path,
+    numero_armada,
+    on_progreso: Optional[Callable[[int, int], None]] = None,
+) -> ResultadoControlPagos:
     for path in [planilla_path, control_path]:
         if not os.path.exists(path):
             raise FileNotFoundError(f"No se encontró el archivo: {path}")
@@ -38,18 +61,19 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
 
     def crear_mapeo_montos(df_planilla, nombres_planilla):
         mapeo_montos = {}
+        sin_coincidencia_local = []
         nombres_control_unicos = set()
-        
+
         wb_temp = load_workbook(control_path, data_only=True)
         ws_temp = wb_temp.active
-        
+
         header_row_temp = None
         for r in range(1, min(ws_temp.max_row, 15) + 1):
             values = [str(c.value).strip() if c.value is not None else "" for c in ws_temp[r]]
             if any(v.upper() == "DOCENTE" for v in values):
                 header_row_temp = r
                 break
-        
+
         if header_row_temp:
             for row in range(header_row_temp + 1, ws_temp.max_row + 1):
                 nombre_cell = None
@@ -58,29 +82,32 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
                     if header_val == "DOCENTE":
                         nombre_cell = ws_temp.cell(row, col)
                         break
-                
+
                 if nombre_cell and nombre_cell.value:
                     nombres_control_unicos.add(str(nombre_cell.value).strip())
-        
-        for docente_control in nombres_control_unicos:
-            if isinstance(docente_control, str):
-                match = process.extractOne(docente_control, nombres_planilla)
-                if match:
-                    nombre_match, score = match
-                    if score >= 85:
-                        fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Total_pago"]
-                        if not fila.empty:
-                            mapeo_montos[docente_control] = float(fila.values[0])
-                        else:
-                            mapeo_montos[docente_control] = None
-                    else:
-                        mapeo_montos[docente_control] = None
-                else:
-                    mapeo_montos[docente_control] = None
-        
-        return mapeo_montos
 
-    mapeo_montos = crear_mapeo_montos(df_planilla, nombres_planilla)
+        for docente_control in nombres_control_unicos:
+            if not isinstance(docente_control, str):
+                continue
+
+            match = process.extractOne(docente_control, nombres_planilla)
+            monto_encontrado = None
+            if match:
+                nombre_match, score = match
+                if score >= UMBRAL_COINCIDENCIA_DOCENTE:
+                    fila = df_planilla.loc[df_planilla["Docente"] == nombre_match, "Total_pago"]
+                    if not fila.empty:
+                        monto_encontrado = float(fila.values[0])
+
+            mapeo_montos[docente_control] = monto_encontrado
+            if monto_encontrado is None:
+                # Antes esto se descartaba en silencio con un simple `continue`
+                # más abajo; ahora queda registrado para avisar en pantalla.
+                sin_coincidencia_local.append(docente_control)
+
+        return mapeo_montos, sin_coincidencia_local
+
+    mapeo_montos, sin_coincidencia = crear_mapeo_montos(df_planilla, nombres_planilla)
 
     def monto_por_nombre(docente_control):
         if not isinstance(docente_control, str):
@@ -105,7 +132,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
 
     headers = {}
     for cell in ws[header_row]:
-        key = _norm(cell.value)
+        key = TextUtils.normalizar_texto(cell.value)
         if key:
             headers[key] = cell.column
 
@@ -122,7 +149,7 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
         "SALDO RESTANTE",
     ]
     for titulo in req:
-        if _norm(titulo) not in headers:
+        if TextUtils.normalizar_texto(titulo) not in headers:
             raise RuntimeError(f"No se encontró la columna: {titulo}")
 
     col_idx_nombre  = headers["DOCENTE"]
@@ -151,80 +178,104 @@ def actualizar_control_pagos(planilla_path, control_path, numero_armada):
     mensajes_copado = []
     mensajes_por_acabar = []
     mensajes_excedente = []
+    actualizados = 0
 
     first_data_row = header_row + 1
-    for r in range(first_data_row, ws.max_row + 1):
-        nombre = ws.cell(row=r, column=col_idx_nombre).value
-        if not nombre or str(nombre).strip().upper() in {"DOCENTE", ""}:
-            continue
+    total_filas = max(ws.max_row - first_data_row + 1, 0)
 
-        monto = monto_por_nombre(str(nombre))
-        if monto is None:
-            continue  # sin coincidencia
+    for indice, r in enumerate(range(first_data_row, ws.max_row + 1), start=1):
+        try:
+            nombre = ws.cell(row=r, column=col_idx_nombre).value
+            if not nombre or str(nombre).strip().upper() in {"DOCENTE", ""}:
+                continue
 
-        total   = ws_values.cell(row=r, column=col_idx_total).value or 0
-        primera = ws_values.cell(row=r, column=col_idx_primera).value or 0
-        segunda = ws_values.cell(row=r, column=col_idx_segunda).value or 0
-        tercera = ws_values.cell(row=r, column=col_idx_tercera).value or 0
-        cuarta  = ws_values.cell(row=r, column=col_idx_cuarta).value or 0
-        quinta  = ws_values.cell(row=r, column=col_idx_quinta).value or 0
-        sexta   = ws_values.cell(row=r, column=col_idx_sexta).value or 0
-    
-        saldo_actual = float(total) - float(primera) - float(segunda) - float(tercera) - float(cuarta) - float(quinta) - float(sexta)
+            monto = monto_por_nombre(str(nombre))
+            if monto is None:
+                continue  # sin coincidencia (ya registrado en sin_coincidencia)
 
-        if monto <= saldo_actual:
-            ws.cell(row=r, column=col_idx_armada).value = float(monto)
-            excedente = 0
-        else:
-            ws.cell(row=r, column=col_idx_armada).value = float(saldo_actual)
-            excedente = monto - saldo_actual
+            total   = ws_values.cell(row=r, column=col_idx_total).value or 0
+            primera = ws_values.cell(row=r, column=col_idx_primera).value or 0
+            segunda = ws_values.cell(row=r, column=col_idx_segunda).value or 0
+            tercera = ws_values.cell(row=r, column=col_idx_tercera).value or 0
+            cuarta  = ws_values.cell(row=r, column=col_idx_cuarta).value or 0
+            quinta  = ws_values.cell(row=r, column=col_idx_quinta).value or 0
+            sexta   = ws_values.cell(row=r, column=col_idx_sexta).value or 0
 
-        # Mantener la fórmula en "Saldo Restante"
-        formula = f"={L_total}{r}-SUM({L_primera}{r},{L_segunda}{r},{L_tercera}{r},{L_cuarta}{r},{L_quinta}{r},{L_sexta}{r})"
-        ws.cell(row=r, column=col_idx_saldo).value = formula
+            saldo_actual = float(total) - float(primera) - float(segunda) - float(tercera) - float(cuarta) - float(quinta) - float(sexta)
 
-        # Registrar el excedente en una columna nueva
-        col_idx_excedente = headers.get("EXCEDENTE")
-        if not col_idx_excedente:
-            col_idx_excedente = ws.max_column + 1
-            ws.cell(row=header_row, column=col_idx_excedente).value = "Excedente"
-            headers["EXCEDENTE"] = col_idx_excedente
-        ws.cell(row=r, column=col_idx_excedente).value = excedente
+            if monto <= saldo_actual:
+                ws.cell(row=r, column=col_idx_armada).value = float(monto)
+                excedente = 0
+            else:
+                ws.cell(row=r, column=col_idx_armada).value = float(saldo_actual)
+                excedente = monto - saldo_actual
 
-        # --- Recalcular saldo después de asignar ---
-        nueva_primera = ws.cell(row=r, column=col_idx_primera).value or 0
-        nueva_segunda = ws.cell(row=r, column=col_idx_segunda).value or 0
-        nueva_tercera = ws.cell(row=r, column=col_idx_tercera).value or 0
-        nueva_cuarta = ws.cell(row=r, column=col_idx_cuarta).value or 0
-        nueva_quinta = ws.cell(row=r, column=col_idx_quinta).value or 0
-        nueva_sexta = ws.cell(row=r, column=col_idx_sexta).value or 0
-        nuevo_saldo = float(total) - float(nueva_primera) - float(nueva_segunda) - float(nueva_tercera) - float(nueva_cuarta) - float(nueva_quinta) - float(nueva_sexta)
+            # Mantener la fórmula en "Saldo Restante"
+            formula = f"={L_total}{r}-SUM({L_primera}{r},{L_segunda}{r},{L_tercera}{r},{L_cuarta}{r},{L_quinta}{r},{L_sexta}{r})"
+            ws.cell(row=r, column=col_idx_saldo).value = formula
 
-        # ---- Acumular mensajes ----
-        if es_cero(nuevo_saldo) and es_cero(excedente):
-            mensajes_copado.append(f"- {nombre}")
+            # Registrar el excedente en una columna nueva
+            col_idx_excedente = headers.get("EXCEDENTE")
+            if not col_idx_excedente:
+                col_idx_excedente = ws.max_column + 1
+                ws.cell(row=header_row, column=col_idx_excedente).value = "Excedente"
+                headers["EXCEDENTE"] = col_idx_excedente
+            ws.cell(row=r, column=col_idx_excedente).value = excedente
 
-        if 0 < nuevo_saldo <= 1280:
-            mensajes_por_acabar.append(f"- {nombre} - Saldo restante: {nuevo_saldo}")
+            actualizados += 1
 
-        if excedente > 0:
-            mensajes_excedente.append(f"- {nombre} - Monto excedente: {excedente}")
+            # --- Recalcular saldo después de asignar ---
+            nueva_primera = ws.cell(row=r, column=col_idx_primera).value or 0
+            nueva_segunda = ws.cell(row=r, column=col_idx_segunda).value or 0
+            nueva_tercera = ws.cell(row=r, column=col_idx_tercera).value or 0
+            nueva_cuarta = ws.cell(row=r, column=col_idx_cuarta).value or 0
+            nueva_quinta = ws.cell(row=r, column=col_idx_quinta).value or 0
+            nueva_sexta = ws.cell(row=r, column=col_idx_sexta).value or 0
+            nuevo_saldo = float(total) - float(nueva_primera) - float(nueva_segunda) - float(nueva_tercera) - float(nueva_cuarta) - float(nueva_quinta) - float(nueva_sexta)
+
+            # ---- Acumular mensajes ----
+            if es_cero(nuevo_saldo) and es_cero(excedente):
+                mensajes_copado.append(str(nombre))
+
+            if 0 < nuevo_saldo <= SALDO_MAXIMO_POR_ACABAR:
+                mensajes_por_acabar.append(f"{nombre} — saldo restante: S/. {nuevo_saldo:.2f}")
+
+            if excedente > 0:
+                mensajes_excedente.append(f"{nombre} — monto excedente: S/. {excedente:.2f}")
+
+        finally:
+            if on_progreso:
+                on_progreso(indice, total_filas)
 
     wb.save(control_path)
     print(f"Archivo actualizado guardado en: {control_path}")
 
-    # --- Imprimir bloques ---
+    # --- Imprimir bloques (se ven en vivo en la consola de la pantalla) ---
     if mensajes_copado:
         print("\n=== CONTRATOS TERMINADOS ===")
         for m in mensajes_copado:
-            print(m)
+            print(f"- {m}")
 
     if mensajes_por_acabar:
         print("\n=== CONTRATOS POR ACABAR ===")
         for m in mensajes_por_acabar:
-            print(m)
+            print(f"- {m}")
 
     if mensajes_excedente:
         print("\n=== CONTRATOS CON EXCEDENTE ===")
         for m in mensajes_excedente:
-            print(m)
+            print(f"- {m}")
+
+    if sin_coincidencia:
+        print("\n=== SIN COINCIDENCIA EN LA PLANILLA (no se actualizaron) ===")
+        for nombre in sin_coincidencia:
+            print(f"- {nombre}")
+
+    return ResultadoControlPagos(
+        actualizados=actualizados,
+        total_filas=total_filas,
+        contratos_terminados=mensajes_copado,
+        contratos_por_acabar=mensajes_por_acabar,
+        contratos_con_excedente=mensajes_excedente,
+        sin_coincidencia=sin_coincidencia,
+    )

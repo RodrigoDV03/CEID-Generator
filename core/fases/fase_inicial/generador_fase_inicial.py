@@ -1,5 +1,13 @@
 import datetime
-from core.fases.models import DocenteData, PaymentData, DocumentConfig, CursoDetalle
+from typing import Callable, Optional
+from core.fases.models import (
+    DocenteData,
+    PaymentData,
+    DocumentConfig,
+    CursoDetalle,
+    ResultadoDocente,
+    ResultadoProcesoFase,
+)
 from core.fases.services import ExcelReaderService
 from core.fases.base_generator import BaseFaseGenerator
 from .builders import OficioBuilder, TdrBuilder, CotizacionBuilder
@@ -20,20 +28,20 @@ class FaseInicialGenerator(BaseFaseGenerator):
         docente: DocenteData,
         payment: PaymentData,
         planilla_path: str
-    ) -> None:
+    ) -> ResultadoDocente:
         # Validar docente
         es_valido, mensaje = self.docente_service.validar_docente(docente)
         if not es_valido:
             print(f"❌ Error - {mensaje}")
-            return
-        
+            return ResultadoDocente(nombre=docente.nombre or "N/A", ok=False, error=mensaje)
+
         # Crear carpeta del docente
         carpeta_docente = self.docente_service.crear_carpeta_docente(
             self.config.carpeta_destino,
             self.config,
             docente
         )
-        
+
         # Leer cursos detallados desde Planilla_Generador expandida
         # Solo para docentes, no para administrativos
         cursos_detallados = []
@@ -43,26 +51,30 @@ class FaseInicialGenerator(BaseFaseGenerator):
                 "Planilla_Generador",
                 docente.nombre
             )
-        
+
         # Generar descripción completa
         descripcion_completa = self.generar_descripcion_completa(docente, payment, planilla_path)
-        
+
         try:
             # 1. Generar OFICIO (para todos)
             self.oficio_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
-            
+
             # 2. Generar TDR (solo para terceros) - pasar cursos_detallados
             if docente.es_tercero:
                 self.tdr_builder.generar(docente, payment, descripcion_completa, carpeta_docente, cursos_detallados)
-            
-            # 3. Generar COTIZACIÓN (para administrativos o terceros)
+
+            # 3. Generar COTIZACIÓN (para administrativos o terceros) - puede quedar sin firma
+            firma_faltante = False
             if self.config.es_administrativo or docente.es_tercero:
-                self.cotizacion_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
-            
+                resultado_cotizacion = self.cotizacion_builder.generar(docente, payment, descripcion_completa, carpeta_docente)
+                firma_faltante = resultado_cotizacion.firma_faltante
+
             print(f"✅ {docente.nombre} - Documentos generados correctamente.")
-            
+            return ResultadoDocente(nombre=docente.nombre, ok=True, firma_faltante=firma_faltante)
+
         except Exception as e:
             print(f"❌ Error generando documentos para {docente.nombre}: {e}")
+            return ResultadoDocente(nombre=docente.nombre, ok=False, error=str(e))
 
 
 def procesar_planilla_fase_inicial(
@@ -71,8 +83,9 @@ def procesar_planilla_fase_inicial(
     carpeta_destino: str,
     mes: str,
     numero_armada: str,
-    tipo_fase_inicial: str
-) -> None:
+    tipo_fase_inicial: str,
+    on_progreso: Optional[Callable[[int, int], None]] = None,
+) -> ResultadoProcesoFase:
     # Crear configuración
     config = DocumentConfig(
         mes=mes,
@@ -124,18 +137,28 @@ def procesar_planilla_fase_inicial(
         df = df.drop_duplicates(subset=['Docente'], keep='first')
     
     # Procesar cada fila
+    resultado_proceso = ResultadoProcesoFase()
+    total_filas = len(df)
     for i, fila in enumerate(df.itertuples(index=False), start=1):
         try:
             # Extraer datos
             docente = excel_service.extraer_docente_data(fila)
             payment = excel_service.extraer_payment_data(fila)
-            
+
             # Generar documentos (pasar planilla_path para leer cursos detallados)
-            generador.generar_documentos_docente(docente, payment, planilla_path)
-            
+            resultado_docente = generador.generar_documentos_docente(docente, payment, planilla_path)
+            resultado_proceso.registrar(resultado_docente)
+
         except ValueError as e:
             print(f"Fila {i}: {e}")
+            resultado_proceso.registrar(ResultadoDocente(nombre=f"Fila {i}", ok=False, error=str(e)))
             continue
         except Exception as e:
             print(f"Fila {i}: Error inesperado - {e}")
+            resultado_proceso.registrar(ResultadoDocente(nombre=f"Fila {i}", ok=False, error=str(e)))
             continue
+        finally:
+            if on_progreso:
+                on_progreso(i, total_filas)
+
+    return resultado_proceso

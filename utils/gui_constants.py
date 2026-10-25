@@ -26,4 +26,10 @@ FONT_FOOTER = ("Segoe UI", 12)
 
 meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
+
+def mes_actual():
+    # strftime("%B") depende del idioma de Windows (en inglés devuelve "October");
+    # se toma de la lista para que el mes salga siempre en español.
+    return meses[datetime.now().month - 1]
+
 años = [str(a) for a in range(datetime.now().year - 5, datetime.now().year + 6)]

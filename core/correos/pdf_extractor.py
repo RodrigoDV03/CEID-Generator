@@ -1,20 +1,13 @@
 import re
 import logging
-import unicodedata
 from typing import Optional, List
 from PyPDF2 import PdfReader
 
+from core.fases.utils import TextUtils
 from .config import PatronesRegex, ServiciosConfig
 
 
 logger = logging.getLogger(__name__)
-
-
-def _normalizar_ascii(texto: str) -> str:
-    return "".join(
-        ch for ch in unicodedata.normalize("NFD", texto)
-        if unicodedata.category(ch) != "Mn"
-    )
 
 
 class RUCExtractor:
@@ -36,7 +29,7 @@ class RUCExtractor:
         return None
     
     def extraer(self, texto: str, debug: bool = False) -> Optional[str]:
-        texto_normalizado = _normalizar_ascii(texto)
+        texto_normalizado = TextUtils.quitar_acentos(texto)
 
         # Priorizar el RUC del proveedor, que suele aparecer junto al nombre.
         match = self.patron_ruc_nombre.search(texto_normalizado)
@@ -161,7 +154,7 @@ class ModalidadExtractor:
             return None
 
         modalidad_cruda = match.group(1).strip().upper()
-        modalidad_normalizada = _normalizar_ascii(modalidad_cruda)
+        modalidad_normalizada = TextUtils.quitar_acentos(modalidad_cruda)
 
         if "HIBRIDA" in modalidad_normalizada or "HIBRIDO" in modalidad_normalizada:
             return "HÍBRIDA"
@@ -183,7 +176,7 @@ class ContratoExtractor:
         )
 
     def tiene_contrato(self, texto: str) -> bool:
-        texto_normalizado = _normalizar_ascii(texto).upper()
+        texto_normalizado = TextUtils.quitar_acentos(texto).upper()
         return bool(self.patron_contrato.search(texto_normalizado))
 
 

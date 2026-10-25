@@ -1,5 +1,6 @@
 from typing import List
 from core.fases.models import PaymentData, CursoDetalle
+from core.reglas_negocio import regla_para_curso
 
 
 class DescriptionService:
@@ -27,7 +28,8 @@ class DescriptionService:
                 elementos_descripcion.append(curso.strip())
             else:
                 # Para cursos académicos normales, agregar el formato tradicional
-                elementos_descripcion.append(f"28 horas de clases de {curso}")
+                horas = regla_para_curso(curso).horas_dictado
+                elementos_descripcion.append(f"{horas} horas de clases de {curso}")
         
         # Agregar servicio de actualización si existe y no está ya en la lista
         if tiene_servicio_actualizacion:

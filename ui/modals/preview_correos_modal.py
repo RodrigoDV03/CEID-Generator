@@ -189,6 +189,10 @@ class PreviewCorreosModal:
         self.lbl_estado_envio = ctk.CTkLabel(logs_header, text="", text_color=TEXT_LIGHT)
         self.lbl_estado_envio.pack(side="right")
 
+        self.barra_envio = ctk.CTkProgressBar(self.logs_frame)
+        self.barra_envio.set(0)
+        self.barra_envio.pack(fill="x", padx=10, pady=(0, 8))
+
         self.txt_logs = ctk.CTkTextbox(
             self.logs_frame,
             fg_color=CONSOLE_BG,
@@ -229,6 +233,15 @@ class PreviewCorreosModal:
         self.txt_logs.see("end")
         self.txt_logs.configure(state="disabled")
 
+    def _actualizar_progreso(self, actual, total):
+        self._mostrar_panel_logs()
+        if not self.barra_envio.winfo_exists():
+            return
+        self.barra_envio.set((actual / total) if total else 0)
+        self.lbl_estado_envio.configure(
+            text=f"Enviando {actual} / {total}...", text_color="#FFD700"
+        )
+
     def _limpiar_logs(self):
         self._mostrar_panel_logs()
         self.txt_logs.configure(state="normal")
@@ -244,6 +257,7 @@ class PreviewCorreosModal:
             messagebox.showerror("Error", error, parent=self.window)
             return
 
+        self.barra_envio.set(1)
         self.lbl_estado_envio.configure(text="Completado", text_color="#4CAF50")
         self._append_log(
             f"\n✅ Envío finalizado: {resumen['exitosos']} exitosos, {resumen['fallidos']} fallidos\n"
@@ -826,9 +840,10 @@ class PreviewCorreosModal:
             return
         try:
             self._limpiar_logs()
+            self.barra_envio.set(0)
             self.lbl_estado_envio.configure(text="Enviando...", text_color="#FFD700")
             self.btn_enviar.configure(state="disabled")
-            self.on_send(copy.deepcopy(self.data), self._append_log, self._finalizar_envio)
+            self.on_send(copy.deepcopy(self.data), self._append_log, self._actualizar_progreso, self._finalizar_envio)
         except Exception as e:
             self.btn_enviar.configure(state="normal")
             messagebox.showerror("Error", str(e), parent=self.window)

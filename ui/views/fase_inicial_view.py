@@ -1,10 +1,10 @@
 import customtkinter as ctk
 from tkinter import filedialog
-from datetime import datetime
-import os, sys, threading
+import os
 import pandas as pd
 
-from ui.components import TextRedirector
+from ui.console_stream import ConsolaEnVivo
+from ui.progress import BarraProgreso
 from utils.gui_constants import *
 from utils import custom_modals as messagebox
 from core.fases.fase_inicial.generador_fase_inicial import procesar_planilla_fase_inicial
@@ -19,12 +19,14 @@ def mostrar_fase_inicial(app):
     # VARIABLES
     # =========================
     hoja_var = ctk.StringVar()
-    mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    mes_var = ctk.StringVar(value=mes_actual())
     numero_armada = ctk.StringVar()
     tipo_fase_inicial = ctk.StringVar(value="planilla docente")
 
     planilla_path = None
     carpeta_destino = None
+
+    root = app.root if hasattr(app, "root") else app.winfo_toplevel()
 
     # =========================
     # CONTENEDOR
@@ -101,7 +103,8 @@ def mostrar_fase_inicial(app):
         .pack(anchor="w", padx=20)
 
     ctk.CTkOptionMenu(frame_extra, variable=numero_armada,
-                    values=["primera", "segunda", "tercera", "cuarta", "quinta", "sexta", "sin armada"])\
+                    values=["primera", "segunda", "tercera", "cuarta", "quinta", "sexta", "sin armada"],
+                    command=lambda _: validar())\
         .pack(anchor="w", padx=20, pady=5)
 
     # =====================================================
@@ -144,27 +147,63 @@ def mostrar_fase_inicial(app):
     # =====================================================
     # GENERAR
     # =====================================================
+    def mostrar_resultado(resultado):
+        boton_gen.configure(state="normal")
+
+        if resultado.sin_firma:
+            barra.completar("Completado con advertencias")
+            lista = "\n".join(f"- {nombre}" for nombre in resultado.sin_firma)
+            messagebox.showwarning(
+                "Documentos generados con advertencias",
+                f"Se generaron {resultado.exitosos} de {resultado.total_procesados} documentos.\n\n"
+                f"{len(resultado.sin_firma)} cotización(es) se generaron SIN firma "
+                f"porque no se encontró el archivo de firma del docente:\n{lista}"
+            )
+        elif resultado.con_error:
+            barra.completar("Completado con errores")
+            lista = "\n".join(f"- {nombre}" for nombre in resultado.con_error)
+            messagebox.showwarning(
+                "Documentos generados con errores",
+                f"Se generaron {resultado.exitosos} de {resultado.total_procesados} documentos.\n\n"
+                f"No se pudieron generar los documentos de:\n{lista}\n\n"
+                "Revisa la consola para el detalle de cada error."
+            )
+        else:
+            barra.completar("Completado")
+            messagebox.showinfo("Éxito", "Documentos generados correctamente")
+
     def generar():
 
         if not planilla_path or not carpeta_destino:
             messagebox.showerror("Error", "Faltan datos")
             return
 
-        def tarea():
-            try:
-                procesar_planilla_fase_inicial(
-                    planilla_path,
-                    hoja_var.get(),
-                    carpeta_destino,
-                    mes_var.get(),
-                    numero_armada.get(),
-                    tipo_fase_inicial.get()
-                )
-                messagebox.showinfo("Éxito", "Documentos generados correctamente")
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
+        # Leer los valores de la pantalla en el hilo principal.
+        hoja = hoja_var.get()
+        mes = mes_var.get()
+        armada = numero_armada.get()
+        tipo = tipo_fase_inicial.get()
 
-        threading.Thread(target=tarea).start()
+        boton_gen.configure(state="disabled")
+        barra.iniciar()
+
+        def tarea():
+            return procesar_planilla_fase_inicial(
+                planilla_path,
+                hoja,
+                carpeta_destino,
+                mes,
+                armada,
+                tipo,
+                on_progreso=lambda actual, total: barra.actualizar(actual, total, "docentes procesados"),
+            )
+
+        def al_error(e):
+            boton_gen.configure(state="normal")
+            barra.completar("Error")
+            messagebox.showerror("Error", str(e))
+
+        consola.ejecutar(tarea, on_exito=mostrar_resultado, on_error=al_error)
 
     boton_gen = ctk.CTkButton(
         contenedor,
@@ -176,6 +215,12 @@ def mostrar_fase_inicial(app):
         command=generar
     )
     boton_gen.pack(pady=20)
+
+    # =====================================================
+    # PROGRESO
+    # =====================================================
+    barra = BarraProgreso(contenedor, root)
+    barra.frame.pack(fill="x", padx=20, pady=(0, 10))
 
     # =====================================================
     # CONSOLA
@@ -192,5 +237,4 @@ def mostrar_fase_inicial(app):
     consola_text.pack(fill="both", expand=True, padx=10, pady=10)
     consola_text.configure(state="disabled")
 
-    sys.stdout = TextRedirector(consola_text)
-    sys.stderr = TextRedirector(consola_text)
+    consola = ConsolaEnVivo(consola_text, root)

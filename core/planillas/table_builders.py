@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 
+from core.planillas import columnas as col
 from core.planillas.transformations import (
     ajustar_nivel,
     expandir_filas_carga_intensivos,
@@ -13,11 +14,11 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
     df = df.copy()
     campos_requeridos = {
         'curso': '',
-        'Curso Dictado': 0,
-        'cantidad_cursos': 0,
-        'Diseño de Examenes': 0,
-        'Examen Clasif.': 0,
-        'Servicio Actualización': 0,
+        col.CURSO_DICTADO: 0,
+        col.CANTIDAD_CURSOS: 0,
+        col.DISENO_EXAMENES: 0,
+        col.EXAMEN_CLASIFICACION: 0,
+        col.SERVICIO_ACTUALIZACION: 0,
     }
 
     for campo, valor_default in campos_requeridos.items():
@@ -27,11 +28,11 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
             df[campo] = df[campo].fillna(valor_default)
 
     columnas_numericas = [
-        'Curso Dictado',
-        'cantidad_cursos',
-        'Diseño de Examenes',
-        'Examen Clasif.',
-        'Servicio Actualización',
+        col.CURSO_DICTADO,
+        col.CANTIDAD_CURSOS,
+        col.DISENO_EXAMENES,
+        col.EXAMEN_CLASIFICACION,
+        col.SERVICIO_ACTUALIZACION,
     ]
     for columna in columnas_numericas:
         df[columna] = pd.to_numeric(df[columna], errors='coerce').fillna(0)
@@ -42,13 +43,13 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
 
     columnas_tabla = {
         'N°': range(1, len(df) + 1),
-        'Docente': df['Docente'],
-        'Sede': df['Sede'],
-        'Categoria (Letra)': df['Categoria (Letra)'],
-        'Categoria (Monto)': df['Categoria (Monto)'],
-        'N_Ruc': df['N_Ruc'],
+        col.DOCENTE: df[col.DOCENTE],
+        col.SEDE: df[col.SEDE],
+        col.CATEGORIA_LETRA: df[col.CATEGORIA_LETRA],
+        col.CATEGORIA_MONTO: df[col.CATEGORIA_MONTO],
+        col.N_RUC: df[col.N_RUC],
         'Curso': df['curso'],
-        'Curso Dictado': df['Curso Dictado'],
+        col.CURSO_DICTADO: df[col.CURSO_DICTADO],
     }
 
     if es_enero:
@@ -56,12 +57,12 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
 
     columnas_tabla.update({
         'Extra Curso': 0,
-        'Cantidad Cursos': df['cantidad_cursos'],
-        'Diseño de Examenes': df['Diseño de Examenes'],
-        'Examen Clasif.': df['Examen Clasif.'],
-        'Servicio Actualización': df['Servicio Actualización'],
-        'Total Pago S/.': 0,
-        'Estado': df['Estado'],
+        'Cantidad Cursos': df[col.CANTIDAD_CURSOS],
+        col.DISENO_EXAMENES: df[col.DISENO_EXAMENES],
+        col.EXAMEN_CLASIFICACION: df[col.EXAMEN_CLASIFICACION],
+        col.SERVICIO_ACTUALIZACION: df[col.SERVICIO_ACTUALIZACION],
+        col.TOTAL_PAGO: 0,
+        col.ESTADO: df[col.ESTADO],
     })
 
     tabla = pd.DataFrame(columnas_tabla)
@@ -69,7 +70,7 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
 
     def agregar_servicio_a_curso(row):
         curso_actual = str(row['Curso']).strip()
-        servicio_actualizacion = pd.to_numeric(row['Servicio Actualización'], errors='coerce')
+        servicio_actualizacion = pd.to_numeric(row[col.SERVICIO_ACTUALIZACION], errors='coerce')
         if pd.isna(servicio_actualizacion):
             servicio_actualizacion = 0
 
@@ -84,18 +85,18 @@ def construir_tabla_planilla(df, es_enero=False, monto_bono=0):
     tabla['Curso'] = tabla.apply(agregar_servicio_a_curso, axis=1)
 
     if es_enero:
-        tabla['Total Pago S/.'] = (
-            tabla['Curso Dictado'] + tabla['Bono'] + tabla['Extra Curso'] +
-            tabla['Diseño de Examenes'] + tabla['Examen Clasif.'] +
-            tabla['Servicio Actualización']
+        tabla[col.TOTAL_PAGO] = (
+            tabla[col.CURSO_DICTADO] + tabla['Bono'] + tabla['Extra Curso'] +
+            tabla[col.DISENO_EXAMENES] + tabla[col.EXAMEN_CLASIFICACION] +
+            tabla[col.SERVICIO_ACTUALIZACION]
         )
     else:
-        tabla['Total Pago S/.'] = (
-            tabla['Curso Dictado'] + tabla['Extra Curso'] + tabla['Diseño de Examenes'] +
-            tabla['Examen Clasif.'] + tabla['Servicio Actualización']
+        tabla[col.TOTAL_PAGO] = (
+            tabla[col.CURSO_DICTADO] + tabla['Extra Curso'] + tabla[col.DISENO_EXAMENES] +
+            tabla[col.EXAMEN_CLASIFICACION] + tabla[col.SERVICIO_ACTUALIZACION]
         )
 
-    tabla = tabla.sort_values('Docente').reset_index(drop=True)
+    tabla = tabla.sort_values(col.DOCENTE).reset_index(drop=True)
     tabla['N°'] = range(1, len(tabla) + 1)
 
     return tabla
@@ -131,36 +132,38 @@ def construir_tabla_carga_academica(datos, estado_planilla, traducir_dias_fn):
 
 def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_docentes, cargar_excel_con_cache_fn, preparar_coordinacion_agrupada_fn):
     if not os.path.exists(ruta_coordinacion):
-        return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+        return pd.DataFrame(columns=col.COLUMNAS_TABLA_COORDINACION)
 
     try:
         coordinacion_df = cargar_excel_con_cache_fn(ruta_coordinacion, sheet_name=0, header=0)
 
         coordinacion_agrupado = preparar_coordinacion_agrupada_fn(coordinacion_df, normalizar_texto)
         if coordinacion_agrupado is None:
-            return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+            return pd.DataFrame(columns=col.COLUMNAS_TABLA_COORDINACION)
 
         datos_docentes_temp = datos_docentes.copy()
-        datos_docentes_temp['docente_norm'] = datos_docentes_temp['Docente'].apply(normalizar_texto)
+        datos_docentes_temp['docente_norm'] = datos_docentes_temp[col.DOCENTE].apply(normalizar_texto)
 
-        coordinacion_con_categoria = coordinacion_agrupado.merge(datos_docentes_temp[['docente_norm', 'Docente', 'Categoria (Letra)', 'Categoria (Monto)']], on='docente_norm', how='left')
+        coordinacion_con_categoria = coordinacion_agrupado.merge(
+            datos_docentes_temp[['docente_norm', col.DOCENTE, col.CATEGORIA_LETRA, col.CATEGORIA_MONTO]], on='docente_norm', how='left'
+        )
 
-        coordinacion_con_categoria['Docente_Final'] = coordinacion_con_categoria['Docente'].fillna(coordinacion_con_categoria['Docente_Original'])
-        coordinacion_con_categoria['Categoria (Letra)'] = coordinacion_con_categoria['Categoria (Letra)'].fillna('N/A')
-        coordinacion_con_categoria['Categoria (Monto)'] = coordinacion_con_categoria['Categoria (Monto)'].fillna(0)
+        coordinacion_con_categoria['Docente_Final'] = coordinacion_con_categoria[col.DOCENTE].fillna(coordinacion_con_categoria['Docente_Original'])
+        coordinacion_con_categoria[col.CATEGORIA_LETRA] = coordinacion_con_categoria[col.CATEGORIA_LETRA].fillna('N/A')
+        coordinacion_con_categoria[col.CATEGORIA_MONTO] = coordinacion_con_categoria[col.CATEGORIA_MONTO].fillna(0)
 
-        coordinacion_con_categoria['Monto_Total'] = (coordinacion_con_categoria['Horas_Total'] * coordinacion_con_categoria['Categoria (Monto)'])
+        coordinacion_con_categoria['Monto_Total'] = (coordinacion_con_categoria[col.RESUMIDA_HORAS_TOTAL] * coordinacion_con_categoria[col.CATEGORIA_MONTO])
 
         tabla_coordinacion = pd.DataFrame({
             'N°': range(1, len(coordinacion_con_categoria) + 1),
-            'Docente': coordinacion_con_categoria['Docente_Final'],
-            'Categoría (Letra)': coordinacion_con_categoria['Categoria (Letra)'],
-            'Categoría (Monto)': coordinacion_con_categoria['Categoria (Monto)'],
-            'Horas Totales': coordinacion_con_categoria['Horas_Total'],
-            'Monto Total': coordinacion_con_categoria['Monto_Total'],
+            col.DOCENTE: coordinacion_con_categoria['Docente_Final'],
+            col.COORD_CATEGORIA_LETRA: coordinacion_con_categoria[col.CATEGORIA_LETRA],
+            col.COORD_CATEGORIA_MONTO: coordinacion_con_categoria[col.CATEGORIA_MONTO],
+            col.COORD_HORAS_TOTALES: coordinacion_con_categoria[col.RESUMIDA_HORAS_TOTAL],
+            col.COORD_MONTO_TOTAL: coordinacion_con_categoria['Monto_Total'],
         })
 
-        tabla_coordinacion = tabla_coordinacion.sort_values('Docente').reset_index(drop=True)
+        tabla_coordinacion = tabla_coordinacion.sort_values(col.DOCENTE).reset_index(drop=True)
         tabla_coordinacion['N°'] = range(1, len(tabla_coordinacion) + 1)
 
         print(f"✅ Tabla de coordinación creada con {len(tabla_coordinacion)} docentes")
@@ -168,4 +171,4 @@ def construir_tabla_coordinacion(ruta_coordinacion, normalizar_texto, datos_doce
 
     except Exception as e:
         print(f"⚠️ Error al crear tabla de coordinación: {e}")
-        return pd.DataFrame(columns=['N°', 'Docente', 'Categoría (Letra)', 'Categoría por Hora', 'Horas Totales', 'Monto Total'])
+        return pd.DataFrame(columns=col.COLUMNAS_TABLA_COORDINACION)

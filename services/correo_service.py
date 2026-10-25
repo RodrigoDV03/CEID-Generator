@@ -3,7 +3,7 @@ from core.correos.email_builder import EmailBuilderFactory
 from core.correos.email_sender import EmailPersonalizado, GmailEmailSender, LoteEmailSender
 from core.correos.gmail_service import GmailService
 from core.correos.processor import CorreosProcessor, ExcelReader, PDFProcessor
-from typing import Any
+from typing import Any, Callable, Optional
 
 
 _gmail_service_shared = None
@@ -151,11 +151,16 @@ def previsualizar_correos_service(
     return previsualizaciones
 
 
-def enviar_previsualizaciones_service(previsualizaciones_editadas):
+def enviar_previsualizaciones_service(
+    previsualizaciones_editadas,
+    on_progreso: Optional[Callable[[int, int], None]] = None,
+):
     """
     Envia correos usando asunto/cuerpo ya editados en previsualizacion.
 
     Cada item debe incluir: destinatario, asunto, cuerpo_html y pdf_paths.
+    `on_progreso(actual, total)`, si se pasa, se llama después de cada envío
+    (exitoso o fallido) para poder mostrar una barra de progreso real.
     """
     gmail_service = _obtener_gmail_service()
     sender = GmailEmailSender(gmail_service)
@@ -163,8 +168,9 @@ def enviar_previsualizaciones_service(previsualizaciones_editadas):
     exitosos = 0
     fallidos = 0
     resultados = []
+    total = len(previsualizaciones_editadas)
 
-    for item in previsualizaciones_editadas:
+    for indice, item in enumerate(previsualizaciones_editadas, start=1):
         try:
             resultado = sender.enviar_con_firma(
                 destinatario=item["destinatario"],
@@ -201,8 +207,9 @@ def enviar_previsualizaciones_service(previsualizaciones_editadas):
                     "error": str(e),
                 }
             )
-
-    resultados = locals().get("resultados", [])
+        finally:
+            if on_progreso:
+                on_progreso(indice, total)
 
     return {
         "exitosos": exitosos,

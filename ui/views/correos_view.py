@@ -41,7 +41,7 @@ def mostrar_correos(app):
     # =========================
     modo_var = ctk.StringVar(value="Masivo (solo orden)")
     tipo_var = ctk.StringVar(value="Docente")
-    mes_var = ctk.StringVar(value=datetime.now().strftime("%B").capitalize())
+    mes_var = ctk.StringVar(value=mes_actual())
     año_var = ctk.StringVar(value=str(datetime.now().year))
 
     mes_inicio_contrato_var = ctk.StringVar(value=mes_var.get())
@@ -263,7 +263,7 @@ def mostrar_correos(app):
             previsualizaciones[:] = previews_editadas
             set_estado(estado_lbl, "Previsualización actualizada", "#FFD700")
 
-        def on_send(previews_editadas, log_callback, done_callback):
+        def on_send(previews_editadas, log_callback, progress_callback, done_callback):
             previsualizaciones[:] = previews_editadas
 
             def tarea_envio():
@@ -271,7 +271,12 @@ def mostrar_correos(app):
                 try:
                     root.after(0, lambda: log_callback("Iniciando envío de correos...\n"))
                     with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
-                        resumen = enviar_previsualizaciones_service(previsualizaciones)
+                        resumen = enviar_previsualizaciones_service(
+                            previsualizaciones,
+                            on_progreso=lambda actual, total: root.after(
+                                0, lambda a=actual, t=total: progress_callback(a, t)
+                            ),
+                        )
                     root.after(0, lambda: done_callback(resumen, None))
                 except Exception as e:
                     root.after(0, lambda: done_callback(None, str(e)))

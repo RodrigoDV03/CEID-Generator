@@ -5,6 +5,8 @@ import pandas as pd
 
 COLUMNAS_PLANILLA_CANONICAS = {
     'Programa Educativo': 'programa_educativo',
+    'ID Programación': 'id_programacion',
+    'ID Programacion': 'id_programacion',
     'Idioma': 'idioma',
     'Nivel': 'nivel',
     'Ciclo': 'ciclo',
