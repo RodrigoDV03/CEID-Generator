@@ -10,6 +10,12 @@ MODALIDAD_SUPERINTENSIVO = 'SUPERINTENSIVO VIRTUAL'
 _MODALIDAD_INTENSIVO_ANTERIOR = 'INTENSIVO VIRTUAL'
 PREFIJO_SUPERINTENSIVO = 'Superintensivo'
 
+# Posgrado: el sistema lo envía como nivel "General", ciclos 1 a 18.
+POSGRADO_BASICO = 'Posgrado Básico'
+POSGRADO_INTERMEDIO = 'Posgrado Intermedio'
+POSGRADO_ULTIMO_CICLO_BASICO = 8
+POSGRADO_ULTIMO_CICLO_GENERAL = 18
+
 _DIAS_INTENSIVOS = [
     {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY'},
     {'SATURDAY', 'SUNDAY'},
@@ -83,7 +89,13 @@ def _construir_curso(idioma, nivel, ciclo):
     return f"{str(idioma).strip()} {str(nivel).strip()} {str(ciclo).strip()}"
 
 
-def ajustar_nivel(row):
+def ajustar_nivel_y_ciclo(row):
+    """
+    Posgrado viene del sistema como nivel "General" con ciclos 1 a 18:
+    - ciclos 1-8  -> Posgrado Básico 1-8 (mismo ciclo);
+    - ciclos 9-18 -> Posgrado Intermedio 1-10 (el ciclo se renumera desde 1).
+    Devuelve (nivel, ciclo).
+    """
     nivel = row['nivel']
     idioma = row['idioma']
     ciclo = row['ciclo']
@@ -93,11 +105,22 @@ def ajustar_nivel(row):
         ciclo_num = None
 
     if nivel == 'General' and idioma in {'Inglés', 'Portugués'} and ciclo_num is not None:
-        if 1 <= ciclo_num <= 8:
-            return 'Posgrado Básico'
-        elif 9 <= ciclo_num <= 18:
-            return 'Posgrado Intermedio'
-    return nivel
+        if 1 <= ciclo_num <= POSGRADO_ULTIMO_CICLO_BASICO:
+            return POSGRADO_BASICO, ciclo_num
+        elif POSGRADO_ULTIMO_CICLO_BASICO < ciclo_num <= POSGRADO_ULTIMO_CICLO_GENERAL:
+            return POSGRADO_INTERMEDIO, ciclo_num - POSGRADO_ULTIMO_CICLO_BASICO
+    return nivel, ciclo
+
+
+def ajustar_nivel(row):
+    return ajustar_nivel_y_ciclo(row)[0]
+
+
+def _siguiente_nivel_y_ciclo(nivel, ciclo_actual):
+    """Nivel y ciclo del curso adicional de un superintensivo (Posgrado Básico 8 -> Posgrado Intermedio 1)."""
+    if _quitar_prefijo_intensivo(nivel) == POSGRADO_BASICO and ciclo_actual == POSGRADO_ULTIMO_CICLO_BASICO:
+        return nivel.replace(POSGRADO_BASICO, POSGRADO_INTERMEDIO), 1
+    return nivel, ciclo_actual + 1
 
 
 def ajustar_modalidad(row):
@@ -130,9 +153,16 @@ def generar_siguiente_curso_intensivo(curso):
     if not match:
         return ''
 
+    # El prefijo es "idioma nivel": el nivel va al final, así que basta
+    # con ajustar ese tramo del texto.
     prefijo = match.group(1).rstrip()
     ciclo_actual = int(match.group(2))
-    return f"{prefijo} {ciclo_actual + 1}"
+    if prefijo.endswith(POSGRADO_BASICO):
+        nivel_siguiente, ciclo_siguiente = _siguiente_nivel_y_ciclo(POSGRADO_BASICO, ciclo_actual)
+        prefijo = prefijo[:-len(POSGRADO_BASICO)] + nivel_siguiente
+    else:
+        ciclo_siguiente = ciclo_actual + 1
+    return f"{prefijo} {ciclo_siguiente}"
 
 
 def _partir_cursos_intensivos(cursos_texto):
@@ -217,7 +247,8 @@ def expandir_filas_carga_intensivos(datos, modalidad_filter='INTENSIVO', aplicar
                 fila_nueva['nivel'] = nivel_original
             fila_nueva['ciclo'] = ciclo_siguiente
         else:
-            ciclo_siguiente = ciclo_actual + 1
+            nivel_siguiente, ciclo_siguiente = _siguiente_nivel_y_ciclo(nivel_original, ciclo_actual)
+            fila_nueva['nivel'] = nivel_siguiente
             fila_nueva['ciclo'] = str(ciclo_siguiente)
 
         fila_nueva['Curso'] = _construir_curso(idioma_nueva, fila_nueva['nivel'], fila_nueva['ciclo'])
@@ -249,7 +280,8 @@ def generar_siguiente_curso_intensivo_desde_fila(row):
     if not idioma or not nivel:
         return generar_siguiente_curso_intensivo(row.get('Curso', ''))
 
-    return _construir_curso(idioma, nivel, ciclo_actual + 1)
+    nivel_siguiente, ciclo_siguiente = _siguiente_nivel_y_ciclo(nivel, ciclo_actual)
+    return _construir_curso(idioma, nivel_siguiente, ciclo_siguiente)
 
 
 def procesar_ediciones_idioma(datos):
@@ -270,7 +302,9 @@ def aplicar_transformaciones_base(datos):
 
     datos_transformados = procesar_ediciones_idioma(datos_transformados)
 
-    datos_transformados['nivel'] = datos_transformados.apply(ajustar_nivel, axis=1)
+    niveles_y_ciclos = [ajustar_nivel_y_ciclo(row) for _, row in datos_transformados.iterrows()]
+    datos_transformados['nivel'] = [nivel for nivel, _ in niveles_y_ciclos]
+    datos_transformados['ciclo'] = [ciclo for _, ciclo in niveles_y_ciclos]
     datos_transformados['modalidad'] = datos_transformados.apply(ajustar_modalidad, axis=1)
 
     mask_intensivo = datos_transformados['modalidad'] == MODALIDAD_SUPERINTENSIVO
